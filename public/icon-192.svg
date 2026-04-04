@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="32" fill="#0f172a"/>
+  <rect x="6" y="6" width="180" height="180" rx="28" fill="url(#g)" stroke="#334155" stroke-width="2"/>
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+  </defs>
+  <!-- Lightning bolt / Zap icon -->
+  <polygon points="104,28 60,108 88,108 80,164 136,76 106,76 104,28" fill="#ffffff" stroke="#0f172a" stroke-width="2" stroke-linejoin="round"/>
+</svg>

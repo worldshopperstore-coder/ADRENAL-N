@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-electron
+.vscode
+*.log
+.DS_Store
+
+.env
+
+# Build outputs - large binary files
+release/
+
+# Portable git
+mingit/
+mingit.zip
