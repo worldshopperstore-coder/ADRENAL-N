@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { LogOut, Package, Droplets, Share2, LayoutDashboard, Briefcase, User, Menu, X, Shield, BarChart3, Users, Wallet, TrendingUp, FileText, ChevronLeft, Settings } from 'lucide-react';
+import { LogOut, Package, Droplets, Share2, LayoutDashboard, Briefcase, User, Menu, X, Shield, BarChart3, Users, Wallet, TrendingUp, FileText, ChevronLeft, Settings, Bug } from 'lucide-react';
 import { loadAdvancesFromSupabase } from '@/utils/kasaSettingsDB';
 import { loadExchangeRates, loadExchangeRatesFromSupabase, saveExchangeRates } from '@/utils/dailyData';
 import { getKasaTheme } from '@/utils/kasaTheme';
@@ -39,6 +39,7 @@ const ADMIN_TABS = [
   { id: 'admin-reports',    label: 'Raporlar',           icon: FileText   },
   { id: 'admin-crossaccounting', label: 'Çapraz Mutabakat', icon: Share2    },
   { id: 'admin-integration',     label: 'POS Entegrasyon',  icon: Settings  },
+  { id: 'admin-debuglog',        label: 'Debug Log',        icon: Bug       },
 ];
 
 export default function AppLayout({ activeTab, onTabChange, children, session, onLogout }: LayoutProps) {

@@ -118,6 +118,7 @@ def process_sale(payload: dict) -> dict:
         created_by = payload.get('createdBy', 'ADRENALIN')
         contract_id = payload['contractId']
         terminal_account_id = payload['terminalAccountId']
+        comment = payload.get('comment') or None  # Açıklama alanı
 
         # 1) TerminalRecords INSERT
         cur.execute("""
@@ -127,12 +128,12 @@ def process_sale(payload: dict) -> dict:
                  MarketId, RegionId, TerminalAccountId, TourGuideId, IsInvoice,
                  ContractId, IsCashRegister, IsCurrentAccount, State)
             VALUES
-                (NULL, NULL, NULL, %s, %s,
+                (%s, NULL, NULL, %s, %s,
                  %s, %s, NULL, 0, NULL,
                  1, 1, %s, NULL, 0,
-                 %s, 0, 0, 0);
+                 %s, 1, 0, 0);
             SELECT SCOPE_IDENTITY();
-        """, (now_str, now_str, created_by, created_by, terminal_account_id, contract_id))
+        """, (comment, now_str, now_str, created_by, created_by, terminal_account_id, contract_id))
         
         terminal_record_id = int(cur.fetchone()[0])
         
@@ -144,13 +145,9 @@ def process_sale(payload: dict) -> dict:
         # TicketGroupId her kişi (ADU/CHL) için ayrı, combo'da aynı kişinin biletleri aynı groupId'yi paylaşır
         ticket_group_counter = 0
         
-        # Bilet son kullanma tarihi: bugün saat 20:00 (park kapanış)
-        expiry = now.replace(hour=20, minute=0, second=0, microsecond=0)
-        # Eğer şu an 20:00'den sonra satış yapıyorsa, yarın 20:00
-        if now.hour >= 20:
-            expiry = expiry + datetime.timedelta(days=1)
-        expiry_str = expiry.strftime('%Y-%m-%dT%H:%M:%S.000')
+        # Bilet tarihi: bugün gece yarısı (Atlantis formatı: 00:00:00.000)
         start_str = now.replace(hour=0, minute=0, second=0, microsecond=0).strftime('%Y-%m-%dT%H:%M:%S.000')
+        expiry_str = start_str  # ExpiryDate = StartDate = bugün 00:00
         
         for ticket_group in payload['tickets']:
             qty = ticket_group['quantity']
@@ -237,6 +234,51 @@ def process_sale(payload: dict) -> dict:
                 created_by, created_by,
             ))
         
+        # 5) TerminalQuantities INSERT — G.ADU/G.CHL sayıları için
+        # Contract'ın tüm CTT'lerini DB'den çek (ContractHeaders → CTTCH → CTT)
+        cur.execute("""
+            SELECT DISTINCT cttch.ContractTicketType_Id
+            FROM ContractTicketTypeContractHeaders cttch
+            JOIN ContractHeaders ch ON ch.Id = cttch.ContractHeader_Id
+            JOIN Contracts c ON c.ContractHeaderId = ch.Id
+            WHERE c.Id = %s AND ch.IsDeleted = 0
+            ORDER BY cttch.ContractTicketType_Id
+        """, (contract_id,))
+        all_ctt_ids = [row[0] for row in cur.fetchall()]
+        
+        # Payload'dan hangi CTT'den kaç kişi olduğunu hesapla
+        ctt_quantity_map = {}
+        for ticket_group in payload['tickets']:
+            qty = ticket_group['quantity']
+            specs = ticket_group['specs']
+            if specs:
+                ctt_id = specs[0]['contractTicketTypeId']
+                ctt_quantity_map[ctt_id] = ctt_quantity_map.get(ctt_id, 0) + qty
+        
+        # DB'den gelen tüm CTT'ler için satır yaz (quantity=0 olsa bile)
+        for ctt_id in all_ctt_ids:
+            qty = ctt_quantity_map.get(ctt_id, 0)
+            cur.execute("""
+                INSERT INTO TerminalQuantities
+                    (TicketTypeId, TerminalRecordId, Quantity,
+                     CreateDate, UpdateDate, CreatedBy, UpdatedBy, ExtraJson, IsDeleted)
+                VALUES
+                    (%s, %s, %s,
+                     %s, %s, %s, %s, NULL, 0);
+            """, (ctt_id, terminal_record_id, qty, now_str, now_str, created_by, created_by))
+        
+        # Eğer DB'de CTT bulunamazsa, en azından payload'daki CTT'leri yaz
+        if not all_ctt_ids:
+            for ctt_id, qty in ctt_quantity_map.items():
+                cur.execute("""
+                    INSERT INTO TerminalQuantities
+                        (TicketTypeId, TerminalRecordId, Quantity,
+                         CreateDate, UpdateDate, CreatedBy, UpdatedBy, ExtraJson, IsDeleted)
+                    VALUES
+                        (%s, %s, %s,
+                         %s, %s, %s, %s, NULL, 0);
+                """, (ctt_id, terminal_record_id, qty, now_str, now_str, created_by, created_by))
+        
         db.commit()
         
         return {
@@ -275,7 +317,9 @@ def process_refund(payload: dict) -> dict:
             UPDATE TerminalRecords SET IsDeleted=1, UpdateDate=%s, UpdatedBy=%s WHERE Id=%s;
             UPDATE Tickets SET IsDeleted=1, UpdateDate=%s, UpdatedBy=%s WHERE TerminalRecordId=%s;
             UPDATE TerminalTransactions SET IsDeleted=1, UpdateDate=%s, UpdatedBy=%s WHERE TerminalRecordId=%s;
+            UPDATE TerminalQuantities SET IsDeleted=1, UpdateDate=%s, UpdatedBy=%s WHERE TerminalRecordId=%s;
         """, (now_str, updated_by, record_id,
+              now_str, updated_by, record_id,
               now_str, updated_by, record_id,
               now_str, updated_by, record_id))
         

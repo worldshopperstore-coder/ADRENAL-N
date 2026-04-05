@@ -440,6 +440,10 @@ const FACE2FACE_CONTRACTS: ContractMapping[] = [
   single('f2f_45', 375, 'FACE ACENTE -5- EUR', 524, 2, 713, F, 'FACE2FACE ENTRANCE', 984, 7, 1658, 985, 7, 1659),
   single('f2f_46', 376, 'FACE ACENTE -6- EUR', 525, 2, 714, F, 'FACE2FACE ENTRANCE', 986, 6, 1660, 987, 6, 1661),
 
+  // ── FACE Acenta -8- (sadece Face2Face'te var) ──
+  single('f2f_47', 377, 'FACE ACENTE -8- USD', 554, 1, 736, F, 'FACE2FACE ENTRANCE', 988, 5, 1704, 989, 5, 1705),
+  single('f2f_48', 378, 'FACE ACENTE -8- EUR', 555, 2, 737, F, 'FACE2FACE ENTRANCE', 990, 5, 1706, 991, 5, 1707),
+
   // ── FACE FREE ──
   {
     packageId: 'f2f_free', contractHeaderId: 66, contractHeaderName: 'FACE FREE', contractId: 66, currencyId: 3,

@@ -234,6 +234,7 @@ export interface SalePayload {
   contractName: string;          // Kontrat adı
   terminalAccountId: number;     // Kasa -> TerminalAccountId
   createdBy: string;             // Personel adı
+  comment?: string;              // Açıklama -> TerminalRecords.Comment
   
   // Bilet bilgileri
   tickets: {

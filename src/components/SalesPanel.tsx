@@ -59,6 +59,7 @@ interface AddSaleForm {
   splitCashEur: string;
   isCrossSale: boolean;
   selectedCurrency: 'USD' | 'EUR' | '';
+  comment: string;
 }
 
 export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpdate }: { usdRate: number; eurRate: number; onSalesUpdate?: (sales: Sale[]) => void }) {
@@ -143,6 +144,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     splitCashEur: '',
     isCrossSale: false,
     selectedCurrency: '',
+    comment: '',
   });
 
   // ── Dövizli kategori yardımcıları ──────────────────────
@@ -323,6 +325,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       splitCashEur: '',
       isCrossSale: false,
       selectedCurrency: '',
+      comment: '',
     });
     setSplitMode(false);
     setSelectedCategory('');
@@ -344,7 +347,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
 
     // Contract mapping kontrolü
     if (!hasContractMapping(formData.packageId)) {
-      setErrorMessage(`Bu paketin DB kontrat eşlemesi bulunamadı. Pasif modda kayıt yapabilirsiniz.`);
+      setErrorMessage(`Bu paket için sistem eşlemesi bulunamadı. Pasif modda kayıt yapabilirsiniz.`);
       return;
     }
 
@@ -402,6 +405,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       splitPayments,
       usdRate,
       eurRate,
+      comment: formData.comment.trim() || undefined,
     };
 
     try {
@@ -420,9 +424,9 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         // failedAt'a göre açıklayıcı hata mesajı
         let errorMsg = result.error || 'Bilinmeyen hata';
         if (result.failedAt === 'pos') {
-          errorMsg = `⚠️ POS HATASI: ${result.posMessage || 'POS cihazı yanıt vermedi'}. DB kaydı geri alındı, bilet basılmadı. Satış tamamlanmadı.`;
+          errorMsg = `⚠️ POS HATASI: ${result.posMessage || 'POS cihazı yanıt vermedi'}. İşlem geri alındı, bilet basılmadı.`;
         } else if (result.failedAt === 'bridge') {
-          errorMsg = `❌ VERİTABANI HATASI: ${result.error || 'Bridge bağlantı hatası'}`;
+          errorMsg = `❌ İŞLEM HATASI: ${result.error || 'Bağlantı hatası'}`;
         } else if (result.failedAt === 'mapping') {
           errorMsg = `❌ EŞLEME HATASI: ${result.error || 'Kontrat eşlemesi bulunamadı'}`;
         }
@@ -491,7 +495,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       setSales((prev) => [...prev, newSale]);
 
       // Form sıfırla
-      setFormData({ packageId: '', adultQty: '0', childQty: '0', paymentType: 'Nakit', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: false, selectedCurrency: '' });
+      setFormData({ packageId: '', adultQty: '0', childQty: '0', paymentType: 'Nakit', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: false, selectedCurrency: '', comment: '' });
       setSplitMode(false);
       setSelectedCategory('');
       setShowAddForm(false);
@@ -638,10 +642,10 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     const currentDate = new Date().toLocaleDateString('tr-TR');
     const currentTime = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 
-    // Atlantis DB bilgi satırları
+    // Sistem bilgi satırları
     const atlantisRows = originalSale.terminalRecordId ? `
-    <tr><td>Atlantis Kayıt No</td><td style="font-weight:700">#${originalSale.terminalRecordId}</td></tr>
-    <tr><td>Atlantis DB İade</td><td style="color:${atlantisOk ? '#2e7d32' : atlantisError ? '#c00' : '#888'};font-weight:700">${atlantisOk ? '✅ Başarılı (Soft Delete)' : atlantisError ? '❌ Hata: ' + atlantisError : '— Yapılmadı'}</td></tr>` : '';
+    <tr><td>Kayıt No</td><td style="font-weight:700">#${originalSale.terminalRecordId}</td></tr>
+    <tr><td>Sistem İade</td><td style="color:${atlantisOk ? '#2e7d32' : atlantisError ? '#c00' : '#888'};font-weight:700">${atlantisOk ? '✅ Başarılı' : atlantisError ? '❌ Hata: ' + atlantisError : '— Yapılmadı'}</td></tr>` : '';
 
     const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
 <title>İade Tutanağı - ${currentDate}</title>
@@ -1362,7 +1366,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               {integrationActive && (
                 <span className={`ml-2 inline-flex items-center gap-1 ${integrationReady ? 'text-emerald-400' : 'text-yellow-400'}`}>
                   <Wifi className="w-3 h-3" />
-                  {integrationReady ? 'DB Aktif' : 'DB Bağlantısız'}
+                  {integrationReady ? 'Sistem Aktif' : 'Bağlantı Yok'}
                 </span>
               )}
             </p>
@@ -1652,6 +1656,21 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                       </div>
                     </div>
 
+                    {/* ── Açıklama (Comment) — opsiyonel, aktif modda DB'ye kaydedilir ── */}
+                    {integrationActive && (
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Açıklama <span className="text-gray-600 normal-case">(opsiyonel)</span></label>
+                        <input
+                          type="text"
+                          placeholder="Tur şirketi, rehber adı vb."
+                          value={formData.comment}
+                          onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-gray-600"
+                          maxLength={200}
+                        />
+                      </div>
+                    )}
+
                     {/* ── Fiyat Hesaplayıcı (realtime) ── */}
                     {formData.packageId && (() => {
                       const pkg = kasaPackages.find(p => p.id === formData.packageId);
@@ -1834,6 +1853,8 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                       const cfg = CATEGORY_CONFIG[selectedCategory];
                       const hasMappingForPkg = formData.packageId ? hasContractMapping(formData.packageId) : false;
                       const showActiveMode = integrationActive;
+                      const selectedPkg = kasaPackages.find(p => p.id === formData.packageId);
+                      const isFreePackage = selectedPkg && selectedPkg.adultPrice === 0 && selectedPkg.childPrice === 0;
                       
                       return (
                         <div className="space-y-2 pt-1">
@@ -1844,7 +1865,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                                 : 'bg-yellow-500/10 border-yellow-500/25 text-yellow-400'
                             }`}>
                               <Database className="w-3.5 h-3.5" />
-                              <span className="font-semibold">{integrationReady ? 'Atlantis DB Aktif' : 'Bridge Bağlantısız'}</span>
+                              <span className="font-semibold">{integrationReady ? 'Bağlantı Aktif' : 'Bağlantı Yok'}</span>
                               {formData.packageId && !hasMappingForPkg && (
                                 <span className="text-yellow-400 ml-auto">⚠ DB eşlemesi yok</span>
                               )}
@@ -1858,7 +1879,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                                 disabled={posProcessing || !formData.packageId || (formData.adultQty === '0' && formData.childQty === '0')}
                                 className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:from-gray-700 disabled:to-gray-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
                               >
-                                <Zap className="w-4 h-4" /> Ödeme Al
+                                <Zap className="w-4 h-4" /> {isFreePackage ? 'Bilet Bas' : 'Ödeme Al'}
                               </button>
                             ) : (
                               <button
@@ -2183,10 +2204,10 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               </div>
             )}
 
-            {/* Atlantis DB bilgilendirmesi */}
+            {/* Sistem kaydı bilgilendirmesi */}
             {integrationActive && refundTargetSale?.terminalRecordId && (
               <div className="bg-blue-900/20 text-blue-300 text-xs px-3 py-2 rounded-lg mb-3 border border-blue-700/30 flex items-center gap-2">
-                <span>🗄️</span> Atlantis DB kaydı da silinecek (Kayıt No: #{refundTargetSale.terminalRecordId})
+                <span>🗄️</span> Sistem kaydı da silinecek (Kayıt No: #{refundTargetSale.terminalRecordId})
               </div>
             )}
 
@@ -2238,16 +2259,16 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               </div>
               
               <h3 className="text-lg font-bold text-white mb-1">
-                {posProcessingStep === 'db' && 'Veritabanına Kayıt Yapılıyor...'}
-                {posProcessingStep === 'pos' && 'POS Cihazından Onay Bekleniyor...'}
-                {posProcessingStep === 'print' && 'Biletler Yazdırılıyor...'}
-                {posProcessingStep === 'done' && 'İşlem Tamamlandı!'}
+                {posProcessingStep === 'db' && 'İşlem Kaydediliyor...'}
+                {posProcessingStep === 'pos' && 'Ödeme Alınıyor...'}
+                {posProcessingStep === 'print' && 'Bilet Basılıyor...'}
+                {posProcessingStep === 'done' && 'İşlem Tamamlandı ✓'}
               </h3>
               
               <p className="text-sm text-gray-400">
-                {posProcessingStep === 'db' && 'Atlantis DB INSERT işlemi sürüyor'}
+                {posProcessingStep === 'db' && 'Lütfen bekleyiniz...'}
                 {posProcessingStep === 'pos' && 'Lütfen müşterinin kartını okutunuz'}
-                {posProcessingStep === 'print' && 'Zebra yazıcıya gönderiliyor'}
+                {posProcessingStep === 'print' && 'Yazıcıya gönderiliyor...'}
                 {posProcessingStep === 'done' && 'Satış başarıyla kaydedildi'}
               </p>
             </div>
@@ -2255,7 +2276,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
             {/* İlerleme Adımları */}
             <div className="space-y-2">
               {(['db', 'pos', 'print', 'done'] as const).map((step, i) => {
-                const labels = ['DB Kayıt', 'POS Onay', 'Bilet Basım', 'Tamamlandı'];
+                const labels = ['Kayıt', 'Ödeme', 'Bilet Basım', 'Tamamlandı'];
                 const icons = [Database, CreditCard, Printer, CheckCircle];
                 const Icon = icons[i];
                 const stepOrder = ['db', 'pos', 'print', 'done'];

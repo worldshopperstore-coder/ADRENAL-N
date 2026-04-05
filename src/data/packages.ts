@@ -178,4 +178,12 @@ export const INITIAL_PACKAGES: PackageItem[] = [
   { id: 'f2f_44', kasaId: 'face2face', name: 'Acenta €8',  category: 'Acenta', adultPrice:  8, childPrice:  8, currency: 'EUR' },
   { id: 'f2f_45', kasaId: 'face2face', name: 'Acenta €7',  category: 'Acenta', adultPrice:  7, childPrice:  7, currency: 'EUR' },
   { id: 'f2f_46', kasaId: 'face2face', name: 'Acenta €6',  category: 'Acenta', adultPrice:  6, childPrice:  6, currency: 'EUR' },
+  // FACE Acenta -8- (sadece Face2Face'te var)
+  { id: 'f2f_47', kasaId: 'face2face', name: 'Acenta $5',  category: 'Acenta', adultPrice:  5, childPrice:  5, currency: 'USD' },
+  { id: 'f2f_48', kasaId: 'face2face', name: 'Acenta €5',  category: 'Acenta', adultPrice:  5, childPrice:  5, currency: 'EUR' },
+
+  // ─── FREE PAKETLER (Ücretsiz giriş) ──────────────────────────────────────────
+  { id: 's_free',   kasaId: 'sinema',    name: 'FREE',  category: 'Münferit', adultPrice: 0, childPrice: 0, currency: 'TL' },
+  { id: 'wp_free',  kasaId: 'wildpark',  name: 'FREE',  category: 'Münferit', adultPrice: 0, childPrice: 0, currency: 'TL' },
+  { id: 'f2f_free', kasaId: 'face2face', name: 'FREE',  category: 'Münferit', adultPrice: 0, childPrice: 0, currency: 'TL' },
 ];

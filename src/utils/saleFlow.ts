@@ -49,6 +49,9 @@ export interface ActiveSaleRequest {
   // Kur bilgisi (split ödemede TL'ye çevirmek için)
   usdRate?: number;
   eurRate?: number;
+  
+  // Açıklama (TerminalRecords.Comment alanı)
+  comment?: string;
 }
 
 export interface ActiveSaleResult {
@@ -201,6 +204,7 @@ function buildSalePayload(
     contractName: mapping.contractHeaderName,
     terminalAccountId,
     createdBy: request.personnelName,
+    comment: request.comment || undefined,
     tickets,
     payments,
     totalAmount,

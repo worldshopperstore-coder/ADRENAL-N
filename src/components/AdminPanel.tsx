@@ -7,6 +7,7 @@ import ReportsTab from './admin/ReportsTab';
 import PaxReportsTab from './admin/PaxReportsTab';
 import CrossSalesAccountingTab from './admin/CrossSalesAccountingTab';
 import IntegrationSettingsPanel from './IntegrationSettings';
+import DebugLogTab from './admin/DebugLogTab';
 
 interface AdminPanelProps {
   activeTab: string;
@@ -24,6 +25,7 @@ export default function AdminPanel({ activeTab }: AdminPanelProps) {
       {activeTab === 'admin-pax'            && <PaxReportsTab />}
       {activeTab === 'admin-crossaccounting' && <CrossSalesAccountingTab />}
       {activeTab === 'admin-integration'     && <IntegrationSettingsPanel />}
+      {activeTab === 'admin-debuglog'         && <DebugLogTab />}
     </div>
   );
 }

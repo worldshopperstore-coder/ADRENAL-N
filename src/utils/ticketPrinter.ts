@@ -42,9 +42,9 @@ const KASA_LABELS: Record<string, string> = {
 };
 
 const TICKET_TYPE_LABELS: Record<string, string> = {
-  ADU: 'YETISKIN',
-  CHL: 'COCUK',
-  COMP: 'UCRETSIZ',
+  ADU: 'ADU',
+  CHL: 'CHL',
+  COMP: 'COMP',
 };
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -88,98 +88,46 @@ function simpleTr(text: string): string {
  * └──────────────────────────────────────────┘
  */
 function generateTicketZPL(ticket: TicketPrintData): string {
-  const kasaLabel = KASA_LABELS[ticket.kasaId] || ticket.kasaId.toUpperCase();
   const typeLabel = TICKET_TYPE_LABELS[ticket.ticketType] || ticket.ticketType;
-  const currSymbol = CURRENCY_SYMBOLS[ticket.currency] || ticket.currency;
   
-  // Grup bilgisi: "2/2"
+  // Grup bilgisi: "ADU 1/2"
   const groupInfo = ticket.groupIndex && ticket.groupTotal 
-    ? `${ticket.groupIndex}/${ticket.groupTotal}` 
-    : '';
+    ? `${typeLabel} ${ticket.groupIndex}/${ticket.groupTotal}` 
+    : typeLabel;
 
   const qrData = ticket.ticketId.toString();
 
   // Türkçe -> ASCII
-  const kategoriZpl = simpleTr(kasaLabel);
+  const kategoriZpl = simpleTr(ticket.kasaLabel);
   const paketZpl = simpleTr(ticket.packageName);
-  const typeZpl = simpleTr(typeLabel);  // ADU / YETISKIN / COCUK
 
-  // Ürün geçerlilik metni oluştur
-  // Eski formatta: "CINEMA ENTRANCE  09:00 TO 23:00"
-  const productsValidity = ticket.products.map(p => 
-    `${simpleTr(p)} ENTRANCE  09:00 TO 23:00`
-  ).join('\\&');  // ZPL satır sonu \\& ile
+  // Ürün entrance bilgileri (ayrı satırlar)
+  const entranceLines = ticket.products.map(p => `${simpleTr(p)} ENTRANCE`);
+  const timeText = '09:00 TO 20:00';
 
-  // ── Boyutlar (69mm×101mm, 8 dot/mm) ──
-  const ETIKET_GENISLIGI_MM = 69;
-  const ETIKET_UZUNLUGU_MM = 101;
-  const DOTS_PER_MM = 8;
-  const zplPW = ETIKET_GENISLIGI_MM * DOTS_PER_MM;   // 552
-  const zplLL = ETIKET_UZUNLUGU_MM * DOTS_PER_MM;    // 808
-
-  // ── QR Kod (ortada) ──
-  const qrSize = 6;
-  const qrApproxDots = qrSize * 25;  // ~150 dot
-  const qrX = Math.max(10, Math.floor(zplPW / 2 - qrApproxDots / 2));
-  const qrY = Math.max(10, Math.floor(zplLL / 2 - qrApproxDots / 2));
-
-  // ── Tarih — sadece gün, saat YOK (QR üstünde, 270°) ──
-  // İnce font: width < height (kalın değil)
-  const dateFontH = 28;
-  const dateFontW = 20;
-  const dateX = qrX - dateFontH - 40;              // QR'ın 40dot üstü
-  const dateOnlyText = ticket.date;                  // "04.04.2026" (saatsiz)
-  const dateTextWidthDots = dateOnlyText.length * dateFontW;
-  const dateRightMargin = 150;
-  const dateY = Math.max(10, zplLL - dateRightMargin - dateTextWidthDots);
-
-  // ── Tip etiketi: "ADU" — tarihle aynı seviye, SOL taraf (270°: küçük Y=sol) ──
-  const typeFontH = 32;
-  const typeFontW = 24;
-  const typeX = dateX;                               // Tarihle aynı dikey seviye
-  const typeY = 50;                                  // Sol kenarda
-
-  // ── Grup bilgisi: "2/2" — tip altında, sol taraf (270°) ──
-  const grpFontH = 24;
-  const grpFontW = 18;
-  const grpX = typeX + typeFontH + 5;               // Tip'in altında
-  const grpY = 50;                                   // Sol kenarda
-
-  // ── Kategori — tarih seviyesinde, SAĞ taraf (270°: büyük Y=sağ) ──
-  // Tarihle aynı X seviyesi (logodan yukarıda)
-  const catFontH = 26;
-  const catFontW = 20;
-  const catX = dateX + 2;                            // Tarihle neredeyse aynı seviye
-  const catStartY = 50;                              // Sol kenardan başla (^FO = sol hizalı)
-
-  // ── Paket (kategori altında, aynı sol hiza, 270°) ──
-  const pkgFontH = 24;
-  const pkgFontW = 18;
-  const pkgX = catX + catFontH + 6;                  // Kategori altında
-  const pkgStartY = catStartY;                       // Aynı sol hizada!
-
-  // ── Geçerlilik Metni (QR altında, 270°, Field Block) ──
-  const validityFontH = 20;
-  const validityFontW = 16;
-  const validityX = qrX + qrApproxDots + 30;        // QR altında (dikeyde)
-  const fbWidth = zplLL - 100;
-  const validityY = Math.max(10, Math.floor((zplLL - fbWidth) / 2));
-
-  // ── ZPL Komutu ──
-  const zpl = `^XA
-^CI28
-^PW${zplPW}
-^LL${zplLL}
+  // ── ZPL Komutu (onaylanan final layout) ──
+  // PW=552 (69mm), LL=808 (101mm), ^A0B (270° döndürülmüş)
+  let zpl = `^XA
+^PW552
+^LL808
 ^LH0,0
-^FO${typeX},${typeY}^A0B,${typeFontH},${typeFontW}^FD${typeZpl}^FS
-^FO${grpX},${grpY}^A0B,${grpFontH},${grpFontW}^FD${groupInfo}^FS
-^FO${dateX},${dateY}^A0B,${dateFontH},${dateFontW}^FD${dateOnlyText}^FS
-^FO${catX},${catStartY}^A0B,${catFontH},${catFontW}^FD${kategoriZpl}^FS
-^FO${pkgX},${pkgStartY}^A0B,${pkgFontH},${pkgFontW}^FD${paketZpl}^FS
-^FO${qrX},${qrY}^BQN,2,${qrSize}^FDQA,${qrData}^FS
-^FO${validityX},${validityY}^A0B,${validityFontH},${validityFontW}^FB${fbWidth},4,5,C,0^FD${productsValidity}^FS
-^XZ`;
+^CI28
+^FO35,50^A0B,36,34^FD${groupInfo}^FS
+^FT120,748^A0B,28,28^FD${kategoriZpl}^FS
+^FT158,748^A0B,28,28^FD${paketZpl}^FS
+^FO105,338^A0B,38,32^FD${ticket.date}^FS
+^FO201,329^BQN,2,6^FDQA,${qrData}^FS`;
 
+  // Entrance satırları (her biri ayrı, sola hizalı ^FT ile)
+  const entranceStartX = 370;
+  const entranceSpacing = 26;
+  entranceLines.forEach((line, i) => {
+    const x = entranceStartX + (i * entranceSpacing);
+    zpl += `\n^FT${x},620^A@B,24,20,E:TT0003M_.FNT^FD${line}^FS`;
+    zpl += `\n^FT${x},310^A@B,24,20,E:TT0003M_.FNT^FD${timeText}^FS`;
+  });
+
+  zpl += '\n^XZ';
   return zpl;
 }
 
