@@ -60,8 +60,35 @@ export default function AttendanceGate({ personnelId, personnelName, kasaId, onC
         await createAttendanceSession(personnelId, personnelName, kasaId, token);
         setStatus('waiting');
       } catch (err) {
-        // Supabase hatası / internet kesilmesi durumunda kullanıcıyı takılı bırakma → direkt geçir
-        console.error('Yoklama kontrolü başarısız, direkt geçiriliyor:', err);
+        // Supabase hatası — 3 kez daha dene
+        console.error('Yoklama kontrolü başarısız, yeniden deneniyor:', err);
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          await new Promise(r => setTimeout(r, 2000 * attempt));
+          try {
+            const retryRecord = await checkAttendanceStatus(personnelId);
+            if (retryRecord && (retryRecord.status === 'checked_in' || retryRecord.status === 'checkout_pending')) {
+              setStatus('confirmed');
+              setTimeout(onConfirmed, 1500);
+              return;
+            }
+            if (retryRecord && retryRecord.status === 'pending' && retryRecord.session_token) {
+              setSessionToken(retryRecord.session_token);
+              setStatus('waiting');
+              return;
+            }
+            // Kayıt yoksa yeni oluştur
+            const token = generateSessionToken(personnelId);
+            setSessionToken(token);
+            await createAttendanceSession(personnelId, personnelName, kasaId, token);
+            setStatus('waiting');
+            return;
+          } catch {
+            console.error(`Yoklama retry ${attempt}/3 başarısız`);
+          }
+        }
+        // 3 deneme de başarısız → kullanıcıyı takılı bırakma, geçir
+        // Puantaj kaydı oluşturulamadı ama iş akışı durmasın
+        console.error('Yoklama 3 denemede de başarısız, kullanıcı geçiriliyor');
         onConfirmed();
       }
     }

@@ -8,7 +8,7 @@ interface AdrenalinLogoProps {
 }
 
 const sizeConfig = {
-  sm: { box: 'w-8 h-8', img: 20, radius: 'rounded-lg', text: 'text-lg' },
+  sm: { box: 'w-8 h-8', img: 22, radius: 'rounded-lg', text: 'text-lg' },
   md: { box: 'w-9 h-9', img: 24, radius: 'rounded-lg', text: 'text-xl' },
   lg: { box: 'w-10 h-10', img: 28, radius: 'rounded-xl', text: 'text-2xl' },
   xl: { box: 'w-12 h-12', img: 36, radius: 'rounded-2xl', text: 'text-4xl' },

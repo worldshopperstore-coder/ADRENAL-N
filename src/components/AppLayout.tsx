@@ -151,8 +151,8 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
         {/* Header — draggable titlebar zone */}
         <div className="border-b border-gray-800/60 flex-shrink-0 p-2.5 pt-3 overflow-hidden electron-drag">
           {/* Logo row */}
-          <div className="flex items-center justify-between min-w-0">
-            <div className="flex items-center gap-2.5 min-w-0 flex-shrink-0 electron-no-drag">
+          <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} min-w-0`}>
+            <div className={`flex items-center gap-2.5 min-w-0 flex-shrink-0 electron-no-drag ${sidebarCollapsed ? 'justify-center w-full' : ''}`}>
               <AdrenalinLogo size="sm" />
               {!sidebarCollapsed && (
                 <AdrenalinLogo variant="wordmark" size="sm" />
