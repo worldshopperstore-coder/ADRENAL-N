@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Trash2, ShoppingCart, FileSpreadsheet, FileText, X, CreditCard, Banknote, DollarSign, Euro, TrendingUp, Users, User, Tag, Globe, ArrowLeftRight, Shuffle, Building2, Package, ChevronRight, Check, Coins, Zap, Loader2, Printer, CheckCircle, AlertTriangle, Database, Wifi } from 'lucide-react';
+import { Plus, ShoppingCart, FileSpreadsheet, FileText, X, CreditCard, Banknote, DollarSign, Euro, TrendingUp, Users, User, Tag, Globe, ArrowLeftRight, Shuffle, Building2, Package, ChevronRight, Check, Coins, Zap, Loader2, Printer, CheckCircle, AlertTriangle, Database, Wifi } from 'lucide-react';
 import { INITIAL_PACKAGES, type PackageItem } from '@/data/packages';
 import { getPackagesByKasa } from '@/utils/packagesDB';
 import { getUserSession, getKasaId, getPersonnelId, getPersonnelName } from '@/utils/session';
@@ -524,16 +524,44 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     }
   };
 
-  const handleDeleteSale = (id: string) => {
-    const deletedSale = sales.find((s) => s.id === id);
-    const updatedSales = sales.filter((s) => s.id !== id);
-    setSales(updatedSales);
-
-    // Çapraz satışsa cross_sales tablosundan da sil
-    if (deletedSale?.isCrossSale) {
-      loadCrossSalesFromFirebase().then(crossSales => {
-        saveCrossSalesToFirebase(crossSales.filter(s => s.id !== id));
-      }).catch(err => console.error('Cross-sale silme hatası:', err));
+  // Bilet tekrar basma
+  const handleReprintTicket = async (sale: Sale) => {
+    if (!sale.terminalRecordId || !sale.ticketIds || sale.ticketIds.length === 0) {
+      alert('⚠️ Bu satışta bilet bilgisi bulunamadı.');
+      return;
+    }
+    try {
+      const pkg = kasaPackages.find(p => p.name === sale.packageName);
+      const kasaLabel = currentKasaId === 'wildpark' ? 'WILDPARK ENTRANCE' : currentKasaId === 'sinema' ? 'CINEMA ENTRANCE' : 'FACE2FACE ENTRANCE';
+      const isFree = sale.total === 0 && sale.category === 'Ücretsiz';
+      
+      const printData = buildTicketPrintData(
+        {
+          terminalRecordId: sale.terminalRecordId,
+          ticketIds: sale.ticketIds,
+        },
+        {
+          packageName: sale.packageName,
+          kasaId: currentKasaId as any,
+          personnelName: sale.personnelName || getPersonnelName(),
+          adultQty: sale.adultQty,
+          childQty: sale.childQty,
+          products: [kasaLabel],
+          adultPrice: pkg?.adultPrice || 0,
+          childPrice: pkg?.childPrice || 0,
+          currency: sale.currency === 'KK' ? 'TL' : sale.currency,
+          isFree,
+        },
+      );
+      
+      const pResult = await printTickets(printData);
+      if (pResult.success) {
+        alert(`✅ ${pResult.printed} bilet tekrar basıldı!`);
+      } else {
+        alert(`⚠️ Yazdırma: ${pResult.printed} basıldı, ${pResult.failed} başarısız\n${pResult.errors.join('\n')}`);
+      }
+    } catch (err: any) {
+      alert(`❌ Yazdırma hatası: ${err.message}`);
     }
   };
 
@@ -742,7 +770,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     const grandTotal = totals.kkTl + cashTlTotal;
     
     // Satır verilerini oluştur
-    const dataRows = sales.filter(sale => !sale.isRefund).map(sale => {
+    const dataRows = sales.filter(sale => !sale.isRefund && sale.category !== 'Ücretsiz').map(sale => {
       const isRefunded = sales.some(s => s.isRefund && s.refundOfSaleId === sale.id);
       const namePrefix = isRefunded ? '[İade] ' : '';
       return `<Row ss:Height="20">
@@ -1220,7 +1248,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     const totalChild = sales.reduce((sum, s) => sum + s.childQty, 0);
     const refundCount = sales.filter(s => s.isRefund).length;
 
-    const salesRows = sales.filter(s => !s.isRefund).map((s, i) => {
+    const salesRows = sales.filter(s => !s.isRefund && s.category !== 'Ücretsiz').map((s, i) => {
       const refundEntry = sales.find(r => r.isRefund && r.refundOfSaleId === s.id);
       const isRefunded = !!refundEntry;
       const strikeStyle = isRefunded ? 'text-decoration:line-through;color:#999;' : '';
@@ -1929,7 +1957,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         <>
           {/* Mobile Card View */}
           <div className="sm:hidden space-y-2">
-            {sales.filter(s => !s.isRefund).map((sale) => {
+            {sales.filter(s => !s.isRefund && s.category !== 'Ücretsiz').map((sale) => {
               const refundEntry = sales.find(s => s.isRefund && s.refundOfSaleId === sale.id);
               const isRefunded = !!refundEntry;
               return (
@@ -1968,9 +1996,12 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                         <button onClick={() => { setRefundTargetSale(sale); setRefundInfo({ reason: '', refundPaymentType: sale.paymentType === 'Çoklu' ? 'Nakit' : sale.paymentType, kkRefundTxId: '' }); setShowRefundModal(true); }}
                           className="text-orange-400 text-xs font-bold bg-orange-500/15 px-2.5 py-1.5 rounded-lg border border-orange-500/30">↩</button>
                       )}
-                      <button onClick={() => handleDeleteSale(sale.id)} className="text-gray-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {sale.ticketIds && sale.ticketIds.length > 0 && (
+                        <button onClick={() => handleReprintTicket(sale)} title="Bilet Tekrar Bas"
+                          className="text-indigo-400 hover:text-indigo-300 p-1.5 rounded-lg hover:bg-indigo-500/15 transition-colors">
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1998,7 +2029,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                   </tr>
                 </thead>
               <tbody className="divide-y divide-gray-800/50">
-                {sales.filter(s => !s.isRefund).map((sale, idx) => {
+                {sales.filter(s => !s.isRefund && s.category !== 'Ücretsiz').map((sale, idx) => {
                   const refundEntry = sales.find(s => s.isRefund && s.refundOfSaleId === sale.id);
                   const isRefunded = !!refundEntry;
                   return (
@@ -2055,13 +2086,15 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                             ↩
                           </button>
                         )}
-                        <button
-                          onClick={() => handleDeleteSale(sale.id)}
-                          title="Sil"
-                          className="text-gray-500 hover:text-red-400 p-1 rounded-lg transition-colors hover:bg-red-500/10"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {sale.ticketIds && sale.ticketIds.length > 0 && (
+                          <button
+                            onClick={() => handleReprintTicket(sale)}
+                            title="Bilet Tekrar Bas"
+                            className="text-indigo-400 hover:text-indigo-300 p-1 rounded-lg transition-colors hover:bg-indigo-500/15"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
