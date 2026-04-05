@@ -21,9 +21,11 @@ const createWindow = () => {
     titleBarStyle: 'hidden',
     titleBarOverlay: {
       color: '#09090b',
-      symbolColor: '#9ca3af',
-      height: 32,
+      symbolColor: '#4b5563',
+      height: 36,
     },
+    backgroundColor: '#09090b',
+    roundedCorners: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,

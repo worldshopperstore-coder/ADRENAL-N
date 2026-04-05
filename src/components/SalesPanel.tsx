@@ -115,7 +115,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
   const [integrationActive, setIntegrationActive] = useState(false);
   const [integrationReady, setIntegrationReady] = useState(false);
   const [posProcessing, setPosProcessing] = useState(false);
-  const [posProcessingStep, setPosProcessingStep] = useState<'db' | 'pos' | 'print' | 'done'>('pos');
+  const [posProcessingStep, setPosProcessingStep] = useState<'pos' | 'print' | 'done'>('pos');
   const [posResult, setPosResult] = useState<ActiveSaleResult | null>(null);
   const [showPosResultModal, setShowPosResultModal] = useState(false);
   const [showPosProcessingModal, setShowPosProcessingModal] = useState(false);
@@ -442,15 +442,11 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         return;
       }
 
-      // Adım 2: DB kayıt (zaten saleFlow içinde tamamlandı)
-      setPosProcessingStep('db');
-      await new Promise(r => setTimeout(r, 300));
-
-      // Adım 3: Bilet basma
+      // Adım 2: Bilet basma
       setPosProcessingStep('print');
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 400));
 
-      // Adım 4: Tamamlandı
+      // Adım 3: Tamamlandı
       setPosProcessingStep('done');
 
       // ── Supabase'e kayıt (pasif modla aynı) ──────────
@@ -2269,7 +2265,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                 <div className="absolute inset-2 rounded-full border-4 border-transparent border-b-violet-500 border-l-cyan-500 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
                 {/* Orta ikon */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  {posProcessingStep === 'db' && <Database className="w-7 h-7 text-indigo-400 animate-pulse" />}
                   {posProcessingStep === 'pos' && <CreditCard className="w-7 h-7 text-blue-400 animate-pulse" />}
                   {posProcessingStep === 'print' && <Printer className="w-7 h-7 text-violet-400 animate-pulse" />}
                   {posProcessingStep === 'done' && <CheckCircle className="w-7 h-7 text-emerald-400" />}
@@ -2278,14 +2273,12 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               
               <h3 className="text-lg font-bold text-white mb-1">
                 {posProcessingStep === 'pos' && 'Ödeme Alınıyor...'}
-                {posProcessingStep === 'db' && 'Kayıt Ediliyor...'}
                 {posProcessingStep === 'print' && 'Bilet Basılıyor...'}
                 {posProcessingStep === 'done' && 'İşlem Tamamlandı ✓'}
               </h3>
               
               <p className="text-sm text-gray-400">
                 {posProcessingStep === 'pos' && 'Lütfen müşterinin kartını okutunuz'}
-                {posProcessingStep === 'db' && 'Lütfen bekleyiniz...'}
                 {posProcessingStep === 'print' && 'Yazıcıya gönderiliyor...'}
                 {posProcessingStep === 'done' && 'Satış başarıyla tamamlandı'}
               </p>
@@ -2293,11 +2286,11 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
 
             {/* İlerleme Adımları */}
             <div className="space-y-2">
-              {(['db', 'pos', 'print', 'done'] as const).map((step, i) => {
-                const labels = ['Kayıt', 'Ödeme', 'Bilet Basım', 'Tamamlandı'];
-                const icons = [Database, CreditCard, Printer, CheckCircle];
+              {(['pos', 'print', 'done'] as const).map((step, i) => {
+                const labels = ['Ödeme', 'Bilet Basım', 'Tamamlandı'];
+                const icons = [CreditCard, Printer, CheckCircle];
                 const Icon = icons[i];
-                const stepOrder = ['db', 'pos', 'print', 'done'];
+                const stepOrder = ['pos', 'print', 'done'];
                 const currentIdx = stepOrder.indexOf(posProcessingStep);
                 const stepIdx = i;
                 const isCompleted = stepIdx < currentIdx;

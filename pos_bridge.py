@@ -442,11 +442,13 @@ def send_pos_payment(payload: dict) -> dict:
         
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        sock.settimeout(5)  # Bağlantı için 5s yeterli
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        sock.settimeout(3)  # Bağlantı için 3s
         sock.connect((host, port))
         sock.settimeout(timeout)  # Yanıt bekleme için asıl timeout
         print("[POS-TCP] Bağlantı kuruldu, veri gönderiliyor...", flush=True)
         sock.sendall(encoded_data)
+        # Hemen flush — veri anında gönderilsin
         print("[POS-TCP] Veri gönderildi, yanıt bekleniyor...", flush=True)
         
         # Yanıt al — düz recv, delimiter yok

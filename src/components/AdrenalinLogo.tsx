@@ -8,10 +8,10 @@ interface AdrenalinLogoProps {
 }
 
 const sizeConfig = {
-  sm: { box: 'w-8 h-8', img: 32, radius: 'rounded-lg', text: 'text-lg' },
-  md: { box: 'w-9 h-9', img: 36, radius: 'rounded-xl', text: 'text-xl' },
-  lg: { box: 'w-10 h-10', img: 40, radius: 'rounded-xl', text: 'text-2xl' },
-  xl: { box: 'w-12 h-12', img: 48, radius: 'rounded-2xl', text: 'text-4xl' },
+  sm: { box: 'w-10 h-10', img: 28, radius: 'rounded-xl', text: 'text-lg' },
+  md: { box: 'w-11 h-11', img: 32, radius: 'rounded-xl', text: 'text-xl' },
+  lg: { box: 'w-12 h-12', img: 36, radius: 'rounded-xl', text: 'text-2xl' },
+  xl: { box: 'w-14 h-14', img: 44, radius: 'rounded-2xl', text: 'text-4xl' },
 };
 
 export const AdrenalinLogo: React.FC<AdrenalinLogoProps> = ({ size = 'md', variant = 'icon', className = '' }) => {
@@ -27,8 +27,8 @@ export const AdrenalinLogo: React.FC<AdrenalinLogoProps> = ({ size = 'md', varia
   }
 
   return (
-    <div className={`${cfg.box} ${cfg.radius} flex items-center justify-center flex-shrink-0 ${className}`}>
-      <img src={flameIcon} alt="Adrenalin" width={cfg.img} height={cfg.img} className="object-contain" />
+    <div className={`${cfg.box} ${cfg.radius} flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20 shadow-lg shadow-orange-500/10 ${className}`}>
+      <img src={flameIcon} alt="Adrenalin" width={cfg.img} height={cfg.img} className="object-contain drop-shadow-sm" />
     </div>
   );
 };

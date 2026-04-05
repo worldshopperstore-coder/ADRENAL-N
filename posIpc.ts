@@ -27,6 +27,7 @@ function sendToPosServer(
   return new Promise((resolve, reject) => {
     const socket = new net.Socket();
     let resolved = false;
+    let chunks: Buffer[] = [];
 
     const timer = setTimeout(() => {
       if (!resolved) {
@@ -37,34 +38,66 @@ function sendToPosServer(
       }
     }, timeoutMs);
 
+    // TCP_NODELAY — Nagle algoritmasını devre dışı bırak, anında gönder
+    socket.setNoDelay(true);
+    // Keep-alive — bağlantı canlı kalsın
+    socket.setKeepAlive(true, 1000);
+
+    // Bağlantı timeout'u — 3 saniye içinde bağlanamazsa hata
+    const connectTimer = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        socket.destroy();
+        reject(new Error('POS Server bağlantı zaman aşımı (3s)'));
+      }
+    }, 3000);
+
     socket.connect(port, host, () => {
+      clearTimeout(connectTimer);
       // Düz JSON gönder — delimiter YOK
       const json = JSON.stringify(transactionData);
       console.log('[POS TCP] Gönderiliyor →', host + ':' + port);
-      console.log('[POS TCP] Payload:', json);
       socket.write(Buffer.from(json, 'utf-8'));
     });
 
     socket.on('data', (chunk: Buffer) => {
-      // İlk gelen veri = tam yanıt (düz JSON, delimiter yok)
       if (resolved) return;
+      chunks.push(chunk);
       
-      const responseStr = chunk.toString('utf-8');
-      console.log('[POS TCP] Yanıt geldi:', responseStr.substring(0, 500));
+      // JSON tamamlanmış mı kontrol et — süslü parantez dengesi
+      const combined = Buffer.concat(chunks).toString('utf-8').trim();
+      if (!combined.startsWith('{')) return;
       
-      clearTimeout(timer);
-      resolved = true;
-      socket.destroy();
-      
-      try {
-        const response = JSON.parse(responseStr);
-        resolve(response);
-      } catch (e) {
-        reject(new Error(`POS yanıt parse hatası: ${responseStr}`));
+      let depth = 0;
+      let inString = false;
+      let escape = false;
+      for (let i = 0; i < combined.length; i++) {
+        const c = combined[i];
+        if (escape) { escape = false; continue; }
+        if (c === '\\') { escape = true; continue; }
+        if (c === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (c === '{') depth++;
+        else if (c === '}') depth--;
+        if (depth === 0 && i > 0) {
+          // Tam JSON alındı
+          console.log('[POS TCP] Yanıt geldi:', combined.substring(0, 500));
+          clearTimeout(timer);
+          resolved = true;
+          socket.destroy();
+          try {
+            const response = JSON.parse(combined);
+            resolve(response);
+          } catch (e) {
+            reject(new Error(`POS yanıt parse hatası: ${combined}`));
+          }
+          return;
+        }
       }
     });
 
     socket.on('error', (err: Error) => {
+      clearTimeout(connectTimer);
       if (!resolved) {
         clearTimeout(timer);
         resolved = true;
@@ -73,9 +106,19 @@ function sendToPosServer(
     });
 
     socket.on('close', () => {
+      clearTimeout(connectTimer);
       if (!resolved) {
         clearTimeout(timer);
         resolved = true;
+        // Bağlantı kapandıysa ama veri geldiyse, parse etmeyi dene
+        if (chunks.length > 0) {
+          const combined = Buffer.concat(chunks).toString('utf-8').trim();
+          try {
+            const response = JSON.parse(combined);
+            resolve(response);
+            return;
+          } catch { /* düşer */ }
+        }
         reject(new Error('POS bağlantısı beklenmedik şekilde kapandı'));
       }
     });
