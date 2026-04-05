@@ -2,7 +2,7 @@ export interface PackageItem {
   id: string;
   kasaId: 'wildpark' | 'sinema' | 'face2face';
   name: string;
-  category: 'Münferit' | 'Visitor' | 'Çapraz Münferit' | 'Çapraz Visitor' | 'Acenta';
+  category: 'Münferit' | 'Visitor' | 'Çapraz Münferit' | 'Çapraz Visitor' | 'Acenta' | 'Ücretsiz';
   adultPrice: number;
   childPrice: number;
   currency: 'TL' | 'USD' | 'EUR';
@@ -182,8 +182,17 @@ export const INITIAL_PACKAGES: PackageItem[] = [
   { id: 'f2f_47', kasaId: 'face2face', name: 'Acenta $5',  category: 'Acenta', adultPrice:  5, childPrice:  5, currency: 'USD' },
   { id: 'f2f_48', kasaId: 'face2face', name: 'Acenta €5',  category: 'Acenta', adultPrice:  5, childPrice:  5, currency: 'EUR' },
 
-  // ─── FREE PAKETLER (Ücretsiz giriş) ──────────────────────────────────────────
-  { id: 's_free',   kasaId: 'sinema',    name: 'FREE',  category: 'Münferit', adultPrice: 0, childPrice: 0, currency: 'TL' },
-  { id: 'wp_free',  kasaId: 'wildpark',  name: 'FREE',  category: 'Münferit', adultPrice: 0, childPrice: 0, currency: 'TL' },
-  { id: 'f2f_free', kasaId: 'face2face', name: 'FREE',  category: 'Münferit', adultPrice: 0, childPrice: 0, currency: 'TL' },
+  // ─── FREE PAKETLER (Ücretsiz giriş) ── Her kasada 3 FREE seçenek ───────────
+  // XD SİNEMA — Ücretsiz
+  { id: 's_free_cine', kasaId: 'sinema', name: 'CINE FREE',  category: 'Ücretsiz', adultPrice: 0, childPrice: 0, currency: 'TL' },
+  { id: 's_free_wild', kasaId: 'sinema', name: 'WILD FREE',  category: 'Ücretsiz', adultPrice: 0, childPrice: 0, currency: 'TL' },
+  { id: 's_free_face', kasaId: 'sinema', name: 'FACE FREE',  category: 'Ücretsiz', adultPrice: 0, childPrice: 0, currency: 'TL' },
+  // WİLDPARK — Ücretsiz
+  { id: 'wp_free_cine', kasaId: 'wildpark', name: 'CINE FREE',  category: 'Ücretsiz', adultPrice: 0, childPrice: 0, currency: 'TL' },
+  { id: 'wp_free_wild', kasaId: 'wildpark', name: 'WILD FREE',  category: 'Ücretsiz', adultPrice: 0, childPrice: 0, currency: 'TL' },
+  { id: 'wp_free_face', kasaId: 'wildpark', name: 'FACE FREE',  category: 'Ücretsiz', adultPrice: 0, childPrice: 0, currency: 'TL' },
+  // FACE2FACE — Ücretsiz
+  { id: 'f2f_free_cine', kasaId: 'face2face', name: 'CINE FREE',  category: 'Ücretsiz', adultPrice: 0, childPrice: 0, currency: 'TL' },
+  { id: 'f2f_free_wild', kasaId: 'face2face', name: 'WILD FREE',  category: 'Ücretsiz', adultPrice: 0, childPrice: 0, currency: 'TL' },
+  { id: 'f2f_free_face', kasaId: 'face2face', name: 'FACE FREE',  category: 'Ücretsiz', adultPrice: 0, childPrice: 0, currency: 'TL' },
 ];

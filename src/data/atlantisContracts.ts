@@ -216,14 +216,32 @@ const SINEMA_CONTRACTS: ContractMapping[] = [
   single('s_45', 362, 'CINEMA ACENTE -5- EUR', 511, 2, 700, C, 'CINEMA ENTRANCE', 958, 7, 1632, 959, 7, 1633),
   single('s_46', 363, 'CINEMA ACENTE -6- EUR', 512, 2, 701, C, 'CINEMA ENTRANCE', 960, 6, 1634, 961, 6, 1635),
 
-  // ── CINE FREE ──
+  // ── FREE paketler (Sinema kasasından) ──
   {
-    packageId: 's_free', contractHeaderId: 41, contractHeaderName: 'CINE FREE', contractId: 41, currencyId: 3,
+    packageId: 's_free_cine', contractHeaderId: 41, contractHeaderName: 'CINE FREE', contractId: 41, currencyId: 3,
     isCombo: false, isFree: true,
     products: [{
       contractProductId: 72, productId: C, productName: 'CINEMA ENTRANCE',
       prices: { COMP: { contractTicketTypeId: 85, priceId: 145, price: 0 } },
       ...gateFor(C),
+    }],
+  },
+  {
+    packageId: 's_free_wild', contractHeaderId: 17, contractHeaderName: 'WILD FREE', contractId: 17, currencyId: 3,
+    isCombo: false, isFree: true,
+    products: [{
+      contractProductId: 20, productId: W, productName: 'WILDPARK ENTRANCE',
+      prices: { COMP: { contractTicketTypeId: 38, priceId: 43, price: 0 } },
+      ...gateFor(W),
+    }],
+  },
+  {
+    packageId: 's_free_face', contractHeaderId: 66, contractHeaderName: 'FACE FREE', contractId: 66, currencyId: 3,
+    isCombo: false, isFree: true,
+    products: [{
+      contractProductId: 111, productId: F, productName: 'FACE2FACE ENTRANCE',
+      prices: { COMP: { contractTicketTypeId: 134, priceId: 222, price: 0 } },
+      ...gateFor(F),
     }],
   },
 ];
@@ -328,14 +346,32 @@ const WILDPARK_CONTRACTS: ContractMapping[] = [
   single('wp_45', 349, 'WILD ACENTE -5- EUR', 498, 2, 687, W, 'WILDPARK ENTRANCE', 932, 7, 1606, 933, 7, 1607),
   single('wp_46', 350, 'WILD ACENTE -6- EUR', 499, 2, 688, W, 'WILDPARK ENTRANCE', 934, 6, 1608, 935, 6, 1609),
 
-  // ── WILD FREE ──
+  // ── FREE paketler (Wildpark kasasından) ──
   {
-    packageId: 'wp_free', contractHeaderId: 17, contractHeaderName: 'WILD FREE', contractId: 17, currencyId: 3,
+    packageId: 'wp_free_cine', contractHeaderId: 41, contractHeaderName: 'CINE FREE', contractId: 41, currencyId: 3,
+    isCombo: false, isFree: true,
+    products: [{
+      contractProductId: 72, productId: C, productName: 'CINEMA ENTRANCE',
+      prices: { COMP: { contractTicketTypeId: 85, priceId: 145, price: 0 } },
+      ...gateFor(C),
+    }],
+  },
+  {
+    packageId: 'wp_free_wild', contractHeaderId: 17, contractHeaderName: 'WILD FREE', contractId: 17, currencyId: 3,
     isCombo: false, isFree: true,
     products: [{
       contractProductId: 20, productId: W, productName: 'WILDPARK ENTRANCE',
       prices: { COMP: { contractTicketTypeId: 38, priceId: 43, price: 0 } },
       ...gateFor(W),
+    }],
+  },
+  {
+    packageId: 'wp_free_face', contractHeaderId: 66, contractHeaderName: 'FACE FREE', contractId: 66, currencyId: 3,
+    isCombo: false, isFree: true,
+    products: [{
+      contractProductId: 111, productId: F, productName: 'FACE2FACE ENTRANCE',
+      prices: { COMP: { contractTicketTypeId: 134, priceId: 222, price: 0 } },
+      ...gateFor(F),
     }],
   },
 ];
@@ -444,9 +480,27 @@ const FACE2FACE_CONTRACTS: ContractMapping[] = [
   single('f2f_47', 377, 'FACE ACENTE -8- USD', 554, 1, 736, F, 'FACE2FACE ENTRANCE', 988, 5, 1704, 989, 5, 1705),
   single('f2f_48', 378, 'FACE ACENTE -8- EUR', 555, 2, 737, F, 'FACE2FACE ENTRANCE', 990, 5, 1706, 991, 5, 1707),
 
-  // ── FACE FREE ──
+  // ── FREE paketler (Face2Face kasasından) ──
   {
-    packageId: 'f2f_free', contractHeaderId: 66, contractHeaderName: 'FACE FREE', contractId: 66, currencyId: 3,
+    packageId: 'f2f_free_cine', contractHeaderId: 41, contractHeaderName: 'CINE FREE', contractId: 41, currencyId: 3,
+    isCombo: false, isFree: true,
+    products: [{
+      contractProductId: 72, productId: C, productName: 'CINEMA ENTRANCE',
+      prices: { COMP: { contractTicketTypeId: 85, priceId: 145, price: 0 } },
+      ...gateFor(C),
+    }],
+  },
+  {
+    packageId: 'f2f_free_wild', contractHeaderId: 17, contractHeaderName: 'WILD FREE', contractId: 17, currencyId: 3,
+    isCombo: false, isFree: true,
+    products: [{
+      contractProductId: 20, productId: W, productName: 'WILDPARK ENTRANCE',
+      prices: { COMP: { contractTicketTypeId: 38, priceId: 43, price: 0 } },
+      ...gateFor(W),
+    }],
+  },
+  {
+    packageId: 'f2f_free_face', contractHeaderId: 66, contractHeaderName: 'FACE FREE', contractId: 66, currencyId: 3,
     isCombo: false, isFree: true,
     products: [{
       contractProductId: 111, productId: F, productName: 'FACE2FACE ENTRANCE',

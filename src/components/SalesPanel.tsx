@@ -91,13 +91,14 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
   const [refundTargetSale, setRefundTargetSale] = useState<Sale | null>(null);
   const [refundInfo, setRefundInfo] = useState<RefundInfo>({ reason: '', refundPaymentType: 'Nakit', kkRefundTxId: '' });
   const [refundProcessing, setRefundProcessing] = useState(false);
-  const CATEGORY_GROUPS = ['Münferit', 'Visitor', 'Çapraz Münferit', 'Çapraz Visitor', 'Acenta'] as const;
+  const CATEGORY_GROUPS = ['Münferit', 'Visitor', 'Çapraz Münferit', 'Çapraz Visitor', 'Acenta', 'Ücretsiz'] as const;
   const CATEGORY_CONFIG: Record<string, { icon: typeof Tag; color: string; bg: string; border: string; ring: string; badge: string; desc: string }> = {
     'Münferit': { icon: Tag, color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', ring: 'ring-emerald-500/20', badge: 'from-emerald-500 to-emerald-600', desc: 'Bireysel TL satışlar' },
     'Visitor': { icon: Globe, color: 'text-sky-400', bg: 'bg-sky-500/15', border: 'border-sky-500/30', ring: 'ring-sky-500/20', badge: 'from-sky-500 to-sky-600', desc: 'Yabancı turist USD/EUR' },
     'Çapraz Münferit': { icon: ArrowLeftRight, color: 'text-orange-400', bg: 'bg-orange-500/15', border: 'border-orange-500/30', ring: 'ring-orange-500/20', badge: 'from-orange-500 to-orange-600', desc: 'Kasalar arası TL' },
     'Çapraz Visitor': { icon: Shuffle, color: 'text-rose-400', bg: 'bg-rose-500/15', border: 'border-rose-500/30', ring: 'ring-rose-500/20', badge: 'from-rose-500 to-rose-600', desc: 'Kasalar arası USD/EUR' },
     'Acenta': { icon: Building2, color: 'text-violet-400', bg: 'bg-violet-500/15', border: 'border-violet-500/30', ring: 'ring-violet-500/20', badge: 'from-violet-500 to-violet-600', desc: 'Acenta anlaşmalı' },
+    'Ücretsiz': { icon: Tag, color: 'text-lime-400', bg: 'bg-lime-500/15', border: 'border-lime-500/30', ring: 'ring-lime-500/20', badge: 'from-lime-500 to-lime-600', desc: 'Ücretsiz giriş biletleri' },
   };
   const [selectedCategory, setSelectedCategory] = useState<(typeof CATEGORY_GROUPS)[number] | ''>('');
 
