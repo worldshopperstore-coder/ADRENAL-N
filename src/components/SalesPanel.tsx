@@ -105,7 +105,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
   const [integrationActive, setIntegrationActive] = useState(false);
   const [integrationReady, setIntegrationReady] = useState(false);
   const [posProcessing, setPosProcessing] = useState(false);
-  const [posProcessingStep, setPosProcessingStep] = useState<'db' | 'pos' | 'print' | 'done'>('db');
+  const [posProcessingStep, setPosProcessingStep] = useState<'db' | 'pos' | 'print' | 'done'>('pos');
   const [posResult, setPosResult] = useState<ActiveSaleResult | null>(null);
   const [showPosResultModal, setShowPosResultModal] = useState(false);
   const [showPosProcessingModal, setShowPosProcessingModal] = useState(false);
@@ -353,7 +353,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
 
     setErrorMessage('');
     setPosProcessing(true);
-    setPosProcessingStep('db');
+    setPosProcessingStep('pos');
     setShowPosProcessingModal(true);
 
     // Split payment bilgisi + ödeme tipi belirleme
@@ -409,8 +409,8 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     };
 
     try {
-      // Adım 1: DB INSERT
-      setPosProcessingStep('db');
+      // Adım 1: POS ödeme
+      setPosProcessingStep('pos');
       
       // Küçük gecikme — UI'ın güncellenmesi için
       await new Promise(r => setTimeout(r, 200));
@@ -424,19 +424,19 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         // failedAt'a göre açıklayıcı hata mesajı
         let errorMsg = result.error || 'Bilinmeyen hata';
         if (result.failedAt === 'pos') {
-          errorMsg = `⚠️ POS HATASI: ${result.posMessage || 'POS cihazı yanıt vermedi'}. İşlem geri alındı, bilet basılmadı.`;
+          errorMsg = `⚠️ İşlem onaylanmadı.`;
         } else if (result.failedAt === 'bridge') {
-          errorMsg = `❌ İŞLEM HATASI: ${result.error || 'Bağlantı hatası'}`;
+          errorMsg = `❌ İşlem kaydedilemedi. Tekrar deneyin.`;
         } else if (result.failedAt === 'mapping') {
-          errorMsg = `❌ EŞLEME HATASI: ${result.error || 'Kontrat eşlemesi bulunamadı'}`;
+          errorMsg = `❌ Paket eşlemesi bulunamadı.`;
         }
         
         setErrorMessage(errorMsg);
         return;
       }
 
-      // Adım 2: POS onayı bekle (eğer KK varsa zaten saleFlow içinde oluyor)
-      setPosProcessingStep('pos');
+      // Adım 2: DB kayıt (zaten saleFlow içinde tamamlandı)
+      setPosProcessingStep('db');
       await new Promise(r => setTimeout(r, 300));
 
       // Adım 3: Bilet basma
@@ -2259,17 +2259,17 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               </div>
               
               <h3 className="text-lg font-bold text-white mb-1">
-                {posProcessingStep === 'db' && 'İşlem Kaydediliyor...'}
                 {posProcessingStep === 'pos' && 'Ödeme Alınıyor...'}
+                {posProcessingStep === 'db' && 'Kayıt Ediliyor...'}
                 {posProcessingStep === 'print' && 'Bilet Basılıyor...'}
                 {posProcessingStep === 'done' && 'İşlem Tamamlandı ✓'}
               </h3>
               
               <p className="text-sm text-gray-400">
-                {posProcessingStep === 'db' && 'Lütfen bekleyiniz...'}
                 {posProcessingStep === 'pos' && 'Lütfen müşterinin kartını okutunuz'}
+                {posProcessingStep === 'db' && 'Lütfen bekleyiniz...'}
                 {posProcessingStep === 'print' && 'Yazıcıya gönderiliyor...'}
-                {posProcessingStep === 'done' && 'Satış başarıyla kaydedildi'}
+                {posProcessingStep === 'done' && 'Satış başarıyla tamamlandı'}
               </p>
             </div>
 

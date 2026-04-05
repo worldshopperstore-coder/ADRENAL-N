@@ -262,13 +262,12 @@ async function tryPrintTickets(
  * Aktif mod satış akışı:
  * 1. Contract mapping bul
  * 2. SalePayload oluştur
- * 3. pos_bridge.py'ye gönder (DB INSERT)
- * 4. POS Server'a ödeme gönder (KK varsa)
+ * 3. POS Server'a ödeme gönder (KK veya nakit) → ÖNCE ÖDEME
+ * 4. Ödeme onaylanırsa → pos_bridge.py'ye gönder (DB INSERT)
  * 5. Bilet yazdır
  * 6. Sonuç döndür
  * 
- * Çoklu ödeme: EUR/USD nakit + KK TL karışık olabilir.
- * KK her zaman TL cinsinden POS cihazına gider (döviz kura çevrilir).
+ * Ödeme onaylanmazsa DB'ye hiçbir şey yazılmaz, bilet basılmaz.
  */
 export async function processActiveSale(request: ActiveSaleRequest): Promise<ActiveSaleResult> {
   // 1) Contract mapping
@@ -284,28 +283,14 @@ export async function processActiveSale(request: ActiveSaleRequest): Promise<Act
   // 2) SalePayload oluştur
   const payload = buildSalePayload(request, mapping);
 
-  // 3) Bridge'e gönder (DB INSERT)
-  const bridgeResult: BridgeResponse = await submitSale(payload);
-  
-  if (!bridgeResult.success) {
-    return {
-      success: false,
-      error: `DB kayıt hatası: ${bridgeResult.error}`,
-      failedAt: 'bridge',
-    };
-  }
-
-  // 4) POS Server'a ödeme gönder (Nakit = fiş, KK = kart çekim)
-  // Toplam TL tutarı hesapla
+  // 3) ÖNCE POS ödeme — onay gelmezse hiçbir şey yapma
   let posAmountTl = 0;
   let posPaymentType: 'credit_card' | 'cash' = 'cash';
   
   if (request.splitPayments) {
-    // Çoklu ödeme — toplam TL tutarını hesapla (POS'a toplam gider)
     const sp = request.splitPayments;
     const cashTotalTl = (sp.cashTl || 0) + ((sp.cashUsd || 0) * (request.usdRate || 1)) + ((sp.cashEur || 0) * (request.eurRate || 1));
     const kkTotalTl = sp.kkTl || 0;
-    // KK varsa KK olarak gönder (POS kart çekim yapar), yoksa nakit fiş
     if (kkTotalTl > 0) {
       posAmountTl = kkTotalTl;
       posPaymentType = 'credit_card';
@@ -323,7 +308,6 @@ export async function processActiveSale(request: ActiveSaleRequest): Promise<Act
       posAmountTl = payload.totalAmount;
     }
   } else {
-    // Nakit ödeme — TL'ye çevir
     posPaymentType = 'cash';
     if (request.currency === 'USD' && request.usdRate) {
       posAmountTl = payload.totalAmount * request.usdRate;
@@ -339,12 +323,11 @@ export async function processActiveSale(request: ActiveSaleRequest): Promise<Act
   
   if (posAmountTl > 0) {
     const posResult = await sendPosPayment({
-      transactionId: `TR-${bridgeResult.terminalRecordId}`,
+      transactionId: `TR-${Date.now()}`,
       items: [{
         name: mapping.contractHeaderName,
         quantity: 1,
         price: posAmountTl,
-        qrData: bridgeResult.ticketIds?.[0]?.toString(),
       }],
       payments: [{
         type: posPaymentType,
@@ -356,28 +339,27 @@ export async function processActiveSale(request: ActiveSaleRequest): Promise<Act
     posMessage = posResult.statusMessage || posResult.error || '';
 
     if (!posResult.success) {
-      // POS başarısız — DB kaydını geri al (soft delete) ve bilet BASMA
-      console.warn('[SaleFlow] POS başarısız, DB kaydı geri alınıyor:', posMessage);
-      
-      try {
-        if (bridgeResult.terminalRecordId) {
-          await submitRefund(bridgeResult.terminalRecordId, request.personnelName + ' (POS Hata Geri Al)');
-          console.log('[SaleFlow] DB kaydı geri alındı:', bridgeResult.terminalRecordId);
-        }
-      } catch (rollbackErr) {
-        console.error('[SaleFlow] DB geri alma hatası:', rollbackErr);
-      }
-      
+      // POS ödeme onaylanmadı — DB'ye hiçbir şey yazma, bilet basma
       return {
         success: false,
-        terminalRecordId: bridgeResult.terminalRecordId,
-        ticketIds: bridgeResult.ticketIds,
-        ticketGroupMap: bridgeResult.ticketGroupMap,
         posSuccess: false,
-        posMessage: `POS hatası: ${posMessage}. DB kaydı geri alındı, bilet basılmadı.`,
+        posMessage: 'İşlem onaylanmadı.',
         failedAt: 'pos',
       };
     }
+  }
+
+  // 4) Ödeme onaylandı → DB INSERT
+  const bridgeResult: BridgeResponse = await submitSale(payload);
+  
+  if (!bridgeResult.success) {
+    return {
+      success: false,
+      error: `DB kayıt hatası: ${bridgeResult.error}`,
+      posSuccess,
+      posMessage,
+      failedAt: 'bridge',
+    };
   }
 
   // 5) Bilet Yazdırma
