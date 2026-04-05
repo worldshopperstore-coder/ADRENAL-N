@@ -31,33 +31,39 @@ export default function AttendanceGate({ personnelId, personnelName, kasaId, onC
     if (isAdmin) return;
     
     async function checkExisting() {
-      const record = await checkAttendanceStatus(personnelId);
+      try {
+        const record = await checkAttendanceStatus(personnelId);
 
-      // Çıkış yapmış → tekrar girişi engelle
-      if (record && record.status === 'checked_out') {
-        setStatus('checked_out');
-        return;
-      }
+        // Çıkış yapmış → tekrar girişi engelle
+        if (record && record.status === 'checked_out') {
+          setStatus('checked_out');
+          return;
+        }
 
-      // Aktif veya çıkış bekliyor → direkt geçir
-      if (record && (record.status === 'checked_in' || record.status === 'checkout_pending')) {
-        setStatus('confirmed');
-        setTimeout(onConfirmed, 1500);
-        return;
-      }
+        // Aktif veya çıkış bekliyor → direkt geçir
+        if (record && (record.status === 'checked_in' || record.status === 'checkout_pending')) {
+          setStatus('confirmed');
+          setTimeout(onConfirmed, 1500);
+          return;
+        }
 
-      // Pending kayıt varsa mevcut token'ı kullan (TeamTab'dan oluşturulmuş olabilir)
-      if (record && record.status === 'pending' && record.session_token) {
-        setSessionToken(record.session_token);
+        // Pending kayıt varsa mevcut token'ı kullan (TeamTab'dan oluşturulmuş olabilir)
+        if (record && record.status === 'pending' && record.session_token) {
+          setSessionToken(record.session_token);
+          setStatus('waiting');
+          return;
+        }
+
+        // Kayıt yok → yeni token oluştur
+        const token = generateSessionToken(personnelId);
+        setSessionToken(token);
+        await createAttendanceSession(personnelId, personnelName, kasaId, token);
         setStatus('waiting');
-        return;
+      } catch (err) {
+        // Supabase hatası / internet kesilmesi durumunda kullanıcıyı takılı bırakma → direkt geçir
+        console.error('Yoklama kontrolü başarısız, direkt geçiriliyor:', err);
+        onConfirmed();
       }
-
-      // Kayıt yok → yeni token oluştur
-      const token = generateSessionToken(personnelId);
-      setSessionToken(token);
-      await createAttendanceSession(personnelId, personnelName, kasaId, token);
-      setStatus('waiting');
     }
     checkExisting();
   }, [personnelId, personnelName, kasaId, isAdmin]);
@@ -67,10 +73,14 @@ export default function AttendanceGate({ personnelId, personnelName, kasaId, onC
     if (status !== 'waiting') return;
 
     pollRef.current = setInterval(async () => {
-      const record = await checkAttendanceStatus(personnelId);
-      if (record && record.status === 'checked_in') {
-        setStatus('confirmed');
-        setTimeout(onConfirmed, 2500);
+      try {
+        const record = await checkAttendanceStatus(personnelId);
+        if (record && record.status === 'checked_in') {
+          setStatus('confirmed');
+          setTimeout(onConfirmed, 2500);
+        }
+      } catch {
+        // Polling hatası → sessizce devam et, bir sonraki turda tekrar denenecek
       }
     }, 2000);
 
