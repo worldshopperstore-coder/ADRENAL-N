@@ -144,8 +144,11 @@ def process_sale(payload: dict) -> dict:
         # TicketGroupId her kişi (ADU/CHL) için ayrı, combo'da aynı kişinin biletleri aynı groupId'yi paylaşır
         ticket_group_counter = 0
         
-        # Bilet son kullanma tarihi: bugün gece yarısı + 1 gün
-        expiry = (now + datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        # Bilet son kullanma tarihi: bugün saat 20:00 (park kapanış)
+        expiry = now.replace(hour=20, minute=0, second=0, microsecond=0)
+        # Eğer şu an 20:00'den sonra satış yapıyorsa, yarın 20:00
+        if now.hour >= 20:
+            expiry = expiry + datetime.timedelta(days=1)
         expiry_str = expiry.strftime('%Y-%m-%dT%H:%M:%S.000')
         start_str = now.replace(hour=0, minute=0, second=0, microsecond=0).strftime('%Y-%m-%dT%H:%M:%S.000')
         
@@ -368,6 +371,79 @@ def print_raw_win32(data: bytes, printer_name: str) -> dict:
         raise Exception(f"Win32 print hatası: {e}")
 
 
+# ── POS Server TCP İletişimi ────────────────────────────────
+
+import socket
+
+POS_HOST = os.environ.get('POS_HOST', '127.0.0.1')
+POS_PORT = int(os.environ.get('POS_PORT', '9960'))
+POS_TIMEOUT = 65  # saniye
+
+def send_pos_payment(payload: dict) -> dict:
+    """
+    POS Server'a TCP üzerinden TransactionData gönderir ve yanıt bekler.
+    Düz JSON gönder, düz JSON al — delimiter YOK.
+    """
+    sock = None
+    try:
+        host = payload.pop('_host', POS_HOST)
+        port = payload.pop('_port', POS_PORT)
+        timeout = payload.pop('_timeout', POS_TIMEOUT)
+        
+        json_string = json.dumps(payload, ensure_ascii=False)
+        encoded_data = json_string.encode('utf-8')
+        
+        print(f"[POS-TCP] Gönderiliyor → {host}:{port}", flush=True)
+        print(f"[POS-TCP] Payload ({len(encoded_data)} byte):\n{json_string[:500]}", flush=True)
+        
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        sock.connect((host, port))
+        print("[POS-TCP] Bağlantı kuruldu, veri gönderiliyor...", flush=True)
+        sock.sendall(encoded_data)
+        print("[POS-TCP] Veri gönderildi, yanıt bekleniyor...", flush=True)
+        
+        # Yanıt al — düz recv, delimiter yok
+        response_bytes = sock.recv(8192)
+        
+        if response_bytes:
+            response_str = response_bytes.decode('utf-8', errors='ignore')
+            print(f"[POS-TCP] Yanıt alındı ({len(response_bytes)} byte): {response_str[:500]}", flush=True)
+            
+            try:
+                response = json.loads(response_str)
+                status = response.get('TransactionStatus', -1)
+                error_code = response.get('TransactionErrorCode')
+                
+                if status == 0 and (error_code is None or error_code == 0):
+                    return {'success': True, 'transactionStatus': 0, 'statusMessage': 'İşlem başarılı', 'response': response}
+                else:
+                    return {
+                        'success': False,
+                        'transactionStatus': status,
+                        'statusMessage': response.get('StatusMessage', f'POS hatası (status: {status}, errorCode: {error_code})'),
+                        'response': response,
+                    }
+            except json.JSONDecodeError:
+                return {'success': False, 'error': f'POS yanıt parse hatası: {response_str[:200]}'}
+        else:
+            return {'success': False, 'error': 'POS Server boş yanıt döndü'}
+        
+    except socket.timeout:
+        return {'success': False, 'error': 'POS Server yanıt zaman aşımı (65s)'}
+    except ConnectionRefusedError:
+        return {'success': False, 'error': 'POS Server bağlantısı reddedildi — POS çalışmıyor olabilir'}
+    except Exception as e:
+        return {'success': False, 'error': f'POS TCP hatası: {str(e)}'}
+    finally:
+        if sock:
+            try:
+                sock.close()
+                print("[POS-TCP] Soket kapatıldı.", flush=True)
+            except:
+                pass
+
+
 # ── Bugünkü Satış Sayısı ──────────────────────────────────
 
 def get_today_sales() -> dict:
@@ -458,6 +534,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
         
         elif path == '/print':
             result = print_zpl(payload)
+            self._send_json(200 if result['success'] else 500, result)
+        
+        elif path == '/pos-payment':
+            result = send_pos_payment(payload)
             self._send_json(200 if result['success'] else 500, result)
         
         else:

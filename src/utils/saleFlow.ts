@@ -297,14 +297,16 @@ export async function processActiveSale(request: ActiveSaleRequest): Promise<Act
   let posPaymentType: 'credit_card' | 'cash' = 'cash';
   
   if (request.splitPayments) {
-    // Çoklu ödeme — KK varsa KK tutarı, yoksa nakit toplam
+    // Çoklu ödeme — toplam TL tutarını hesapla (POS'a toplam gider)
     const sp = request.splitPayments;
-    if ((sp.kkTl || 0) > 0) {
-      posAmountTl = sp.kkTl || 0;
+    const cashTotalTl = (sp.cashTl || 0) + ((sp.cashUsd || 0) * (request.usdRate || 1)) + ((sp.cashEur || 0) * (request.eurRate || 1));
+    const kkTotalTl = sp.kkTl || 0;
+    // KK varsa KK olarak gönder (POS kart çekim yapar), yoksa nakit fiş
+    if (kkTotalTl > 0) {
+      posAmountTl = kkTotalTl;
       posPaymentType = 'credit_card';
     } else {
-      // Sadece nakit — TL toplamını hesapla
-      posAmountTl = (sp.cashTl || 0) + ((sp.cashUsd || 0) * (request.usdRate || 1)) + ((sp.cashEur || 0) * (request.eurRate || 1));
+      posAmountTl = cashTotalTl;
       posPaymentType = 'cash';
     }
   } else if (request.paymentType === 'Kredi Kartı') {

@@ -181,15 +181,18 @@ export interface PosCartProduct {
   Name: string;
   Quantity: number;
   Price: number;
+  PriceInt: number;              // Kuruş cinsinden fiyat (Price * 100)
   Tax: number;
-  SecondaryData: string;         // QR code data = ticket Id
+  TaxInt: number;                // Kuruş cinsinden vergi (Tax * 100)
+  SecondaryData: string | null;  // QR code data = ticket Id
   SecondaryDataFormat: PosSecondaryDataFormat;
-  PLUBarcode: string;
+  PLUBarcode: string | null;
 }
 
 export interface PosCartPayment {
   PaymentType: PosPaymentType;
   Amount: number;
+  AmountInt: number;             // Kuruş cinsinden tutar (Amount * 100)
 }
 
 export interface PosInvoiceInfo {
@@ -203,10 +206,11 @@ export interface PosTransactionData {
   Id: string;
   OutputType: PosOutputType;
   InvoiceInfo: PosInvoiceInfo | null;
+  TransactionStatus: PosTransactionStatus;    // İstek: 1 (SentToPos), Yanıt: 0 (Ok) / 3 (Error)
+  TransactionMessage: string | null;
+  TransactionErrorCode: number | null;
   CartProducts: PosCartProduct[];
   CartPayments: PosCartPayment[];
-  TransactionStatus?: PosTransactionStatus;
-  StatusMessage?: string;
 }
 
 // ── Satış İşlem Tipleri ───────────────────────────────────

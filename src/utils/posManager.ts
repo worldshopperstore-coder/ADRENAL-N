@@ -2,7 +2,8 @@
    POS Server İşlem Yöneticisi
    
    Renderer process'ten POS Server'a ödeme gönderir.
-   Electron IPC üzerinden main process TCP client'ı kullanır.
+   1. Electron varsa: IPC → main process TCP → POS Server
+   2. Electron yoksa: HTTP → pos_bridge.py → TCP → POS Server
    ────────────────────────────────────────────────────────── */
 
 import type {
@@ -15,6 +16,7 @@ import type {
   PosSecondaryDataFormat,
   IntegrationSettings,
 } from '@/types/atlantis';
+import { submitPosPayment } from '@/utils/posBridge';
 
 // Electron window type
 declare global {
@@ -87,25 +89,23 @@ export async function sendPosPayment(request: PosPaymentRequest): Promise<PosPay
   if (!settings.pos.enabled) {
     return { success: true, transactionStatus: 0, statusMessage: 'POS devre dışı — direkt onay' };
   }
-  
-  if (!window.electron?.pos) {
-    console.warn('[POS] Electron IPC mevcut değil — POS atlanıyor, DB kaydı yeterli');
-    return { success: true, transactionStatus: 0, statusMessage: 'Electron IPC yok — POS atlandı, DB kaydı başarılı' };
-  }
 
   const cartProducts: PosCartProduct[] = request.items.map(item => ({
     Name: item.name,
     Quantity: item.quantity,
     Price: item.price,
+    PriceInt: Math.round(item.price * 100),
     Tax: settings.pos.tax,
-    SecondaryData: item.qrData || '',
+    TaxInt: Math.round(settings.pos.tax * 100),
+    SecondaryData: item.qrData || null,
     SecondaryDataFormat: (item.qrData ? 2048 : 0) as PosSecondaryDataFormat,  // PsQR=2048
-    PLUBarcode: '',
+    PLUBarcode: null,
   }));
 
   const cartPayments: PosCartPayment[] = request.payments.map(p => ({
     PaymentType: p.type === 'credit_card' ? 0 : 1,  // CreditCard=0, Cash=1
     Amount: p.amount,
+    AmountInt: Math.round(p.amount * 100),
   }));
 
   // Toplam TL tutarını hesapla — receiptLimit üzerinde e-fatura gerekir
@@ -122,37 +122,76 @@ export async function sendPosPayment(request: PosPaymentRequest): Promise<PosPay
     Id: request.transactionId,
     OutputType: outputType,
     InvoiceInfo: null,
+    TransactionStatus: 1,           // SentToPos — istek gönderiliyor
+    TransactionMessage: null,
+    TransactionErrorCode: null,
     CartProducts: cartProducts,
     CartPayments: cartPayments,
   };
 
-  try {
-    const result = await window.electron.pos.send({
-      host: settings.pos.ip,
-      port: settings.pos.port,
-      data: transactionData,
-      timeout: 60_000,
-    });
+  // ── Yol 1: Electron IPC varsa doğrudan TCP ──
+  if (window.electron?.pos) {
+    console.log('[POS] Electron IPC ile gönderiliyor...');
+    try {
+      const result = await window.electron.pos.send({
+        host: settings.pos.ip,
+        port: settings.pos.port,
+        data: transactionData,
+        timeout: 60_000,
+      });
 
-    if (!result.success) {
-      return { success: false, error: result.error };
+      if (!result.success) {
+        return { success: false, error: result.error };
+      }
+
+      const response = result.response;
+      const status = response?.TransactionStatus;
+      const errorCode = response?.TransactionErrorCode;
+      
+      if (status === 0 && (errorCode === null || errorCode === undefined || errorCode === 0)) {
+        return { success: true, transactionStatus: 0, statusMessage: 'İşlem başarılı', rawResponse: response };
+      } else {
+        return {
+          success: false,
+          transactionStatus: status,
+          statusMessage: response?.TransactionMessage || response?.StatusMessage || `POS hatası (status: ${status}, errorCode: ${errorCode})`,
+          rawResponse: response,
+        };
+      }
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
-
-    const response = result.response;
-    const status = response?.TransactionStatus;
+  }
+  
+  // ── Yol 2: Electron yok → Bridge HTTP üzerinden POS TCP ──
+  console.log('[POS] Electron yok, Bridge üzerinden POS\'a gönderiliyor...');
+  try {
+    const bridgePosData = {
+      ...transactionData,
+      _host: settings.pos.ip,
+      _port: settings.pos.port,
+      _timeout: 65,
+    };
     
-    if (status === 0) {
-      return { success: true, transactionStatus: 0, statusMessage: 'İşlem başarılı', rawResponse: response };
+    const result = await submitPosPayment(bridgePosData);
+    
+    if (result.success) {
+      return {
+        success: true,
+        transactionStatus: result.transactionStatus || 0,
+        statusMessage: result.statusMessage || 'İşlem başarılı (Bridge)',
+        rawResponse: result.response,
+      };
     } else {
       return {
         success: false,
-        transactionStatus: status,
-        statusMessage: response?.StatusMessage || `POS hatası (status: ${status})`,
-        rawResponse: response,
+        transactionStatus: result.transactionStatus,
+        statusMessage: result.statusMessage || result.error,
+        error: result.error,
       };
     }
   } catch (err: any) {
-    return { success: false, error: err.message };
+    return { success: false, error: `Bridge POS hatası: ${err.message}` };
   }
 }
 

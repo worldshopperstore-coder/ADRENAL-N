@@ -101,3 +101,38 @@ export async function isBridgeAvailable(): Promise<boolean> {
     return false;
   }
 }
+
+/** POS Server'a bridge TCP üzerinden ödeme gönder */
+export async function submitPosPayment(transactionData: object): Promise<{
+  success: boolean;
+  transactionStatus?: number;
+  statusMessage?: string;
+  response?: any;
+  error?: string;
+}> {
+  try {
+    // POS timeout 65s, bridge timeout'u daha uzun tutuyoruz
+    const url = `${getBridgeUrl()}/pos-payment`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 70_000); // 70s — POS 65s + margin
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        body: JSON.stringify(transactionData),
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      const data = await response.json();
+      return data;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      return { success: false, error: 'POS Bridge bağlantı zaman aşımı (70s)' };
+    }
+    return { success: false, error: `POS Bridge hatası: ${err.message}` };
+  }
+}

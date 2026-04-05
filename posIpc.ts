@@ -13,8 +13,6 @@ import net from 'net';
 import { spawn, type ChildProcess } from 'child_process';
 import path from 'path';
 
-const POS_DELIMITER = Buffer.from([0x13]); // SimpleTCP delimiter
-
 let bridgeProcess: ChildProcess | null = null;
 let bridgeReady = false;
 
@@ -28,48 +26,41 @@ function sendToPosServer(
 ): Promise<object> {
   return new Promise((resolve, reject) => {
     const socket = new net.Socket();
-    let buffer = Buffer.alloc(0);
     let resolved = false;
 
     const timer = setTimeout(() => {
       if (!resolved) {
         resolved = true;
-        console.error('[POS TCP] TIMEOUT! Buffer boyut:', buffer.length, 'içerik:', buffer.toString('utf-8').substring(0, 500));
+        console.error('[POS TCP] TIMEOUT!');
         socket.destroy();
         reject(new Error('POS Server yanıt zaman aşımı'));
       }
     }, timeoutMs);
 
     socket.connect(port, host, () => {
-      // JSON + delimiter gönder
+      // Düz JSON gönder — delimiter YOK
       const json = JSON.stringify(transactionData);
       console.log('[POS TCP] Gönderiliyor →', host + ':' + port);
       console.log('[POS TCP] Payload:', json);
-      const payload = Buffer.concat([Buffer.from(json, 'utf-8'), POS_DELIMITER]);
-      socket.write(payload);
+      socket.write(Buffer.from(json, 'utf-8'));
     });
 
     socket.on('data', (chunk: Buffer) => {
-      buffer = Buffer.concat([buffer, chunk]);
-      console.log('[POS TCP] Data geldi, boyut:', chunk.length, 'toplam:', buffer.length);
-      console.log('[POS TCP] Raw:', chunk.toString('utf-8').substring(0, 500));
+      // İlk gelen veri = tam yanıt (düz JSON, delimiter yok)
+      if (resolved) return;
       
-      // Delimiter'ı ara
-      const delimIdx = buffer.indexOf(POS_DELIMITER);
-      if (delimIdx >= 0) {
-        const messageBytes = buffer.subarray(0, delimIdx);
-        const message = messageBytes.toString('utf-8');
-        
-        clearTimeout(timer);
-        resolved = true;
-        socket.destroy();
-        
-        try {
-          const response = JSON.parse(message);
-          resolve(response);
-        } catch (e) {
-          reject(new Error(`POS yanıt parse hatası: ${message}`));
-        }
+      const responseStr = chunk.toString('utf-8');
+      console.log('[POS TCP] Yanıt geldi:', responseStr.substring(0, 500));
+      
+      clearTimeout(timer);
+      resolved = true;
+      socket.destroy();
+      
+      try {
+        const response = JSON.parse(responseStr);
+        resolve(response);
+      } catch (e) {
+        reject(new Error(`POS yanıt parse hatası: ${responseStr}`));
       }
     });
 
