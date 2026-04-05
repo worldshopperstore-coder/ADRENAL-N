@@ -3,7 +3,8 @@ const { Client } = pkg;
 
 // Supabase database connection
 // Using pooled connection for better reliability
-const connectionString = 'postgresql://postgres.mipafqwsibhazkszzcxb:Z123ysf0703@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
+// ⚠️ Connection string .env dosyasından okunur, güvenlik için hardcoded KULLANMAYIN
+const connectionString = process.env.DATABASE_URL || '';\nif (!connectionString) {\n  console.error('❌ DATABASE_URL environment variable is not set. Use: DATABASE_URL=postgresql://... node setup.js');\n  process.exit(1);\n}
 
 const client = new Client({
   connectionString: connectionString,

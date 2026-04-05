@@ -1492,10 +1492,12 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               </div>
             </div>
 
-            {/* ── SIDE-BY-SIDE LAYOUT: Sol=Kategori, Sağ=Form ── */}
+            {/* ── SIDE-BY-SIDE LAYOUT: Sol=Kategori, Orta=Form, Sağ=Çoklu Ödeme ── */}
             <div className="flex-1 overflow-hidden flex flex-col sm:flex-row">
-              {/* SOL PANEL: Kategori Seçimi */}
+              {/* SOL PANEL: Kategori Seçimi (splitMode'da gizlenir) */}
+              {!splitMode && (
               <div className="flex-shrink-0 sm:w-56 sm:border-r border-b sm:border-b-0 border-gray-700/40 p-3 sm:p-4 overflow-y-auto">
+                <>
                 <label className="block text-[10px] text-gray-500 mb-2 font-bold uppercase tracking-widest">Kategori</label>
                 <div className="flex sm:flex-col gap-1.5 overflow-x-auto sm:overflow-x-visible pb-1 sm:pb-0">
                   {CATEGORY_GROUPS.map((group) => {
@@ -1536,10 +1538,22 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                     );
                   })}
                 </div>
+                  </>
               </div>
+              )}
 
-              {/* SAĞ PANEL: Form */}
+              {/* FORM PANEL */}
               <div ref={modalScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-5">
+                {/* Geri butonu - splitMode'da kategorilere dönmek için */}
+                {splitMode && (
+                  <button
+                    type="button"
+                    onClick={() => setSplitMode(false)}
+                    className="flex items-center gap-1.5 mb-3 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white bg-gray-800/60 border border-gray-700/50 hover:bg-gray-700 transition-all"
+                  >
+                    <span>←</span> Kategorilere Dön
+                  </button>
+                )}
                 {!selectedCategory ? (
                   <div className="text-center py-12 border border-dashed border-gray-700/50 rounded-xl bg-gray-800/20 h-full flex flex-col items-center justify-center">
                     <Package className="w-10 h-10 text-gray-700 mx-auto mb-3" />
@@ -1606,48 +1620,30 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                       return (
                         <div>
                           <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Para Birimi</label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {/* DOLAR Butonu */}
+                          <div className="flex gap-2">
                             <button
                               type="button"
-                              onClick={() => {
-                                if (usdPkg) setFormData({ ...formData, packageId: usdPkg.id, selectedCurrency: 'USD' });
-                              }}
-                              className={`relative flex items-center justify-center gap-2.5 py-3.5 rounded-xl border-2 transition-all duration-200 font-bold text-sm ${
+                              onClick={() => { if (usdPkg) setFormData({ ...formData, packageId: usdPkg.id, selectedCurrency: 'USD' }); }}
+                              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all text-sm font-bold ${
                                 formData.selectedCurrency === 'USD'
-                                  ? 'bg-amber-500/20 border-amber-400/70 text-amber-300 ring-2 ring-amber-500/25 shadow-lg shadow-amber-500/15'
-                                  : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:bg-gray-800 hover:border-gray-500 hover:text-gray-300'
+                                  ? 'bg-amber-500/20 border-amber-400/60 text-amber-300'
+                                  : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
                               }`}
                             >
-                              {formData.selectedCurrency === 'USD' && (
-                                <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
-                                  <Check className="w-3 h-3 text-white" />
-                                </div>
-                              )}
-                              <DollarSign className="w-5 h-5" />
-                              <span className="text-base">DOLAR</span>
-                              {usdPkg && <span className="text-[10px] opacity-70 ml-1">Y:{usdPkg.adultPrice}$ Ç:{usdPkg.childPrice}$</span>}
+                              <DollarSign className="w-4 h-4" /> USD
+                              {usdPkg && <span className="text-[10px] opacity-60 ml-0.5">{usdPkg.adultPrice}/{usdPkg.childPrice}</span>}
                             </button>
-                            {/* EURO Butonu */}
                             <button
                               type="button"
-                              onClick={() => {
-                                if (eurPkg) setFormData({ ...formData, packageId: eurPkg.id, selectedCurrency: 'EUR' });
-                              }}
-                              className={`relative flex items-center justify-center gap-2.5 py-3.5 rounded-xl border-2 transition-all duration-200 font-bold text-sm ${
+                              onClick={() => { if (eurPkg) setFormData({ ...formData, packageId: eurPkg.id, selectedCurrency: 'EUR' }); }}
+                              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all text-sm font-bold ${
                                 formData.selectedCurrency === 'EUR'
-                                  ? 'bg-blue-500/20 border-blue-400/70 text-blue-300 ring-2 ring-blue-500/25 shadow-lg shadow-blue-500/15'
-                                  : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:bg-gray-800 hover:border-gray-500 hover:text-gray-300'
+                                  ? 'bg-blue-500/20 border-blue-400/60 text-blue-300'
+                                  : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
                               }`}
                             >
-                              {formData.selectedCurrency === 'EUR' && (
-                                <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                                  <Check className="w-3 h-3 text-white" />
-                                </div>
-                              )}
-                              <Euro className="w-5 h-5" />
-                              <span className="text-base">EURO</span>
-                              {eurPkg && <span className="text-[10px] opacity-70 ml-1">Y:{eurPkg.adultPrice}€ Ç:{eurPkg.childPrice}€</span>}
+                              <Euro className="w-4 h-4" /> EUR
+                              {eurPkg && <span className="text-[10px] opacity-60 ml-0.5">{eurPkg.adultPrice}/{eurPkg.childPrice}</span>}
                             </button>
                           </div>
                         </div>
@@ -1706,7 +1702,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                       </div>
                     )}
 
-                    {/* ── Fiyat Hesaplayıcı (realtime) ── */}
+                    {/* ── Fiyat + Çoklu Ödeme (kompakt) ── */}
                     {formData.packageId && (() => {
                       const pkg = kasaPackages.find(p => p.id === formData.packageId);
                       if (!pkg) return null;
@@ -1719,29 +1715,17 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                       const totalTl = pkg.currency === 'TL' ? totalForeign : totalForeign * rate;
 
                       return (
-                        <div className={`rounded-xl border p-3 transition-all duration-300 ${
+                        <div className={`rounded-lg border px-3 py-2 ${
                           pkg.currency !== 'TL'
-                            ? 'bg-gradient-to-r from-amber-950/40 to-blue-950/40 border-amber-500/20'
-                            : 'bg-gradient-to-r from-emerald-950/40 to-gray-900 border-emerald-500/20'
+                            ? 'bg-amber-950/30 border-amber-500/20'
+                            : 'bg-emerald-950/30 border-emerald-500/20'
                         }`}>
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${pkg.currency === 'USD' ? 'bg-amber-500/20' : pkg.currency === 'EUR' ? 'bg-blue-500/20' : 'bg-emerald-500/20'}`}>
-                                {pkg.currency === 'USD' ? <DollarSign className="w-4 h-4 text-amber-400" /> : pkg.currency === 'EUR' ? <Euro className="w-4 h-4 text-blue-400" /> : <span className="text-emerald-400 text-sm font-bold">₺</span>}
-                              </div>
-                              <div>
-                                <p className="text-[10px] text-gray-500 font-medium uppercase">Toplam</p>
-                                <p className="text-xl font-black text-white leading-tight">
-                                  {totalForeign.toFixed(2)} <span className={`text-sm ${pkg.currency === 'USD' ? 'text-amber-400' : pkg.currency === 'EUR' ? 'text-blue-400' : 'text-emerald-400'}`}>{currSymbol}</span>
-                                </p>
-                              </div>
-                            </div>
+                            <span className="text-lg font-black text-white">
+                              {totalForeign.toFixed(2)} <span className={`text-sm ${pkg.currency === 'USD' ? 'text-amber-400' : pkg.currency === 'EUR' ? 'text-blue-400' : 'text-emerald-400'}`}>{currSymbol}</span>
+                            </span>
                             {pkg.currency !== 'TL' && (
-                              <div className="text-right">
-                                <p className="text-[10px] text-gray-500 font-medium uppercase">TL Karşılığı</p>
-                                <p className="text-lg font-bold text-emerald-400">{totalTl.toFixed(2)} <span className="text-xs text-emerald-500/60">₺</span></p>
-                                <p className="text-[10px] text-gray-600">Kur: {rate.toFixed(4)}</p>
-                              </div>
+                              <span className="text-sm font-bold text-emerald-400">≈{totalTl.toFixed(2)} ₺ <span className="text-[10px] text-gray-600">({rate.toFixed(2)})</span></span>
                             )}
                           </div>
                         </div>
@@ -1757,116 +1741,17 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                           setFormData({ ...formData, splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '' });
                         }
                       }}
-                      className={`w-full py-2.5 rounded-xl text-xs font-bold border transition-all duration-200 flex items-center justify-center gap-2 ${
+                      className={`w-full py-2 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
                         splitMode
-                          ? 'bg-orange-500/15 text-orange-300 border-orange-500/30 hover:bg-orange-500/25 shadow-lg shadow-orange-500/10'
-                          : 'bg-gray-800/60 text-gray-400 border-gray-700/50 hover:bg-gray-700/60 hover:text-gray-200'
+                          ? 'bg-orange-500/15 text-orange-300 border-orange-500/30'
+                          : 'bg-gray-800/60 text-gray-400 border-gray-700/50 hover:text-gray-200'
                       }`}
                     >
-                      <Coins className="w-3.5 h-3.5" />
-                      {splitMode ? 'Çoklu Ödemeyi Kapat' : 'Çoklu Ödeme Al'}
+                      <Coins className="w-3 h-3" />
+                      {splitMode ? 'Çoklu Ödemeyi Kapat' : 'Çoklu Ödeme'}
                     </button>
 
-                    {/* ── Split Payment Panel ── */}
-                    {splitMode && (() => {
-                      const selectedPkg = kasaPackages.find(p => p.id === formData.packageId);
-                      const adultQ = parseInt(formData.adultQty) || 0;
-                      const childQ = parseInt(formData.childQty) || 0;
-                      const saleTotal = selectedPkg ? (adultQ * selectedPkg.adultPrice + childQ * selectedPkg.childPrice) : 0;
-                      const saleCurrency = selectedPkg?.currency || 'TL';
-                      const totalInTl = saleCurrency === 'USD' ? saleTotal * usdRate : saleCurrency === 'EUR' ? saleTotal * eurRate : saleTotal;
-                      const splitKk = parseFloat(formData.splitKkTl) || 0;
-                      const splitTl = parseFloat(formData.splitCashTl) || 0;
-                      const splitUsd = parseFloat(formData.splitCashUsd) || 0;
-                      const splitEur = parseFloat(formData.splitCashEur) || 0;
-                      const paidTl = splitKk + splitTl + (splitUsd * usdRate) + (splitEur * eurRate);
-                      const remaining = totalInTl - paidTl;
-                      const remainingUsd = usdRate > 0 ? remaining / usdRate : 0;
-                      const remainingEur = eurRate > 0 ? remaining / eurRate : 0;
 
-                      return saleTotal > 0 ? (
-                        <div className="bg-gradient-to-b from-gray-800/40 to-gray-900/60 border border-orange-500/20 rounded-xl p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-xs text-orange-300 font-medium uppercase tracking-wider flex items-center gap-1.5">
-                              <Coins className="w-3.5 h-3.5" /> Ödeme Dağılımı
-                            </label>
-                            <span className="text-xs font-bold text-white">
-                              {saleTotal.toFixed(2)} {saleCurrency === 'TL' ? '₺' : saleCurrency === 'USD' ? '$' : '€'}
-                              {saleCurrency !== 'TL' && <span className="text-gray-500 ml-1">(≈{totalInTl.toFixed(2)} ₺)</span>}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            {/* KK TL */}
-                            <div>
-                              <label className="block text-[10px] text-emerald-400/80 mb-1 font-semibold">
-                                <CreditCard className="w-3 h-3 inline mr-1" />KK (₺)
-                              </label>
-                              <input
-                                type="number" min="0" step="0.01" value={formData.splitKkTl}
-                                onChange={(e) => setFormData({ ...formData, splitKkTl: e.target.value })}
-                                placeholder={remaining > 0.01 ? `${remaining.toFixed(2)}` : '0.00'}
-                                className="w-full px-3 py-2 bg-gray-800 border border-emerald-700/40 rounded-lg text-emerald-300 text-sm focus:outline-none focus:border-emerald-500 transition-colors placeholder-emerald-900/80"
-                              />
-                            </div>
-                            {/* Nakit TL */}
-                            <div>
-                              <label className="block text-[10px] text-blue-400/80 mb-1 font-semibold">
-                                <Banknote className="w-3 h-3 inline mr-1" />Nakit TL (₺)
-                              </label>
-                              <input
-                                type="number" min="0" step="0.01" value={formData.splitCashTl}
-                                onChange={(e) => setFormData({ ...formData, splitCashTl: e.target.value })}
-                                placeholder={remaining > 0.01 ? `${remaining.toFixed(2)}` : '0.00'}
-                                className="w-full px-3 py-2 bg-gray-800 border border-blue-700/40 rounded-lg text-blue-300 text-sm focus:outline-none focus:border-blue-500 transition-colors placeholder-blue-900/80"
-                              />
-                            </div>
-                            {/* Nakit USD */}
-                            <div>
-                              <label className="block text-[10px] text-amber-400/80 mb-1 font-semibold">
-                                <DollarSign className="w-3 h-3 inline mr-1" />USD ($)
-                              </label>
-                              <input
-                                type="number" min="0" step="0.01" value={formData.splitCashUsd}
-                                onChange={(e) => setFormData({ ...formData, splitCashUsd: e.target.value })}
-                                placeholder={remaining > 0.01 ? `${remainingUsd.toFixed(2)}` : '0.00'}
-                                className="w-full px-3 py-2 bg-gray-800 border border-amber-700/40 rounded-lg text-amber-300 text-sm focus:outline-none focus:border-amber-500 transition-colors placeholder-amber-900/80"
-                              />
-                            </div>
-                            {/* Nakit EUR */}
-                            <div>
-                              <label className="block text-[10px] text-blue-400/80 mb-1 font-semibold">
-                                <Euro className="w-3 h-3 inline mr-1" />EUR (€)
-                              </label>
-                              <input
-                                type="number" min="0" step="0.01" value={formData.splitCashEur}
-                                onChange={(e) => setFormData({ ...formData, splitCashEur: e.target.value })}
-                                placeholder={remaining > 0.01 ? `${remainingEur.toFixed(2)}` : '0.00'}
-                                className="w-full px-3 py-2 bg-gray-800 border border-blue-700/40 rounded-lg text-blue-300 text-sm focus:outline-none focus:border-blue-500 transition-colors placeholder-blue-900/80"
-                              />
-                            </div>
-                          </div>
-                          {/* Kalan Gösterge */}
-                          <div className={`text-xs font-bold text-center py-2 rounded-lg border ${
-                            Math.abs(remaining) < 0.01
-                              ? 'bg-emerald-900/30 text-emerald-400 border-emerald-700/40'
-                              : remaining > 0
-                                ? 'bg-amber-900/30 text-amber-400 border-amber-700/40'
-                                : 'bg-red-900/30 text-red-400 border-red-700/40'
-                          }`}>
-                            {Math.abs(remaining) < 0.01
-                              ? '✓ Ödeme tamamlandı'
-                              : remaining > 0
-                                ? `Kalan: ${remaining.toFixed(2)} ₺  ·  ${remainingUsd.toFixed(2)} $  ·  ${remainingEur.toFixed(2)} €`
-                                : `Fazla: ${Math.abs(remaining).toFixed(2)} ₺`
-                            }
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-gray-800/40 border border-orange-500/20 rounded-xl p-3 flex items-center justify-center text-xs text-gray-500">
-                          Paket ve miktar seçerek tutarı oluşturun
-                        </div>
-                      );
-                    })()}
 
                     {/* Çapraz Satış badge */}
                     {formData.isCrossSale && (
@@ -1939,6 +1824,99 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                   </div>
                 )}
               </div>
+
+              {/* SAĞ PANEL: Çoklu Ödeme (splitMode aktifken görünür) */}
+              {splitMode && (
+              <div className="flex-shrink-0 sm:w-64 sm:border-l border-t sm:border-t-0 border-gray-700/40 p-3 sm:p-4 overflow-y-auto">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[10px] text-orange-400 font-bold uppercase tracking-widest">Çoklu Ödeme</label>
+                    <button type="button" onClick={() => setSplitMode(false)} className="text-[9px] text-gray-500 hover:text-gray-300">✕ Kapat</button>
+                  </div>
+                  {(() => {
+                    const selectedPkg = kasaPackages.find(p => p.id === formData.packageId);
+                    const adultQ = parseInt(formData.adultQty) || 0;
+                    const childQ = parseInt(formData.childQty) || 0;
+                    const saleTotal = selectedPkg ? (adultQ * selectedPkg.adultPrice + childQ * selectedPkg.childPrice) : 0;
+                    const saleCurrency = selectedPkg?.currency || 'TL';
+                    const totalInTl = saleCurrency === 'USD' ? saleTotal * usdRate : saleCurrency === 'EUR' ? saleTotal * eurRate : saleTotal;
+                    const splitKk = parseFloat(formData.splitKkTl) || 0;
+                    const splitTl = parseFloat(formData.splitCashTl) || 0;
+                    const splitUsd = parseFloat(formData.splitCashUsd) || 0;
+                    const splitEur = parseFloat(formData.splitCashEur) || 0;
+                    const paidTl = splitKk + splitTl + (splitUsd * usdRate) + (splitEur * eurRate);
+                    const remaining = totalInTl - paidTl;
+                    const remainingUsd = usdRate > 0 ? remaining / usdRate : 0;
+                    const remainingEur = eurRate > 0 ? remaining / eurRate : 0;
+
+                    return saleTotal > 0 ? (
+                      <div className="space-y-2">
+                        <div className="text-[10px] text-center text-white font-bold">
+                          {saleTotal.toFixed(2)} {saleCurrency === 'TL' ? '₺' : saleCurrency === 'USD' ? '$' : '€'}
+                          {saleCurrency !== 'TL' && <span className="text-gray-500"> (≈{totalInTl.toFixed(0)}₺)</span>}
+                        </div>
+                        <div className="space-y-1.5">
+                          <div>
+                            <label className="block text-[9px] text-emerald-400/80 mb-0.5 font-semibold">KK ₺</label>
+                            <input
+                              type="number" min="0" step="0.01" value={formData.splitKkTl}
+                              onChange={(e) => setFormData({ ...formData, splitKkTl: e.target.value })}
+                              placeholder={remaining > 0.01 ? `${remaining.toFixed(0)}` : '0'}
+                              className="w-full px-2 py-1.5 bg-gray-800 border border-emerald-700/40 rounded-lg text-emerald-300 text-xs focus:outline-none focus:border-emerald-500 placeholder-emerald-900/80"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] text-blue-400/80 mb-0.5 font-semibold">Nakit ₺</label>
+                            <input
+                              type="number" min="0" step="0.01" value={formData.splitCashTl}
+                              onChange={(e) => setFormData({ ...formData, splitCashTl: e.target.value })}
+                              placeholder={remaining > 0.01 ? `${remaining.toFixed(0)}` : '0'}
+                              className="w-full px-2 py-1.5 bg-gray-800 border border-blue-700/40 rounded-lg text-blue-300 text-xs focus:outline-none focus:border-blue-500 placeholder-blue-900/80"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] text-amber-400/80 mb-0.5 font-semibold">USD $</label>
+                            <input
+                              type="number" min="0" step="0.01" value={formData.splitCashUsd}
+                              onChange={(e) => setFormData({ ...formData, splitCashUsd: e.target.value })}
+                              placeholder={remaining > 0.01 ? `${remainingUsd.toFixed(0)}` : '0'}
+                              className="w-full px-2 py-1.5 bg-gray-800 border border-amber-700/40 rounded-lg text-amber-300 text-xs focus:outline-none focus:border-amber-500 placeholder-amber-900/80"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] text-violet-400/80 mb-0.5 font-semibold">EUR €</label>
+                            <input
+                              type="number" min="0" step="0.01" value={formData.splitCashEur}
+                              onChange={(e) => setFormData({ ...formData, splitCashEur: e.target.value })}
+                              placeholder={remaining > 0.01 ? `${remainingEur.toFixed(0)}` : '0'}
+                              className="w-full px-2 py-1.5 bg-gray-800 border border-violet-700/40 rounded-lg text-violet-300 text-xs focus:outline-none focus:border-violet-500 placeholder-violet-900/80"
+                            />
+                          </div>
+                        </div>
+                        <div className={`text-[10px] font-bold text-center py-1.5 rounded-md border ${
+                          Math.abs(remaining) < 0.01
+                            ? 'bg-emerald-900/30 text-emerald-400 border-emerald-700/40'
+                            : remaining > 0
+                              ? 'bg-amber-900/30 text-amber-400 border-amber-700/40'
+                              : 'bg-red-900/30 text-red-400 border-red-700/40'
+                        }`}>
+                          {Math.abs(remaining) < 0.01
+                            ? '✓ Tamamlandı'
+                            : remaining > 0
+                              ? `Kalan: ${remaining.toFixed(2)}₺`
+                              : `Fazla: ${Math.abs(remaining).toFixed(2)}₺`
+                          }
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-gray-800/40 border border-orange-500/20 rounded-lg p-2.5 flex items-center justify-center text-xs text-gray-500">
+                        Paket ve miktar seçin
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+              )}
             </div>
           </div>
         </div>

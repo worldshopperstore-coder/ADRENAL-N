@@ -6,9 +6,17 @@ dist-electron
 .DS_Store
 
 .env
+.env.*
+!.env.example
 
 # Build outputs - large binary files
 release/
+
+# Backup files
+*.bak
+
+# Large source images
+build/flame-logo.png
 
 # Portable git
 mingit/
