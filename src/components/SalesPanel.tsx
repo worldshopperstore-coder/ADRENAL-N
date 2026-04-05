@@ -422,9 +422,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       // Adım 1: POS ödeme
       setPosProcessingStep('pos');
       
-      // Küçük gecikme — UI'ın güncellenmesi için
-      await new Promise(r => setTimeout(r, 200));
-      
       const result = await processActiveSale(request);
       
       if (!result.success) {

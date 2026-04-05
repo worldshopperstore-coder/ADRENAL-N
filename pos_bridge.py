@@ -441,8 +441,10 @@ def send_pos_payment(payload: dict) -> dict:
         print(f"[POS-TCP] Payload ({len(encoded_data)} byte):\n{json_string[:500]}", flush=True)
         
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        sock.settimeout(5)  # Bağlantı için 5s yeterli
         sock.connect((host, port))
+        sock.settimeout(timeout)  # Yanıt bekleme için asıl timeout
         print("[POS-TCP] Bağlantı kuruldu, veri gönderiliyor...", flush=True)
         sock.sendall(encoded_data)
         print("[POS-TCP] Veri gönderildi, yanıt bekleniyor...", flush=True)
