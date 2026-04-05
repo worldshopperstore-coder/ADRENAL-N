@@ -102,7 +102,12 @@ function generateTicketZPL(ticket: TicketPrintData): string {
   const paketZpl = simpleTr(ticket.packageName);
 
   // Ürün entrance bilgileri (ayrı satırlar)
-  const entranceLines = ticket.products.map(p => `${simpleTr(p)} ENTRANCE`);
+  // products zaten "CINEMA ENTRANCE", "WILDPARK ENTRANCE" gibi geliyor
+  const entranceLines = ticket.products.map(p => {
+    const upper = simpleTr(p);
+    // Zaten ENTRANCE içeriyorsa tekrar ekleme
+    return upper.includes('ENTRANCE') ? upper : `${upper} ENTRANCE`;
+  });
   const timeText = '09:00 TO 20:00';
 
   // ── ZPL Komutu (onaylanan final layout) ──
