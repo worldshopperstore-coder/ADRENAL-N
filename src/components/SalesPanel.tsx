@@ -69,9 +69,18 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
   );
 
   // Supabase'den paketleri yükle, Supabase boşsa varsayılanı kullan
+  // FREE paketler her zaman INITIAL_PACKAGES'tan gelir (Supabase'te olmayabilir)
   useEffect(() => {
+    const freePkgs = INITIAL_PACKAGES.filter(p => p.kasaId === currentKasaId && p.category === 'Ücretsiz');
     getPackagesByKasa(currentKasaId).then(pkgs => {
-      if (pkgs.length > 0) setKasaPackages(pkgs);
+      if (pkgs.length > 0) {
+        // Supabase paketlerine FREE paketleri ekle (eğer yoksa)
+        const merged = [...pkgs];
+        for (const fp of freePkgs) {
+          if (!merged.some(p => p.id === fp.id)) merged.push(fp);
+        }
+        setKasaPackages(merged);
+      }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentKasaId]);
