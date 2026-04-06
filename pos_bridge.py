@@ -18,6 +18,7 @@ import os
 import signal
 import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 from urllib.parse import urlparse
 
 try:
@@ -32,6 +33,7 @@ DB_PORT = int(os.environ.get('DB_PORT', '1433'))
 DB_NAME = os.environ.get('DB_NAME', 'AquariumDB3')
 DB_USER = os.environ.get('DB_USER', 'sa')
 DB_PASS = os.environ.get('DB_PASS', 'Atl@2022!')
+BRIDGE_HOST = os.environ.get('BRIDGE_HOST', '0.0.0.0')
 BRIDGE_PORT = int(os.environ.get('BRIDGE_PORT', '5555'))
 
 conn = None
@@ -418,78 +420,114 @@ def print_raw_win32(data: bytes, printer_name: str) -> dict:
 # ── POS Server TCP İletişimi ────────────────────────────────
 
 import socket
+import threading
 
 POS_HOST = os.environ.get('POS_HOST', '127.0.0.1')
 POS_PORT = int(os.environ.get('POS_PORT', '9960'))
 POS_TIMEOUT = 65  # saniye
 
+# Persistent POS bağlantısı — her seferinde yeni soket açmak yerine hazır tut
+_pos_sock = None
+_pos_lock = threading.Lock()
+
+def _get_pos_socket(host, port):
+    """POS Server'a kalıcı soket bağlantısı — varsa yeniden kullan, yoksa aç"""
+    global _pos_sock
+    if _pos_sock is not None:
+        try:
+            # Soket hala canlı mı kontrol et
+            _pos_sock.settimeout(0.1)
+            _pos_sock.recv(1, socket.MSG_PEEK)
+        except socket.timeout:
+            # Timeout = soket canlı, sadece veri yok → OK
+            return _pos_sock
+        except Exception:
+            # Bağlantı kopmuş, yeniden aç
+            try:
+                _pos_sock.close()
+            except:
+                pass
+            _pos_sock = None
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    sock.settimeout(3)  # Bağlantı için 3s
+    sock.connect((host, port))
+    _pos_sock = sock
+    return sock
+
 def send_pos_payment(payload: dict) -> dict:
     """
     POS Server'a TCP üzerinden TransactionData gönderir ve yanıt bekler.
     Düz JSON gönder, düz JSON al — delimiter YOK.
+    Persistent bağlantı kullanır — soket açma süresini atlar.
     """
-    sock = None
-    try:
-        host = payload.pop('_host', POS_HOST)
-        port = payload.pop('_port', POS_PORT)
-        timeout = payload.pop('_timeout', POS_TIMEOUT)
-        
-        json_string = json.dumps(payload, ensure_ascii=False)
-        encoded_data = json_string.encode('utf-8')
-        
-        print(f"[POS-TCP] Gönderiliyor → {host}:{port}", flush=True)
-        print(f"[POS-TCP] Payload ({len(encoded_data)} byte):\n{json_string[:500]}", flush=True)
-        
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-        sock.settimeout(3)  # Bağlantı için 3s
-        sock.connect((host, port))
-        sock.settimeout(timeout)  # Yanıt bekleme için asıl timeout
-        print("[POS-TCP] Bağlantı kuruldu, veri gönderiliyor...", flush=True)
-        sock.sendall(encoded_data)
-        # Hemen flush — veri anında gönderilsin
-        print("[POS-TCP] Veri gönderildi, yanıt bekleniyor...", flush=True)
-        
-        # Yanıt al — düz recv, delimiter yok
-        response_bytes = sock.recv(8192)
-        
-        if response_bytes:
-            response_str = response_bytes.decode('utf-8', errors='ignore')
-            print(f"[POS-TCP] Yanıt alındı ({len(response_bytes)} byte): {response_str[:500]}", flush=True)
+    with _pos_lock:
+        sock = None
+        try:
+            host = payload.pop('_host', POS_HOST)
+            port = payload.pop('_port', POS_PORT)
+            timeout = payload.pop('_timeout', POS_TIMEOUT)
+            
+            json_string = json.dumps(payload, ensure_ascii=False)
+            encoded_data = json_string.encode('utf-8')
+            
+            print(f"[POS-TCP] Gönderiliyor → {host}:{port} ({len(encoded_data)} byte)", flush=True)
             
             try:
-                response = json.loads(response_str)
-                status = response.get('TransactionStatus', -1)
-                error_code = response.get('TransactionErrorCode')
+                sock = _get_pos_socket(host, port)
+                print("[POS-TCP] Mevcut bağlantı kullanılıyor", flush=True)
+            except Exception:
+                # Fallback: yeni soket aç
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+                sock.settimeout(3)
+                sock.connect((host, port))
+                print("[POS-TCP] Yeni bağlantı açıldı", flush=True)
+            
+            sock.settimeout(timeout)
+            sock.sendall(encoded_data)
+            print("[POS-TCP] Veri gönderildi, yanıt bekleniyor...", flush=True)
+            
+            # Yanıt al
+            response_bytes = sock.recv(8192)
+            
+            if response_bytes:
+                # NULL byte'ları temizle
+                response_str = response_bytes.decode('utf-8', errors='ignore').replace('\x00', '')
+                print(f"[POS-TCP] Yanıt alındı ({len(response_bytes)} byte)", flush=True)
                 
-                if status == 0 and (error_code is None or error_code == 0):
-                    return {'success': True, 'transactionStatus': 0, 'statusMessage': 'İşlem başarılı', 'response': response}
-                else:
-                    return {
-                        'success': False,
-                        'transactionStatus': status,
-                        'statusMessage': response.get('StatusMessage', f'POS hatası (status: {status}, errorCode: {error_code})'),
-                        'response': response,
-                    }
-            except json.JSONDecodeError:
-                return {'success': False, 'error': f'POS yanıt parse hatası: {response_str[:200]}'}
-        else:
-            return {'success': False, 'error': 'POS Server boş yanıt döndü'}
-        
-    except socket.timeout:
-        return {'success': False, 'error': 'POS Server yanıt zaman aşımı (65s)'}
-    except ConnectionRefusedError:
-        return {'success': False, 'error': 'POS Server bağlantısı reddedildi — POS çalışmıyor olabilir'}
-    except Exception as e:
-        return {'success': False, 'error': f'POS TCP hatası: {str(e)}'}
-    finally:
-        if sock:
-            try:
-                sock.close()
-                print("[POS-TCP] Soket kapatıldı.", flush=True)
-            except:
-                pass
+                try:
+                    response = json.loads(response_str)
+                    status = response.get('TransactionStatus', -1)
+                    error_code = response.get('TransactionErrorCode')
+                    
+                    if status == 0 and (error_code is None or error_code == 0):
+                        return {'success': True, 'transactionStatus': 0, 'statusMessage': 'İşlem başarılı', 'response': response}
+                    else:
+                        return {
+                            'success': False,
+                            'transactionStatus': status,
+                            'statusMessage': response.get('StatusMessage', response.get('TransactionMessage', f'POS hatası (status: {status}, errorCode: {error_code})')),
+                            'response': response,
+                        }
+                except json.JSONDecodeError:
+                    return {'success': False, 'error': f'POS yanıt parse hatası: {response_str[:200]}'}
+            else:
+                return {'success': False, 'error': 'POS Server boş yanıt döndü'}
+            
+        except socket.timeout:
+            return {'success': False, 'error': 'POS Server yanıt zaman aşımı (65s)'}
+        except ConnectionRefusedError:
+            return {'success': False, 'error': 'POS Server bağlantısı reddedildi — POS çalışmıyor olabilir'}
+        except Exception as e:
+            # Bağlantı kopmuşsa persistent soketi temizle
+            global _pos_sock
+            _pos_sock = None
+            return {'success': False, 'error': f'POS TCP hatası: {str(e)}'}
+
 
 
 # ── Bugünkü Satış Sayısı ──────────────────────────────────
@@ -521,6 +559,10 @@ def get_today_sales() -> dict:
 # ── HTTP Handler ───────────────────────────────────────────
 
 class BridgeHandler(BaseHTTPRequestHandler):
+    def address_string(self):
+        # Reverse DNS lookup'ı devre dışı bırak — 5-15s gecikme önlenir
+        return self.client_address[0]
+
     def log_message(self, format, *args):
         # stdout'a log yaz (Electron'un okuyabileceği)
         print(f"[BRIDGE] {args[0]}", flush=True)
@@ -615,8 +657,18 @@ def main():
         print(f"[BRIDGE] SQL Server bağlantı hatası: {e}", file=sys.stderr, flush=True)
         # Yine de sunucuyu başlat, bağlantı sonra kurulabilir
     
-    server = HTTPServer(('127.0.0.1', BRIDGE_PORT), BridgeHandler)
-    print(f"[BRIDGE] HTTP sunucu başlatıldı: http://127.0.0.1:{BRIDGE_PORT}", flush=True)
+    # POS Server'a ön-bağlantı kur (ilk işlem de hızlı olsun)
+    try:
+        _get_pos_socket(POS_HOST, int(os.environ.get('POS_PORT', POS_PORT)))
+        print(f"[BRIDGE] POS Server ön-bağlantı başarılı: {POS_HOST}:{POS_PORT}", flush=True)
+    except Exception as e:
+        print(f"[BRIDGE] POS Server ön-bağlantı başarısız (sorun değil): {e}", flush=True)
+    
+    class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+        daemon_threads = True
+
+    server = ThreadedHTTPServer((BRIDGE_HOST, BRIDGE_PORT), BridgeHandler)
+    print(f"[BRIDGE] HTTP sunucu başlatıldı: http://{BRIDGE_HOST}:{BRIDGE_PORT} (threaded)", flush=True)
     print(f"[BRIDGE] READY", flush=True)  # Electron'un dinleyeceği sinyal
     
     try:
