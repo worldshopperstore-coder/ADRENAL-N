@@ -26,6 +26,10 @@ contextBridge.exposeInMainWorld('electron', {
     /** Bridge process durumu */
     status: () => ipcRenderer.invoke('bridge:status'),
   },
+  printers: {
+    /** Sistemdeki yazıcı listesini getir */
+    list: () => ipcRenderer.invoke('printers:list') as Promise<{ name: string; isDefault: boolean }[]>,
+  },
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),
     maximize: () => ipcRenderer.send('window:maximize'),

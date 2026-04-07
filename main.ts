@@ -56,6 +56,13 @@ app.on('ready', () => {
   ipcMain.on('window:close', () => mainWindow?.close());
   ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized() ?? false);
 
+  // Yazıcı listesi
+  ipcMain.handle('printers:list', async () => {
+    if (!mainWindow) return [];
+    const printers = await mainWindow.webContents.getPrintersAsync();
+    return printers.map(p => ({ name: p.name, isDefault: p.isDefault }));
+  });
+
   createWindow();
 
   // pos_bridge EXE otomatik başlat

@@ -36,6 +36,9 @@ declare global {
         stop: () => Promise<{ success: boolean }>;
         status: () => Promise<{ running: boolean; ready: boolean; pid: number | null }>;
       };
+      printers: {
+        list: () => Promise<{ name: string; isDefault: boolean }[]>;
+      };
     };
   }
 }
@@ -292,4 +295,61 @@ async function _syncSettingsToSupabase(settings: IntegrationSettings): Promise<v
       eur_advance: 0,
       updated_at: new Date().toISOString(),
     }], { onConflict: 'kasa_id' });
+}
+
+// ── Otomatik Yazıcı Algılama ──────────────────────────────
+
+/**
+ * Sistemdeki Zebra yazıcıyı otomatik algıla, localStorage'a ve Supabase'e kaydet.
+ * Her giriş yapıldığında çağrılır.
+ * Yazıcı değiştiyse günceller, aynıysa dokunmaz.
+ */
+export async function autoDetectPrinter(kasaId: string): Promise<string | null> {
+  if (!window.electron?.printers) return null;
+
+  try {
+    const printers = await window.electron.printers.list();
+    // Zebra/ZDesigner yazıcıyı bul
+    const zebra = printers.find(p =>
+      p.name.toLowerCase().includes('zdesigner') ||
+      p.name.toLowerCase().includes('zebra')
+    );
+
+    if (!zebra) {
+      console.warn('[PRINTER] Zebra yazıcı bulunamadı. Mevcut yazıcılar:', printers.map(p => p.name));
+      return null;
+    }
+
+    // Mevcut ayarla karşılaştır
+    const settings = getSettings();
+    if (settings.printer.name === zebra.name) {
+      // Aynı yazıcı, değişiklik yok
+      return zebra.name;
+    }
+
+    // Yeni yazıcı algılandı — güncelle
+    console.log(`[PRINTER] Zebra algılandı: "${zebra.name}" (önceki: "${settings.printer.name}")`);
+    settings.printer.name = zebra.name;
+    localStorage.setItem('integrationSettings', JSON.stringify(settings));
+
+    // Supabase'e kasa bazlı kaydet
+    try {
+      const { supabase } = await import('@/config/supabase');
+      if (supabase) {
+        await supabase
+          .from('kasa_settings')
+          .upsert([{
+            kasa_id: `printer_${kasaId}`,
+            updated_by: zebra.name,
+            updated_at: new Date().toISOString(),
+            tl_advance: 0, usd_advance: 0, eur_advance: 0,
+          }], { onConflict: 'kasa_id' });
+      }
+    } catch { /* offline — sorun değil */ }
+
+    return zebra.name;
+  } catch (err) {
+    console.error('[PRINTER] Algılama hatası:', err);
+    return null;
+  }
 }

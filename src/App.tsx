@@ -90,6 +90,8 @@ export default function App() {
           } else {
             setActiveTab('dashboard');
           }
+          // Yazıcı otomatik algıla (oturum restore)
+          import('@/utils/posManager').then(m => m.autoDetectPrinter(restored.kasa.id)).catch(() => {});
         }
       } catch {
         localStorage.removeItem('userSession');
@@ -127,6 +129,9 @@ export default function App() {
     
     // Online durumunu Supabase'e bildir
     setPersonnelOnline(personnel.id);
+
+    // Zebra yazıcıyı otomatik algıla
+    import('@/utils/posManager').then(m => m.autoDetectPrinter(kasa.id)).catch(() => {});
 
     // Genel müdür için admin panel'i aç, diğerleri için dashboard
     if (personnel.role === 'genel_mudur') {
