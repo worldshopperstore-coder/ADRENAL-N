@@ -2386,18 +2386,10 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                   <div className="text-gray-400">Bilet ID'leri:</div>
                   <div className="text-white font-mono text-xs">{posResult.ticketIds.join(', ')}</div>
                 </div>
-                {/* Yazdırma Sonucu */}
-                {posResult.printResult && (
-                  <div className={`mt-2 text-xs px-2 py-1 rounded ${
-                    posResult.printResult.failed === 0
-                      ? 'bg-emerald-900/30 text-emerald-300'
-                      : 'bg-yellow-900/30 text-yellow-300'
-                  }`}>
+                {/* Yazdırma Sonucu — sadece başarılıysa göster */}
+                {posResult.printResult && posResult.printResult.printed > 0 && posResult.printResult.failed === 0 && (
+                  <div className="mt-2 text-xs px-2 py-1 rounded bg-emerald-900/30 text-emerald-300">
                     🖨️ {posResult.printResult.printed} bilet basıldı
-                    {posResult.printResult.failed > 0 && `, ${posResult.printResult.failed} başarısız`}
-                    {posResult.printResult.errors.length > 0 && (
-                      <div className="mt-1 text-[10px] opacity-75">{posResult.printResult.errors[0]}</div>
-                    )}
                   </div>
                 )}
               </div>

@@ -112,15 +112,16 @@ function generateTicketZPL(ticket: TicketPrintData): string {
 
   // ── ZPL Komutu (onaylanan final layout) ──
   // PW=552 (69mm), LL=808 (101mm), ^A0B (270° döndürülmüş)
+  // Tüm fontlar aynı: TT0003M_ (TrueType)
   let zpl = `^XA
 ^PW552
 ^LL808
 ^LH0,0
 ^CI28
-^FO35,50^A0B,36,34^FD${groupInfo}^FS
-^FT120,748^A0B,28,28^FD${kategoriZpl}^FS
-^FT158,748^A0B,28,28^FD${paketZpl}^FS
-^FO105,338^A0B,38,32^FD${ticket.date}^FS
+^FO35,50^A@B,36,34,E:TT0003M_.FNT^FD${groupInfo}^FS
+^FT120,748^A@B,28,28,E:TT0003M_.FNT^FD${kategoriZpl}^FS
+^FT158,748^A@B,28,28,E:TT0003M_.FNT^FD${paketZpl}^FS
+^FO105,338^A@B,38,32,E:TT0003M_.FNT^FD${ticket.date}^FS
 ^FO201,329^BQN,2,6^FDQA,${qrData}^FS`;
 
   // Entrance satırları — QR'dan uzak, saat ile entrance yakın
