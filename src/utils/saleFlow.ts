@@ -70,6 +70,17 @@ export interface ActiveSaleResult {
     failed: number;
     errors: string[];
   };
+  /** Satış bilgisi (bilet tekrar basma için) */
+  _saleInfo?: {
+    packageName: string;
+    packageId: string;
+    adultQty: number;
+    childQty: number;
+    adultPrice: number;
+    childPrice: number;
+    currency: string;
+    isFree: boolean;
+  };
 }
 
 // ── Yardımcı Fonksiyonlar ─────────────────────────────────

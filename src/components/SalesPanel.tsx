@@ -509,6 +509,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       
       // İşlem modalını kapat, sonuç modalını göster
       setPosProcessing(false);
+      const isFreePackage = selectedPackage.adultPrice === 0 && selectedPackage.childPrice === 0;
       setPosResult({
         ...result,
         _saleInfo: {
