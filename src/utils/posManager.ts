@@ -251,8 +251,45 @@ export function isIntegrationEnabled(): boolean {
 
 export function saveIntegrationSettings(settings: IntegrationSettings): void {
   localStorage.setItem('integrationSettings', JSON.stringify(settings));
+  // Supabase'e de kaydet (tüm kasalar görsün)
+  _syncSettingsToSupabase(settings).catch(() => {});
 }
 
 export function loadIntegrationSettings(): IntegrationSettings {
   return getSettings();
+}
+
+/** Uygulama açılışında Supabase'den aktif mod durumunu çek ve localStorage'ı güncelle */
+export async function syncIntegrationFromSupabase(): Promise<void> {
+  try {
+    const { supabase } = await import('@/config/supabase');
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from('kasa_settings')
+      .select('tl_advance')
+      .eq('kasa_id', 'global_integration')
+      .single();
+    if (!error && data) {
+      const remoteEnabled = data.tl_advance === 1;
+      const local = getSettings();
+      if (remoteEnabled !== local.enabled) {
+        local.enabled = remoteEnabled;
+        localStorage.setItem('integrationSettings', JSON.stringify(local));
+      }
+    }
+  } catch { /* offline — localStorage'daki değer geçerli */ }
+}
+
+async function _syncSettingsToSupabase(settings: IntegrationSettings): Promise<void> {
+  const { supabase } = await import('@/config/supabase');
+  if (!supabase) return;
+  await supabase
+    .from('kasa_settings')
+    .upsert([{
+      kasa_id: 'global_integration',
+      tl_advance: settings.enabled ? 1 : 0,
+      usd_advance: 0,
+      eur_advance: 0,
+      updated_at: new Date().toISOString(),
+    }], { onConflict: 'kasa_id' });
 }

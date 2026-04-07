@@ -98,6 +98,9 @@ export default function App() {
     
     // Personel veritabanını başlat
     initializePersonnelDB();
+
+    // Aktif mod durumunu Supabase'den çek (tüm kasalar senkron)
+    import('@/utils/posManager').then(m => m.syncIntegrationFromSupabase()).catch(() => {});
   }, []);
 
   // Duyuru kontrolü: giriş sonrası + her 60 saniyede bir
