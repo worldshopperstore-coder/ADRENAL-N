@@ -90,7 +90,7 @@ function simpleTr(text: string): string {
 function generateTicketZPL(ticket: TicketPrintData): string {
   const typeLabel = TICKET_TYPE_LABELS[ticket.ticketType] || ticket.ticketType;
   
-  // Grup bilgisi: "ADU 1/2"
+  // Grup bilgisi: tip kendi içinde numaralanır (ADU 1/2, CHL 1/1)
   const groupInfo = ticket.groupIndex && ticket.groupTotal 
     ? `${typeLabel} ${ticket.groupIndex}/${ticket.groupTotal}` 
     : typeLabel;
@@ -99,13 +99,13 @@ function generateTicketZPL(ticket: TicketPrintData): string {
 
   // Türkçe -> ASCII
   const kategoriZpl = simpleTr(ticket.kasaLabel);
-  const paketZpl = simpleTr(ticket.packageName);
+  // Paket adından fiyat bilgisini temizle (ör: "Acenta $12" → "ACENTA")
+  const cleanName = ticket.packageName.replace(/\s*[\$€]\s*\d+/g, '').replace(/\s+\d+\s*TL/gi, '');
+  const paketZpl = simpleTr(cleanName);
 
   // Ürün entrance bilgileri (ayrı satırlar)
-  // products zaten "CINEMA ENTRANCE", "WILDPARK ENTRANCE" gibi geliyor
   const entranceLines = ticket.products.map(p => {
     const upper = simpleTr(p);
-    // Zaten ENTRANCE içeriyorsa tekrar ekleme
     return upper.includes('ENTRANCE') ? upper : `${upper} ENTRANCE`;
   });
   const timeText = '09:00 TO 20:00';
@@ -123,13 +123,13 @@ function generateTicketZPL(ticket: TicketPrintData): string {
 ^FO105,338^A0B,38,32^FD${ticket.date}^FS
 ^FO201,329^BQN,2,6^FDQA,${qrData}^FS`;
 
-  // Entrance satırları (her biri ayrı, sola hizalı ^FT ile)
-  const entranceStartX = 370;
+  // Entrance satırları — QR'dan uzak, saat ile entrance yakın
+  const entranceStartX = 390;
   const entranceSpacing = 26;
   entranceLines.forEach((line, i) => {
     const x = entranceStartX + (i * entranceSpacing);
-    zpl += `\n^FT${x},620^A@B,24,20,E:TT0003M_.FNT^FD${line}^FS`;
-    zpl += `\n^FT${x},310^A@B,24,20,E:TT0003M_.FNT^FD${timeText}^FS`;
+    zpl += `\n^FT${x},580^A@B,24,20,E:TT0003M_.FNT^FD${line}^FS`;
+    zpl += `\n^FT${x},350^A@B,24,20,E:TT0003M_.FNT^FD${timeText}^FS`;
   });
 
   zpl += '\n^XZ';
@@ -250,7 +250,9 @@ export function buildTicketPrintData(
   if (groupKeys.length > 0) {
     // GroupMap varsa, her grup için 1 bilet bas (ilk ticket ID'yi kullan)
     let personIndex = 0;
-    const totalPersons = request.adultQty + request.childQty + (request.compQty || 0);
+    let aduIndex = 0;
+    let chlIndex = 0;
+    let compIndex = 0;
     
     for (const groupKey of groupKeys) {
       personIndex++;
@@ -260,19 +262,33 @@ export function buildTicketPrintData(
       // Kişi tipi belirle
       let ticketType: 'ADU' | 'CHL' | 'COMP';
       let price: number;
+      let typeIndex: number;
+      let typeTotal: number;
       
       if (request.isFree) {
         ticketType = 'COMP';
         price = 0;
+        compIndex++;
+        typeIndex = compIndex;
+        typeTotal = request.compQty || (request.adultQty + request.childQty);
       } else if (personIndex <= request.adultQty) {
         ticketType = 'ADU';
         price = request.adultPrice;
+        aduIndex++;
+        typeIndex = aduIndex;
+        typeTotal = request.adultQty;
       } else if (personIndex <= request.adultQty + request.childQty) {
         ticketType = 'CHL';
         price = request.childPrice;
+        chlIndex++;
+        typeIndex = chlIndex;
+        typeTotal = request.childQty;
       } else {
         ticketType = 'COMP';
         price = 0;
+        compIndex++;
+        typeIndex = compIndex;
+        typeTotal = request.compQty || 0;
       }
       
       printData.push({
@@ -288,30 +304,46 @@ export function buildTicketPrintData(
         personnelName: request.personnelName,
         date: dateStr,
         time: timeStr,
-        groupIndex: personIndex,
-        groupTotal: totalPersons,
+        groupIndex: typeIndex,
+        groupTotal: typeTotal,
       });
     }
   } else {
     // GroupMap yoksa, her ticket ID için ayrı bilet bas
-    const totalPersons = saleResult.ticketIds.length;
+    let aduIndex = 0;
+    let chlIndex = 0;
+    let compIndex = 0;
     
     saleResult.ticketIds.forEach((ticketId, idx) => {
       let ticketType: 'ADU' | 'CHL' | 'COMP';
       let price: number;
+      let typeIndex: number;
+      let typeTotal: number;
       
       if (request.isFree) {
         ticketType = 'COMP';
         price = 0;
+        compIndex++;
+        typeIndex = compIndex;
+        typeTotal = saleResult.ticketIds.length;
       } else if (idx < request.adultQty) {
         ticketType = 'ADU';
         price = request.adultPrice;
+        aduIndex++;
+        typeIndex = aduIndex;
+        typeTotal = request.adultQty;
       } else if (idx < request.adultQty + request.childQty) {
         ticketType = 'CHL';
         price = request.childPrice;
+        chlIndex++;
+        typeIndex = chlIndex;
+        typeTotal = request.childQty;
       } else {
         ticketType = 'COMP';
         price = 0;
+        compIndex++;
+        typeIndex = compIndex;
+        typeTotal = (request.compQty || 0);
       }
       
       printData.push({
@@ -327,8 +359,8 @@ export function buildTicketPrintData(
         personnelName: request.personnelName,
         date: dateStr,
         time: timeStr,
-        groupIndex: idx + 1,
-        groupTotal: totalPersons,
+        groupIndex: typeIndex,
+        groupTotal: typeTotal,
       });
     });
   }
