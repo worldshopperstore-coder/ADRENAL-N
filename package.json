@@ -9,7 +9,8 @@
     "dev": "concurrently \"vite\" \"wait-on http://127.0.0.1:5173 && NODE_ENV=development VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron dist/main.js\"",
     "build:renderer": "vite build",
     "build:main": "npx esbuild main.ts --bundle --platform=node --outfile=dist/main.cjs --format=cjs --external:electron",
-    "build": "npm run build:renderer && npm run build:main",
+    "build:preload": "npx esbuild preload.ts --bundle --platform=node --outfile=dist/preload.cjs --format=cjs --external:electron",
+    "build": "npm run build:renderer && npm run build:main && npm run build:preload",
     "dist": "npm run build && electron-builder --publish never",
     "dist:win": "npm run build && electron-builder --win --publish never",
     "dist:mac": "npm run build && electron-builder --mac --publish never",
@@ -49,7 +50,12 @@
       "dist/**/*",
       "package.json"
     ],
-    "extraResources": [],
+    "extraResources": [
+      {
+        "from": "pos_bridge.py",
+        "to": "pos_bridge.py"
+      }
+    ],
     "directories": {
       "buildResources": "build",
       "output": "release"

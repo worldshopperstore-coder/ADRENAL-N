@@ -59,7 +59,11 @@ app.on('ready', () => {
   createWindow();
 
   // pos_bridge.py otomatik başlat
-  const bridgePath = path.join(__dirname, '..', 'pos_bridge.py');
+  const isDev = !!process.env.VITE_DEV_SERVER_URL;
+  const bridgePath = isDev
+    ? path.join(__dirname, '..', 'pos_bridge.py')
+    : path.join(process.resourcesPath, 'pos_bridge.py');
+  console.log('[BRIDGE] Path:', bridgePath);
   startBridgeProcess('python', bridgePath).then(ready => {
     console.log(ready ? '[BRIDGE] Otomatik başlatıldı ✓' : '[BRIDGE] Başlatılamadı');
   });
