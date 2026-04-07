@@ -191,10 +191,31 @@ function startBridgeProcess(pythonPath: string, bridgePath: string, env?: Record
 }
 
 /** EXE veya python ile bridge başlat. cmd=exe path, args=[] veya cmd='python', args=[script] */
-function startBridgeExe(cmd: string, args: string[]): Promise<boolean> {
+/** Port 5555'te zaten bir pos_bridge çalışıyor mu kontrol et */
+function checkExistingBridge(): Promise<boolean> {
   return new Promise((resolve) => {
+    const sock = new net.Socket();
+    sock.setTimeout(1000);
+    sock.once('connect', () => { sock.destroy(); resolve(true); });
+    sock.once('error', () => { sock.destroy(); resolve(false); });
+    sock.once('timeout', () => { sock.destroy(); resolve(false); });
+    sock.connect(5555, '127.0.0.1');
+  });
+}
+
+function startBridgeExe(cmd: string, args: string[]): Promise<boolean> {
+  return new Promise(async (resolve) => {
     if (bridgeProcess) {
       resolve(bridgeReady);
+      return;
+    }
+
+    // Zaten çalışan bir pos_bridge var mı? (önceki session'dan kalan)
+    const alreadyRunning = await checkExistingBridge();
+    if (alreadyRunning) {
+      console.log('[BRIDGE] Zaten port 5555 açık — mevcut bridge kullanılıyor ✓');
+      bridgeReady = true;
+      resolve(true);
       return;
     }
 
