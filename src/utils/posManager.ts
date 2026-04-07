@@ -39,6 +39,14 @@ declare global {
       printers: {
         list: () => Promise<{ name: string; isDefault: boolean }[]>;
       };
+      updater: {
+        check: () => Promise<{ available: boolean; version?: string }>;
+        download: () => Promise<{ success: boolean; error?: string }>;
+        install: () => void;
+        onUpdateAvailable: (callback: (data: { version: string }) => void) => void;
+        onDownloadProgress: (callback: (data: { percent: number }) => void) => void;
+        onUpdateDownloaded: (callback: () => void) => void;
+      };
     };
   }
 }

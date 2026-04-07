@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.3",
+    "electron-updater": "^6.8.3",
     "lucide-react": "^0.292.0",
     "pg": "^8.20.0",
     "react": "^18.2.0",
@@ -78,6 +79,8 @@
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/installerSidebar.bmp",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Adrenalin Dünyası"
@@ -96,6 +99,13 @@
       "icon": "build/icon.png",
       "category": "Office",
       "artifactName": "${productName}-${version}.${ext}"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "worldshopperstore-coder",
+        "repo": "ADRENAL-N"
+      }
+    ]
   }
 }

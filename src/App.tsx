@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Megaphone } from 'lucide-react';
+import { Megaphone, Download, RefreshCw } from 'lucide-react';
 import { getActiveAnnouncements, type Announcement } from '@/utils/announcementsDB';
 import AppLayout from '@/components/AppLayout';
 import DashboardTab from '@/components/DashboardTab';
@@ -29,6 +29,11 @@ export default function App() {
   });
   const [announcementPopup, setAnnouncementPopup] = useState<Announcement[]>([]);
   const [maintenanceNotice, setMaintenanceNotice] = useState<string | null>(null);
+
+  // Auto-update state
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null);
+  const [updateReady, setUpdateReady] = useState(false);
 
   const checkAnnouncements = async () => {
     const announcements = await getActiveAnnouncements();
@@ -103,6 +108,22 @@ export default function App() {
 
     // Aktif mod durumunu Supabase'den çek (tüm kasalar senkron)
     import('@/utils/posManager').then(m => m.syncIntegrationFromSupabase()).catch(() => {});
+  }, []);
+
+  // Auto-update dinleyici
+  useEffect(() => {
+    const el = window.electron;
+    if (!el?.updater) return;
+    el.updater.onUpdateAvailable((data) => {
+      setUpdateVersion(data.version);
+    });
+    el.updater.onDownloadProgress((data) => {
+      setUpdateProgress(Math.round(data.percent));
+    });
+    el.updater.onUpdateDownloaded(() => {
+      setUpdateProgress(null);
+      setUpdateReady(true);
+    });
   }, []);
 
   // Duyuru kontrolü: giriş sonrası + her 60 saniyede bir
@@ -217,6 +238,58 @@ export default function App() {
       onLogout={handleLogout}
     >
       {renderContent()}
+
+      {/* Güncelleme bildirimi */}
+      {updateVersion && !updateReady && updateProgress === null && (
+        <div className="fixed bottom-4 right-4 z-[90] bg-gray-900 border border-emerald-700/50 rounded-xl p-4 shadow-2xl max-w-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-emerald-600/20 border border-emerald-600/40 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Download className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white">Güncelleme Mevcut</p>
+              <p className="text-xs text-gray-400">v{updateVersion} hazır</p>
+            </div>
+          </div>
+          <button
+            onClick={() => { setUpdateProgress(0); window.electron?.updater.download(); }}
+            className="mt-3 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg transition-colors text-sm"
+          >
+            Güncelle
+          </button>
+        </div>
+      )}
+
+      {/* İndirme ilerlemesi */}
+      {updateProgress !== null && !updateReady && (
+        <div className="fixed bottom-4 right-4 z-[90] bg-gray-900 border border-blue-700/50 rounded-xl p-4 shadow-2xl max-w-xs w-72">
+          <p className="text-sm font-semibold text-white mb-2">İndiriliyor… %{updateProgress}</p>
+          <div className="w-full bg-gray-700 rounded-full h-2">
+            <div className="bg-blue-500 h-2 rounded-full transition-all duration-300" style={{ width: `${updateProgress}%` }} />
+          </div>
+        </div>
+      )}
+
+      {/* Yeniden başlat */}
+      {updateReady && (
+        <div className="fixed bottom-4 right-4 z-[90] bg-gray-900 border border-amber-700/50 rounded-xl p-4 shadow-2xl max-w-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-amber-600/20 border border-amber-600/40 rounded-lg flex items-center justify-center flex-shrink-0">
+              <RefreshCw className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white">Güncelleme Hazır</p>
+              <p className="text-xs text-gray-400">Yeniden başlatarak güncelle</p>
+            </div>
+          </div>
+          <button
+            onClick={() => window.electron?.updater.install()}
+            className="mt-3 w-full bg-amber-600 hover:bg-amber-500 text-white font-semibold py-2 rounded-lg transition-colors text-sm"
+          >
+            Yeniden Başlat
+          </button>
+        </div>
+      )}
 
       {/* Duyuru popup */}
       {announcementPopup.length > 0 && (

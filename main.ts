@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import path from 'path';
 import { registerPosIpcHandlers, cleanupBridge, startBridgeExe } from './posIpc';
+import { autoUpdater } from 'electron-updater';
 
 // GPU sorunlarını önle (RDP / VM ortamları için)
 app.disableHardwareAcceleration();
@@ -80,6 +81,50 @@ app.on('ready', () => {
     console.log(ready ? '[BRIDGE] Otomatik başlatıldı ✓' : '[BRIDGE] Başlatılamadı');
     mainWindow?.webContents.send('bridge:status-update', { status: ready ? 'connected' : 'failed' });
   });
+
+  // ── Otomatik Güncelleme ─────────────────────────────────
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('[UPDATER] Güncelleme mevcut:', info.version);
+    mainWindow?.webContents.send('updater:update-available', { version: info.version });
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    mainWindow?.webContents.send('updater:download-progress', { percent: Math.round(progress.percent) });
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    console.log('[UPDATER] Güncelleme indirildi, yeniden başlatılacak');
+    mainWindow?.webContents.send('updater:update-downloaded');
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('[UPDATER] Hata:', err.message);
+  });
+
+  // IPC: Renderer'dan güncelleme kontrol/indir/kur
+  ipcMain.handle('updater:check', async () => {
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      return { available: !!result?.updateInfo, version: result?.updateInfo?.version };
+    } catch { return { available: false }; }
+  });
+
+  ipcMain.handle('updater:download', async () => {
+    try { await autoUpdater.downloadUpdate(); return { success: true }; }
+    catch (e: any) { return { success: false, error: e.message }; }
+  });
+
+  ipcMain.handle('updater:install', () => {
+    autoUpdater.quitAndInstall();
+  });
+
+  // 5 saniye sonra güncelleme kontrol et
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(() => {});
+  }, 5000);
 });
 
 app.on('window-all-closed', () => {

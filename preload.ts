@@ -39,4 +39,24 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('bridge:status-update', (_event: any, data: any) => callback(data));
     },
   },
+  updater: {
+    /** Güncelleme kontrol et */
+    check: () => ipcRenderer.invoke('updater:check') as Promise<{ available: boolean; version?: string }>,
+    /** Güncellemeyi indir */
+    download: () => ipcRenderer.invoke('updater:download') as Promise<{ success: boolean; error?: string }>,
+    /** Güncellemeyi kur ve yeniden başlat */
+    install: () => ipcRenderer.invoke('updater:install'),
+    /** Güncelleme mevcut bildirimi */
+    onUpdateAvailable: (callback: (data: { version: string }) => void) => {
+      ipcRenderer.on('updater:update-available', (_event: any, data: any) => callback(data));
+    },
+    /** İndirme ilerlemesi */
+    onDownloadProgress: (callback: (data: { percent: number }) => void) => {
+      ipcRenderer.on('updater:download-progress', (_event: any, data: any) => callback(data));
+    },
+    /** İndirme tamamlandı */
+    onUpdateDownloaded: (callback: () => void) => {
+      ipcRenderer.on('updater:update-downloaded', () => callback());
+    },
+  },
 });
