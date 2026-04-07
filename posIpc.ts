@@ -13,7 +13,7 @@ import net from 'net';
 import { spawn, type ChildProcess } from 'child_process';
 import path from 'path';
 
-export { startBridgeProcess };
+export { startBridgeProcess, startBridgeExe };
 
 let bridgeProcess: ChildProcess | null = null;
 let bridgeReady = false;
@@ -185,6 +185,56 @@ function startBridgeProcess(pythonPath: string, bridgePath: string, env?: Record
         clearTimeout(readyTimer);
         readyTimer = null;
       }
+      resolve(false);
+    });
+  });
+}
+
+/** EXE veya python ile bridge başlat. cmd=exe path, args=[] veya cmd='python', args=[script] */
+function startBridgeExe(cmd: string, args: string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (bridgeProcess) {
+      resolve(bridgeReady);
+      return;
+    }
+
+    bridgeReady = false;
+
+    bridgeProcess = spawn(cmd, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+
+    let readyTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      console.warn('[BRIDGE] READY sinyali alınamadı (10s timeout)');
+      resolve(false);
+    }, 10_000);
+
+    bridgeProcess.stdout?.on('data', (data: Buffer) => {
+      const text = data.toString();
+      console.log(text.trim());
+      if (text.includes('[BRIDGE] READY')) {
+        bridgeReady = true;
+        if (readyTimer) { clearTimeout(readyTimer); readyTimer = null; }
+        resolve(true);
+      }
+    });
+
+    bridgeProcess.stderr?.on('data', (data: Buffer) => {
+      console.error(`[BRIDGE ERR] ${data.toString().trim()}`);
+    });
+
+    bridgeProcess.on('exit', (code) => {
+      console.log(`[BRIDGE] Process çıktı, kod: ${code}`);
+      bridgeProcess = null;
+      bridgeReady = false;
+    });
+
+    bridgeProcess.on('error', (err) => {
+      console.error(`[BRIDGE] Process hata: ${err.message}`);
+      bridgeProcess = null;
+      bridgeReady = false;
+      if (readyTimer) { clearTimeout(readyTimer); readyTimer = null; }
       resolve(false);
     });
   });

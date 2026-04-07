@@ -21,3 +21,6 @@ build/flame-logo.png
 # Portable git
 mingit/
 mingit.zip
+
+build/pos_bridge/
+pos_bridge.spec

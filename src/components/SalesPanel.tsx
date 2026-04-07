@@ -40,6 +40,7 @@ interface Sale {
   // Atlantis DB referansları (aktif mod)
   terminalRecordId?: number;
   ticketIds?: number[];
+  ticketGroupMap?: Record<string, number[]>;
 }
 
 interface RefundInfo {
@@ -487,6 +488,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         // Atlantis referansları — iade için gerekli
         terminalRecordId: result.terminalRecordId,
         ticketIds: result.ticketIds,
+        ticketGroupMap: result.ticketGroupMap,
       };
 
       if (formData.isCrossSale) {
@@ -505,7 +507,19 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       
       // İşlem modalını kapat, sonuç modalını göster
       setPosProcessing(false);
-      setPosResult(result);
+      setPosResult({
+        ...result,
+        _saleInfo: {
+          packageName: selectedPackage.name,
+          packageId: selectedPackage.id,
+          adultQty,
+          childQty,
+          adultPrice: selectedPackage.adultPrice,
+          childPrice: selectedPackage.childPrice,
+          currency: selectedPackage.currency,
+          isFree: isFreePackage,
+        },
+      });
       
       // Kısa gecikme ile processing modal'dan sonuç modal'a geçiş
       setTimeout(() => {
@@ -535,6 +549,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         {
           terminalRecordId: sale.terminalRecordId,
           ticketIds: sale.ticketIds,
+          ticketGroupMap: sale.ticketGroupMap,
         },
         {
           packageName: sale.packageName,
@@ -2406,12 +2421,10 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                   onClick={async () => {
                     // Manuel bilet basımı (tekrar bas)
                     try {
-                      const selectedPkg = kasaPackages.find((p: PackageItem) => p.id === formData.packageId);
-                      if (!selectedPkg || !posResult.ticketIds || !posResult.terminalRecordId) return;
+                      const saleInfo = posResult._saleInfo;
+                      if (!saleInfo || !posResult.ticketIds || !posResult.terminalRecordId) return;
                       
                       const kasaLabel = currentKasaId === 'wildpark' ? 'WILDPARK' : currentKasaId === 'sinema' ? 'XD SINEMA' : 'FACE2FACE';
-                      const adultQ = parseInt(formData.adultQty) || 0;
-                      const childQ = parseInt(formData.childQty) || 0;
                       
                       const printData = buildTicketPrintData(
                         {
@@ -2420,15 +2433,16 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                           ticketGroupMap: posResult.ticketGroupMap as Record<string, number[]> | undefined,
                         },
                         {
-                          packageName: selectedPkg.name,
+                          packageName: saleInfo.packageName,
                           kasaId: currentKasaId as any,
                           personnelName: getPersonnelName(),
-                          adultQty: adultQ,
-                          childQty: childQ,
+                          adultQty: saleInfo.adultQty,
+                          childQty: saleInfo.childQty,
                           products: [kasaLabel],
-                          adultPrice: selectedPkg.adultPrice,
-                          childPrice: selectedPkg.childPrice,
-                          currency: selectedPkg.currency,
+                          adultPrice: saleInfo.adultPrice,
+                          childPrice: saleInfo.childPrice,
+                          currency: saleInfo.currency,
+                          isFree: saleInfo.isFree,
                         },
                       );
                       

@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import path from 'path';
-import { registerPosIpcHandlers, cleanupBridge, startBridgeProcess } from './posIpc';
+import { registerPosIpcHandlers, cleanupBridge, startBridgeExe } from './posIpc';
 
 // GPU sorunlarını önle (RDP / VM ortamları için)
 app.disableHardwareAcceleration();
@@ -58,14 +58,20 @@ app.on('ready', () => {
 
   createWindow();
 
-  // pos_bridge.py otomatik başlat
-  const isDev = !!process.env.VITE_DEV_SERVER_URL;
-  const bridgePath = isDev
+  // pos_bridge EXE otomatik başlat
+  const isDevEnv = !!process.env.VITE_DEV_SERVER_URL;
+  const bridgePath = isDevEnv
     ? path.join(__dirname, '..', 'pos_bridge.py')
-    : path.join(process.resourcesPath, 'pos_bridge.py');
+    : path.join(process.resourcesPath, 'pos_bridge.exe');
+  const bridgeCmd = isDevEnv ? 'python' : bridgePath;
+  const bridgeArgs = isDevEnv ? [path.join(__dirname, '..', 'pos_bridge.py')] : [];
   console.log('[BRIDGE] Path:', bridgePath);
-  startBridgeProcess('python', bridgePath).then(ready => {
+
+  // Renderer'a durum bildir
+  mainWindow?.webContents.send('bridge:status-update', { status: 'connecting' });
+  startBridgeExe(bridgeCmd, bridgeArgs).then(ready => {
     console.log(ready ? '[BRIDGE] Otomatik başlatıldı ✓' : '[BRIDGE] Başlatılamadı');
+    mainWindow?.webContents.send('bridge:status-update', { status: ready ? 'connected' : 'failed' });
   });
 });
 

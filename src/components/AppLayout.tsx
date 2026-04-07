@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { LogOut, Package, Droplets, Share2, LayoutDashboard, Briefcase, User, Menu, X, Shield, BarChart3, Users, Wallet, TrendingUp, FileText, ChevronLeft, Settings, Bug, Minus, Square, Copy } from 'lucide-react';
+import { LogOut, Package, Droplets, Share2, LayoutDashboard, Briefcase, User, Menu, X, Shield, BarChart3, Users, Wallet, TrendingUp, FileText, ChevronLeft, Settings, Bug, Minus, Copy, Wifi, WifiOff, Loader2 } from 'lucide-react';
 import { loadAdvancesFromSupabase } from '@/utils/kasaSettingsDB';
 import { loadExchangeRates, loadExchangeRatesFromSupabase, saveExchangeRates } from '@/utils/dailyData';
 import { getKasaTheme } from '@/utils/kasaTheme';
@@ -56,6 +56,23 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sidebarCollapsed = collapsed && !hovered;
+
+  // Bridge durum popup
+  const [bridgeStatus, setBridgeStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
+  const [showBridgePopup, setShowBridgePopup] = useState(false);
+
+  useEffect(() => {
+    const electron = (window as any).electron;
+    if (!electron?.window?.onBridgeStatus) return;
+    electron.window.onBridgeStatus((data: { status: string }) => {
+      const s = data.status as typeof bridgeStatus;
+      setBridgeStatus(s);
+      setShowBridgePopup(true);
+      if (s === 'connected' || s === 'failed') {
+        setTimeout(() => setShowBridgePopup(false), s === 'connected' ? 3000 : 6000);
+      }
+    });
+  }, []);
 
   const handleMouseEnter = () => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -150,6 +167,24 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
           </button>
         </div>
       </div>
+
+      {/* Bridge status popup */}
+      {showBridgePopup && (
+        <div className={`fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-sm transition-all duration-300 ${
+          bridgeStatus === 'connecting' ? 'bg-yellow-900/80 border-yellow-700/50 text-yellow-200' :
+          bridgeStatus === 'connected' ? 'bg-green-900/80 border-green-700/50 text-green-200' :
+          'bg-red-900/80 border-red-700/50 text-red-200'
+        }`}>
+          {bridgeStatus === 'connecting' && <Loader2 className="w-5 h-5 animate-spin" />}
+          {bridgeStatus === 'connected' && <Wifi className="w-5 h-5" />}
+          {bridgeStatus === 'failed' && <WifiOff className="w-5 h-5" />}
+          <span className="text-sm font-medium">
+            {bridgeStatus === 'connecting' && 'Bridge bağlanıyor...'}
+            {bridgeStatus === 'connected' && 'Bridge bağlandı'}
+            {bridgeStatus === 'failed' && 'Bridge bağlantı başarısız'}
+          </span>
+        </div>
+      )}
 
       {/* Mobile Menu Button */}
       <button

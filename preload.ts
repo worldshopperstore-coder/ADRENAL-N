@@ -31,5 +31,8 @@ contextBridge.exposeInMainWorld('electron', {
     maximize: () => ipcRenderer.send('window:maximize'),
     close: () => ipcRenderer.send('window:close'),
     isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+    onBridgeStatus: (callback: (data: { status: string }) => void) => {
+      ipcRenderer.on('bridge:status-update', (_event: any, data: any) => callback(data));
+    },
   },
 });

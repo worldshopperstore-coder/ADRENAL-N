@@ -10,7 +10,7 @@
     "build:renderer": "vite build",
     "build:main": "npx esbuild main.ts --bundle --platform=node --outfile=dist/main.cjs --format=cjs --external:electron",
     "build:preload": "npx esbuild preload.ts --bundle --platform=node --outfile=dist/preload.cjs --format=cjs --external:electron",
-    "build": "npm run build:renderer && npm run build:main && npm run build:preload",
+    "build": "npm run build:renderer && npm run build:main && npm run build:preload && xcopy /Y build\\pos_bridge.exe dist\\",
     "dist": "npm run build && electron-builder --publish never",
     "dist:win": "npm run build && electron-builder --win --publish never",
     "dist:mac": "npm run build && electron-builder --mac --publish never",
@@ -52,8 +52,8 @@
     ],
     "extraResources": [
       {
-        "from": "pos_bridge.py",
-        "to": "pos_bridge.py"
+        "from": "build/pos_bridge.exe",
+        "to": "pos_bridge.exe"
       }
     ],
     "directories": {
