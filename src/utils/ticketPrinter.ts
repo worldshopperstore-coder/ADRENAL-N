@@ -310,12 +310,19 @@ export function buildTicketPrintData(
       });
     }
   } else {
-    // GroupMap yoksa, her ticket ID için ayrı bilet bas
+    // GroupMap yoksa — combo paketlerde ürün sayısına göre grupla
+    // Combo3: 3 ürün → her 3 ticketId = 1 kişi, Combo2: her 2 ticketId = 1 kişi
+    const productsPerPerson = request.products.length || 1;
+    const totalPersons = Math.floor(saleResult.ticketIds.length / productsPerPerson);
+    
     let aduIndex = 0;
     let chlIndex = 0;
     let compIndex = 0;
     
-    saleResult.ticketIds.forEach((ticketId, idx) => {
+    for (let personIdx = 0; personIdx < totalPersons; personIdx++) {
+      // Her kişinin ilk ticket ID'sini al (combo'da geri kalanları atla)
+      const ticketId = saleResult.ticketIds[personIdx * productsPerPerson];
+      
       let ticketType: 'ADU' | 'CHL' | 'COMP';
       let price: number;
       let typeIndex: number;
@@ -326,14 +333,14 @@ export function buildTicketPrintData(
         price = 0;
         compIndex++;
         typeIndex = compIndex;
-        typeTotal = saleResult.ticketIds.length;
-      } else if (idx < request.adultQty) {
+        typeTotal = totalPersons;
+      } else if (personIdx < request.adultQty) {
         ticketType = 'ADU';
         price = request.adultPrice;
         aduIndex++;
         typeIndex = aduIndex;
         typeTotal = request.adultQty;
-      } else if (idx < request.adultQty + request.childQty) {
+      } else if (personIdx < request.adultQty + request.childQty) {
         ticketType = 'CHL';
         price = request.childPrice;
         chlIndex++;
@@ -363,7 +370,7 @@ export function buildTicketPrintData(
         groupIndex: typeIndex,
         groupTotal: typeTotal,
       });
-    });
+    }
   }
   
   return printData;

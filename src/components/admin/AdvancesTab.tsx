@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Wallet, Save, RotateCcw, TreePine, Monitor, Users2 } from 'lucide-react';
+import { Wallet, Save, RotateCcw, TreePine, Monitor, Users2, Target } from 'lucide-react';
 import { getKasaSettings, updateKasaAdvances } from '@/utils/kasaSettingsDB';
 import { supabase } from '@/config/supabase';
+import { saveWeeklyTarget, getWeeklyTarget, getCurrentWeekStart } from '@/utils/weeklyTargetsDB';
 
 type KasaId = 'wildpark' | 'sinema' | 'face2face';
 
@@ -255,6 +256,87 @@ function KasaAdvanceCard({ kasa }: KasaCardProps) {
   );
 }
 
+function WeeklyTargetCard({ kasa }: KasaCardProps) {
+  const [targetAmount, setTargetAmount] = useState(0);
+  const [original, setOriginal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const weekStart = getCurrentWeekStart();
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const t = await getWeeklyTarget(kasa.id, weekStart);
+      const amount = t?.targetAmount || 0;
+      setTargetAmount(amount);
+      setOriginal(amount);
+      setLoading(false);
+    })();
+  }, [kasa.id, weekStart]);
+
+  const isDirty = targetAmount !== original;
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMsg(null);
+    const session = localStorage.getItem('userSession');
+    const updatedBy = session ? (JSON.parse(session).personnel?.fullName ?? 'admin') : 'admin';
+    await saveWeeklyTarget({ kasaId: kasa.id, weekStart, targetAmount, updatedBy });
+    setSaving(false);
+    setOriginal(targetAmount);
+    setMsg({ ok: true, text: '✓ Hedef kaydedildi' });
+  };
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4 shadow-boltify-card">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={`w-9 h-9 rounded-lg ${kasa.bg} border ${kasa.borderAccent} flex items-center justify-center`}>
+            <kasa.Icon className={`w-5 h-5 ${kasa.text}`} />
+          </div>
+          <h3 className={`text-base font-bold ${kasa.text}`}>{kasa.name}</h3>
+        </div>
+        {!loading && isDirty && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <Save className="w-3.5 h-3.5" />
+            {saving ? 'Kaydediliyor...' : 'Kaydet'}
+          </button>
+        )}
+      </div>
+      {loading ? (
+        <div className="text-sm text-gray-500 text-center py-4">Yükleniyor...</div>
+      ) : (
+        <div>
+          <label className="block text-xs text-gray-400 mb-1.5 font-medium">
+            Haftalık Hedef (TL) — {weekStart}
+          </label>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">🎯</span>
+              <input
+                type="number"
+                min={0}
+                step={1000}
+                value={targetAmount}
+                onChange={e => { setTargetAmount(Number(e.target.value)); setMsg(null); }}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-rose-500"
+                placeholder="Ör: 50000"
+              />
+            </div>
+            <span className="text-xs text-gray-500 w-24 text-right">{fmt(targetAmount)} ₺</span>
+          </div>
+          {msg && <p className={`text-xs font-medium mt-2 ${msg.ok ? 'text-green-400' : 'text-yellow-400'}`}>{msg.text}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdvancesTab() {
   return (
     <div className="space-y-4">
@@ -278,6 +360,29 @@ export default function AdvancesTab() {
         <p>• Avans değerleri kasanın açılış bakiyesini temsil eder.</p>
         <p>• Değiştirdiğinizde personel kasayı yeniden açtığında yeni avans geçerli olur.</p>
         <p>• Her kasanın avansı birbirinden bağımsızdır.</p>
+      </div>
+
+      {/* ── Haftalık Hedefler ─────────────────────────── */}
+      <div className="flex items-center gap-3 mt-8">
+        <div className="w-10 h-10 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center justify-center">
+          <Target className="w-5 h-5 text-rose-400" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-white tracking-tight">Haftalık Hedefler</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Her kasa için haftalık satış hedefi belirleyin (TL)</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {KASAS.map(k => (
+          <WeeklyTargetCard key={k.id} kasa={k} />
+        ))}
+      </div>
+
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-xs text-gray-500 space-y-1">
+        <p>• Hedefler haftalık olarak belirlenir (Pazartesi - Pazar).</p>
+        <p>• Personeller sadece kendi kasalarının yüzdesini görür, tutarı görmez.</p>
+        <p>• Hedefe en çok katkı yapan personel performans kaydına yansır.</p>
       </div>
     </div>
   );

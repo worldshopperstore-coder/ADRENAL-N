@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, ShoppingCart, FileSpreadsheet, FileText, X, CreditCard, Banknote, DollarSign, Euro, TrendingUp, Users, User, Tag, Globe, ArrowLeftRight, Shuffle, Building2, Package, ChevronRight, Check, Coins, Zap, Loader2, Printer, CheckCircle, AlertTriangle, Database, Wifi } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Plus, ShoppingCart, FileSpreadsheet, FileText, X, CreditCard, Banknote, DollarSign, Euro, TrendingUp, Users, User, Tag, Globe, ArrowLeftRight, Shuffle, Building2, Package, ChevronRight, Check, Coins, Zap, Loader2, Printer, CheckCircle, AlertTriangle, Database, Wifi, Target } from 'lucide-react';
 import { INITIAL_PACKAGES, type PackageItem } from '@/data/packages';
 import { getPackagesByKasa } from '@/utils/packagesDB';
 import { getUserSession, getKasaId, getPersonnelId, getPersonnelName } from '@/utils/session';
@@ -14,6 +14,8 @@ import { getKasaSettings, loadAdvancesFromSupabase } from '@/utils/kasaSettingsD
 import { processActiveSale, processActiveRefund, checkIntegrationReady, hasContractMapping, type ActiveSaleRequest, type ActiveSaleResult } from '@/utils/saleFlow';
 import { isIntegrationEnabled } from '@/utils/posManager';
 import { printTickets, buildTicketPrintData } from '@/utils/ticketPrinter';
+import { getWeeklyTarget, getWeeklyProgress, getCurrentWeekStart } from '@/utils/weeklyTargetsDB';
+import { generateCrossHTMLReport } from '@/components/CrossSalesTab';
 
 
 interface Sale {
@@ -545,6 +547,30 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       const kasaLabel = currentKasaId === 'wildpark' ? 'WILDPARK ENTRANCE' : currentKasaId === 'sinema' ? 'CINEMA ENTRANCE' : 'FACE2FACE ENTRANCE';
       const isFree = sale.total === 0 && sale.category === 'Ücretsiz';
       
+      // Çapraz paketlerde ürün sayısını hesapla (ticket sayısı / kişi sayısı)
+      const totalPersons = sale.adultQty + sale.childQty;
+      const productsPerPerson = totalPersons > 0 ? Math.round(sale.ticketIds.length / totalPersons) : 1;
+      
+      // Ürün listesini çapraz paket kategorisine göre oluştur
+      let products: string[];
+      if (productsPerPerson >= 3) {
+        products = ['CINEMA ENTRANCE', 'WILDPARK ENTRANCE', 'FACE2FACE ENTRANCE'];
+      } else if (productsPerPerson === 2) {
+        // 2'li combo — kasaya göre hangi 2 ürün olduğunu belirle
+        const isCapraz = sale.category?.includes('Çapraz');
+        if (isCapraz) {
+          const comboProducts = [kasaLabel];
+          if (!comboProducts.includes('CINEMA ENTRANCE') && sale.packageName?.includes('XD')) comboProducts.push('CINEMA ENTRANCE');
+          if (!comboProducts.includes('WILDPARK ENTRANCE') && sale.packageName?.includes('WP')) comboProducts.push('WILDPARK ENTRANCE');
+          if (!comboProducts.includes('FACE2FACE ENTRANCE') && sale.packageName?.includes('F2F')) comboProducts.push('FACE2FACE ENTRANCE');
+          products = comboProducts.length >= 2 ? comboProducts : [kasaLabel, 'CINEMA ENTRANCE'];
+        } else {
+          products = [kasaLabel];
+        }
+      } else {
+        products = [kasaLabel];
+      }
+      
       const printData = buildTicketPrintData(
         {
           terminalRecordId: sale.terminalRecordId,
@@ -557,7 +583,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
           personnelName: sale.personnelName || getPersonnelName(),
           adultQty: sale.adultQty,
           childQty: sale.childQty,
-          products: [kasaLabel],
+          products: products,
           adultPrice: pkg?.adultPrice || 0,
           childPrice: pkg?.childPrice || 0,
           currency: sale.currency === 'KK' ? 'TL' : sale.currency,
@@ -567,12 +593,12 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       
       const pResult = await printTickets(printData);
       if (pResult.success) {
-        alert(`✅ ${pResult.printed} bilet tekrar basıldı!`);
+        console.log(`[Print] ${pResult.printed} bilet tekrar basıldı`);
       } else {
-        alert(`⚠️ Yazdırma: ${pResult.printed} basıldı, ${pResult.failed} başarısız\n${pResult.errors.join('\n')}`);
+        console.warn(`[Print] ${pResult.printed} basıldı, ${pResult.failed} başarısız`, pResult.errors);
       }
     } catch (err: any) {
-      alert(`❌ Yazdırma hatası: ${err.message}`);
+      console.warn('[Print] Yazdırma hatası:', err.message);
     }
   };
 
@@ -1397,6 +1423,23 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
   const cashTlTotal = totals.cashTl + (totals.cashUsd * usdRate) + (totals.cashEur * eurRate);
   const grandTotal = totals.kkTl + cashTlTotal;
 
+  // ── Haftalık Hedef ──
+  const [weeklyTarget, setWeeklyTarget] = useState(0);
+  const [weeklyCumulativeTl, setWeeklyCumulativeTl] = useState(0);
+  const weeklyPercentage = weeklyTarget > 0 ? Math.min((weeklyCumulativeTl / weeklyTarget) * 100, 100) : 0;
+
+  useEffect(() => {
+    const currentKasa = currentKasaId;
+    if (!currentKasa || currentKasa === 'genel') return;
+    getWeeklyTarget(currentKasa).then(t => {
+      setWeeklyTarget(t?.targetAmount || 0);
+    });
+    // Haftalık kümülatif ciro
+    getWeeklyProgress(currentKasa).then(p => {
+      setWeeklyCumulativeTl(p?.totalTl || 0);
+    });
+  }, [currentKasaId, sales]);
+
   return (
     <div className="p-3 sm:p-4 lg:p-6 space-y-4">
       {/* ── HEADER ── */}
@@ -1418,12 +1461,34 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-orange-500/20 transition-all duration-200 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white w-full sm:w-auto justify-center"
-        >
-          <Plus className="w-4 h-4" /> Satış Ekle
-        </button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          {sales.length > 0 && (
+            <button
+              onClick={exportToHTML}
+              className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white border border-gray-700"
+            >
+              <FileText className="w-4 h-4" />
+              <span className="hidden sm:inline">Rapor</span>
+            </button>
+          )}
+          <button
+            onClick={async () => {
+              const cs = await loadCrossSalesFromFirebase();
+              if (cs.length === 0) { alert('Çapraz satış kaydı bulunamadı'); return; }
+              generateCrossHTMLReport(cs);
+            }}
+            className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white border border-gray-700"
+          >
+            <Shuffle className="w-4 h-4" />
+            <span className="hidden sm:inline">Çapraz Rapor</span>
+          </button>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-orange-500/20 transition-all duration-200 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white"
+          >
+            <Plus className="w-4 h-4" /> Satış Ekle
+          </button>
+        </div>
       </div>
 
       {/* ── SUMMARY CARDS ── */}
@@ -1471,6 +1536,33 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
             </div>
             <p className="text-lg font-black text-white">{grandTotal.toFixed(2)} <span className="text-xs font-normal text-gray-400">₺</span></p>
           </div>
+        </div>
+      )}
+
+      {/* ── HAFTALIK HEDEF PROGRESS BAR (kompakt) ── */}
+      {weeklyTarget > 0 && (
+        <div className="flex items-center gap-2 px-1 py-1.5">
+          <Target className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">Haftalık Hedef</span>
+          <div className="flex-1 h-2.5 bg-gray-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ease-out ${
+                weeklyPercentage >= 100 ? 'bg-gradient-to-r from-emerald-500 to-green-400' :
+                weeklyPercentage >= 75 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' :
+                weeklyPercentage >= 50 ? 'bg-gradient-to-r from-orange-500 to-amber-400' :
+                'bg-gradient-to-r from-rose-500 to-red-400'
+              }`}
+              style={{ width: `${Math.min(weeklyPercentage, 100)}%` }}
+            />
+          </div>
+          <span className={`text-xs font-black flex-shrink-0 ${
+            weeklyPercentage >= 100 ? 'text-emerald-400' :
+            weeklyPercentage >= 75 ? 'text-amber-400' :
+            weeklyPercentage >= 50 ? 'text-orange-400' :
+            'text-rose-400'
+          }`}>
+            %{weeklyPercentage.toFixed(0)}{weeklyPercentage >= 100 ? ' 🎉' : ''}
+          </span>
         </div>
       )}
 
@@ -2111,24 +2203,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         </>
       )}
 
-      {/* ── EXPORT BUTTONS (sadece satış varsa) ── */}
-      {sales.length > 0 && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-gradient-to-r from-gray-900 to-gray-950 rounded-xl border border-gray-700/50 p-3 sm:p-4 shadow-boltify-card gap-3">
-          <div className="text-xs text-gray-400">
-            <span className="font-bold text-white">{sales.length}</span> satış kaydı · Genel Toplam: <span className="font-black text-emerald-400">{grandTotal.toFixed(2)} ₺</span>
-          </div>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <button
-              onClick={exportToHTML}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white rounded-xl transition-all text-xs font-bold shadow-boltify-glow"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              Rapor
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ── REFUND MODAL ── */}
       {showRefundModal && refundTargetSale && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -2440,12 +2514,12 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                       
                       const pResult = await printTickets(printData);
                       if (pResult.success) {
-                        alert(`✅ ${pResult.printed} bilet basıldı!`);
+                        console.log(`[Print] ${pResult.printed} bilet basıldı`);
                       } else {
-                        alert(`⚠️ Yazdırma: ${pResult.printed} basıldı, ${pResult.failed} başarısız\n${pResult.errors.join('\n')}`);
+                        console.warn(`[Print] ${pResult.printed} basıldı, ${pResult.failed} başarısız`, pResult.errors);
                       }
                     } catch (err: any) {
-                      alert(`❌ Yazdırma hatası: ${err.message}`);
+                      console.warn('[Print] Yazdırma hatası:', err.message);
                     }
                   }}
                   className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all"

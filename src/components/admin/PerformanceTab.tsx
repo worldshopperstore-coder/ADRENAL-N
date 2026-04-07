@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   TrendingUp, Package, ArrowLeftRight, BarChart2,
-  Award, Star, Shuffle, Info,
+  Award, Star, Shuffle, Info, Target,
   TreePine, Monitor, Users2,
 } from 'lucide-react';
 import {
@@ -12,11 +12,12 @@ import {
 } from '@/utils/performanceDB';
 import { getAllPersonnelFromFirebase } from '@/utils/personnelSupabaseDB';
 import { INITIAL_PACKAGES } from '@/data/packages';
+import { getAllWeeklyTargets, getWeeklyProgress, getCurrentWeekStart, getWeekEnd } from '@/utils/weeklyTargetsDB';
 import type { Personnel } from '@/types/personnel';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Period = 'week' | 'month' | 'lastMonth' | '3months';
-type View   = 'kasa' | 'packages' | 'cross';
+type View   = 'kasa' | 'packages' | 'cross' | 'target';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const KASA_INFO: Record<string, { name: string; Icon: React.FC<any>; bar: string; text: string; border: string; bg: string }> = {
@@ -53,6 +54,7 @@ const VIEW_TABS: { key: View; icon: React.ReactNode; label: string }[] = [
   { key: 'kasa',      icon: <BarChart2 className="w-4 h-4" />,       label: 'Kasa Özeti'      },
   { key: 'packages',  icon: <Package className="w-4 h-4" />,         label: 'Paket & Kategori'},
   { key: 'cross',     icon: <Shuffle className="w-4 h-4" />,         label: 'Çapraz Satış'    },
+  { key: 'target',    icon: <Target className="w-4 h-4" />,          label: 'Haftalık Hedef'  },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -659,6 +661,226 @@ function CrosaSatisView({ sales, crossSales, rates }: {
   );
 }
 
+// ── Sub-view: Haftalık Hedef ─────────────────────────────────────────────────
+function HaftalikHedefView() {
+  const [loading, setLoading] = useState(true);
+  const [kasaProgress, setKasaProgress] = useState<{
+    kasaId: string;
+    targetAmount: number;
+    currentAmount: number;
+    percentage: number;
+    personnelBreakdown: { personnelId: string; personnelName: string; totalTl: number; percentage: number }[];
+  }[]>([]);
+
+  useEffect(() => {
+    const weekStart = getCurrentWeekStart();
+    setLoading(true);
+
+    Promise.all([
+      getAllWeeklyTargets(weekStart),
+      ...['wildpark', 'sinema', 'face2face'].map(k => getWeeklyProgress(k, weekStart)),
+    ]).then(([targets, wpProgress, snProgress, f2fProgress]) => {
+      const progressMap: Record<string, typeof wpProgress> = {
+        wildpark: wpProgress,
+        sinema: snProgress,
+        face2face: f2fProgress,
+      };
+
+      const result = ['wildpark', 'sinema', 'face2face'].map(kasaId => {
+        const target = targets.find(t => t.kasaId === kasaId);
+        const progress = progressMap[kasaId];
+        const targetAmount = target?.targetAmount || 0;
+        const currentAmount = progress?.totalTl || 0;
+        const percentage = targetAmount > 0 ? Math.min((currentAmount / targetAmount) * 100, 100) : 0;
+
+        return {
+          kasaId,
+          targetAmount,
+          currentAmount,
+          percentage,
+          personnelBreakdown: progress?.personnelBreakdown || [],
+        };
+      });
+
+      setKasaProgress(result);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const weekStart = getCurrentWeekStart();
+  const weekEnd = getWeekEnd(weekStart);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-40">
+        <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Tüm kasalar genelinde en çok katkı sağlayan personel
+  const allPersonnelMap: Record<string, { name: string; totalTl: number }> = {};
+  for (const k of kasaProgress) {
+    for (const p of k.personnelBreakdown) {
+      if (!allPersonnelMap[p.personnelId]) allPersonnelMap[p.personnelId] = { name: p.personnelName, totalTl: 0 };
+      allPersonnelMap[p.personnelId].totalTl += p.totalTl;
+    }
+  }
+  const topOverall = Object.entries(allPersonnelMap)
+    .map(([id, d]) => ({ id, name: d.name, totalTl: d.totalTl }))
+    .sort((a, b) => b.totalTl - a.totalTl);
+
+  const totalTarget = kasaProgress.reduce((a, k) => a + k.targetAmount, 0);
+  const totalCurrent = kasaProgress.reduce((a, k) => a + k.currentAmount, 0);
+  const totalPct = totalTarget > 0 ? Math.min((totalCurrent / totalTarget) * 100, 100) : 0;
+
+  return (
+    <div className="space-y-5">
+      {/* Hafta bilgisi */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-boltify-card">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Target className="w-5 h-5 text-rose-400" />
+            <span className="text-sm font-bold text-white">Haftalık Hedef Özeti</span>
+          </div>
+          <span className="text-xs text-gray-500">{weekStart} → {weekEnd}</span>
+        </div>
+        {totalTarget > 0 ? (
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-400">Genel İlerleme</span>
+              <span className={`text-lg font-black ${
+                totalPct >= 100 ? 'text-emerald-400' :
+                totalPct >= 75 ? 'text-amber-400' :
+                totalPct >= 50 ? 'text-orange-400' :
+                'text-rose-400'
+              }`}>%{totalPct.toFixed(1)}</span>
+            </div>
+            <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${
+                  totalPct >= 100 ? 'bg-gradient-to-r from-emerald-500 to-green-400' :
+                  totalPct >= 75 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' :
+                  totalPct >= 50 ? 'bg-gradient-to-r from-orange-500 to-amber-400' :
+                  'bg-gradient-to-r from-rose-500 to-red-400'
+                }`}
+                style={{ width: `${totalPct}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>₺{fmtNum(totalCurrent)}</span>
+              <span>Hedef: ₺{fmtNum(totalTarget)}</span>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-600 mt-2">Bu hafta için hedef belirlenmemiş. Avanslar sekmesinden hedef girebilirsiniz.</p>
+        )}
+      </div>
+
+      {/* Kasa bazlı hedef kartları */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {kasaProgress.map(k => {
+          const info = KASA_INFO[k.kasaId];
+          return (
+            <div key={k.kasaId} className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-boltify-card space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-8 h-8 rounded-lg ${info.bg} border ${info.border} flex items-center justify-center`}>
+                    <info.Icon className={`w-4 h-4 ${info.text}`} />
+                  </div>
+                  <span className={`font-bold text-sm ${info.text}`}>{info.name}</span>
+                </div>
+                <span className={`text-lg font-black ${
+                  k.percentage >= 100 ? 'text-emerald-400' :
+                  k.percentage >= 75 ? 'text-amber-400' :
+                  k.percentage >= 50 ? 'text-orange-400' :
+                  'text-rose-400'
+                }`}>
+                  {k.targetAmount > 0 ? `%${k.percentage.toFixed(1)}` : '—'}
+                </span>
+              </div>
+
+              {k.targetAmount > 0 ? (
+                <>
+                  <div className="h-2.5 bg-gray-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${info.bar}`}
+                      style={{ width: `${k.percentage}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>₺{fmtNum(k.currentAmount)}</span>
+                    <span>₺{fmtNum(k.targetAmount)}</span>
+                  </div>
+
+                  {/* Personel katkıları */}
+                  {k.personnelBreakdown.length > 0 && (
+                    <div className="border-t border-gray-800 pt-2 space-y-1.5">
+                      <span className="text-xs text-gray-500 font-medium">Personel Katkıları</span>
+                      {k.personnelBreakdown.slice(0, 5).map((p, i) => {
+                        const pPct = k.targetAmount > 0 ? (p.totalTl / k.targetAmount) * 100 : 0;
+                        return (
+                          <div key={p.personnelId} className="flex items-center gap-2">
+                            <span className="text-xs w-4 text-gray-600 flex-shrink-0">
+                              {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
+                            </span>
+                            <span className="text-xs text-gray-300 flex-1 truncate">{p.personnelName}</span>
+                            <span className="text-xs text-gray-500">{pPct.toFixed(1)}%</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-gray-600 text-center py-2">Hedef belirlenmemiş</p>
+              )}
+
+              {k.percentage >= 100 && (
+                <p className="text-xs text-emerald-400 font-bold text-center animate-pulse">🎉 Hedef tamamlandı!</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Genel personel sıralaması */}
+      {topOverall.length > 0 && totalTarget > 0 && (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-boltify-card">
+          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <Award className="w-4 h-4 text-yellow-400" /> Genel Personel Katkı Sıralaması
+          </h3>
+          <div className="space-y-2">
+            {topOverall.map((p, i) => {
+              const pPct = totalTarget > 0 ? (p.totalTl / totalTarget) * 100 : 0;
+              const maxTl = topOverall[0]?.totalTl || 1;
+              return (
+                <div key={p.id} className="flex items-center gap-3">
+                  <span className="w-6 text-center flex-shrink-0">
+                    {i === 0 ? <Award className="w-4 h-4 text-yellow-400 mx-auto" /> :
+                     i === 1 ? <Award className="w-4 h-4 text-gray-400 mx-auto" /> :
+                     i === 2 ? <Award className="w-4 h-4 text-amber-700 mx-auto" /> :
+                     <span className="text-xs text-gray-600">{i + 1}</span>}
+                  </span>
+                  <span className="text-sm text-white font-medium w-32 flex-shrink-0 truncate">{p.name}</span>
+                  <div className="flex-1 h-5 bg-gray-800 rounded-lg overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-lg transition-all"
+                      style={{ width: `${(p.totalTl / maxTl) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-400 w-20 text-right flex-shrink-0">₺{fmtNum(p.totalTl)}</span>
+                  <span className="text-xs text-gray-500 w-10 text-right flex-shrink-0">{pPct.toFixed(1)}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function PerformanceTab() {
   const [period, setPeriod]       = useState<Period>('month');
@@ -777,6 +999,7 @@ export default function PerformanceTab() {
           {view === 'kasa'      && <KasaOzetiView sales={sales} crossSales={crossSales} rates={rates} />}
           {view === 'packages'  && <PaketKategoriView sales={sales} rates={rates} />}
           {view === 'cross'     && <CrosaSatisView sales={sales} crossSales={crossSales} rates={rates} />}
+          {view === 'target'    && <HaftalikHedefView />}
         </>
       )}
     </div>
