@@ -49,7 +49,7 @@ def get_connection():
             password=DB_PASS,
             database=DB_NAME,
             charset='utf8',
-            login_timeout=10,
+            login_timeout=5,
             timeout=30,
         )
         conn.autocommit(False)
@@ -646,30 +646,31 @@ def main():
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
     
-    # Bağlantı testi
-    try:
-        db = get_connection()
-        cur = db.cursor()
-        cur.execute("SELECT DB_NAME()")
-        dbname = cur.fetchone()[0]
-        print(f"[BRIDGE] SQL Server bağlantısı başarılı: {dbname}@{DB_HOST}", flush=True)
-    except Exception as e:
-        print(f"[BRIDGE] SQL Server bağlantı hatası: {e}", file=sys.stderr, flush=True)
-        # Yine de sunucuyu başlat, bağlantı sonra kurulabilir
-    
-    # POS Server'a ön-bağlantı kur (ilk işlem de hızlı olsun)
-    try:
-        _get_pos_socket(POS_HOST, int(os.environ.get('POS_PORT', POS_PORT)))
-        print(f"[BRIDGE] POS Server ön-bağlantı başarılı: {POS_HOST}:{POS_PORT}", flush=True)
-    except Exception as e:
-        print(f"[BRIDGE] POS Server ön-bağlantı başarısız (sorun değil): {e}", flush=True)
-    
     class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         daemon_threads = True
 
     server = ThreadedHTTPServer((BRIDGE_HOST, BRIDGE_PORT), BridgeHandler)
     print(f"[BRIDGE] HTTP sunucu başlatıldı: http://{BRIDGE_HOST}:{BRIDGE_PORT} (threaded)", flush=True)
     print(f"[BRIDGE] READY", flush=True)  # Electron'un dinleyeceği sinyal
+
+    # Bağlantıları arka planda kur (READY'yi bekletmesin)
+    def _warmup():
+        try:
+            db = get_connection()
+            cur = db.cursor()
+            cur.execute("SELECT DB_NAME()")
+            dbname = cur.fetchone()[0]
+            print(f"[BRIDGE] SQL Server bağlantısı başarılı: {dbname}@{DB_HOST}", flush=True)
+        except Exception as e:
+            print(f"[BRIDGE] SQL Server bağlantı hatası: {e}", file=sys.stderr, flush=True)
+        try:
+            _get_pos_socket(POS_HOST, int(os.environ.get('POS_PORT', POS_PORT)))
+            print(f"[BRIDGE] POS Server ön-bağlantı başarılı: {POS_HOST}:{POS_PORT}", flush=True)
+        except Exception as e:
+            print(f"[BRIDGE] POS Server ön-bağlantı başarısız (sorun değil): {e}", flush=True)
+
+    warmup_thread = threading.Thread(target=_warmup, daemon=True)
+    warmup_thread.start()
     
     try:
         server.serve_forever()
