@@ -1,6 +1,6 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import path from 'path';
-import { registerPosIpcHandlers, cleanupBridge } from './posIpc';
+import { registerPosIpcHandlers, cleanupBridge, startBridgeProcess } from './posIpc';
 
 // GPU sorunlarını önle (RDP / VM ortamları için)
 app.disableHardwareAcceleration();
@@ -18,12 +18,7 @@ const createWindow = () => {
     title: 'Adrenalin',
     icon: path.join(__dirname, '..', 'public', 'icon.ico'),
     autoHideMenuBar: true,
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#09090b',
-      symbolColor: '#4b5563',
-      height: 36,
-    },
+    frame: false,
     backgroundColor: '#09090b',
     roundedCorners: true,
     webPreferences: {
@@ -51,7 +46,23 @@ const createWindow = () => {
 app.on('ready', () => {
   // POS entegrasyon IPC handler'larını kaydet
   registerPosIpcHandlers();
+
+  // Window control IPC handlers
+  ipcMain.on('window:minimize', () => mainWindow?.minimize());
+  ipcMain.on('window:maximize', () => {
+    if (mainWindow?.isMaximized()) mainWindow.unmaximize();
+    else mainWindow?.maximize();
+  });
+  ipcMain.on('window:close', () => mainWindow?.close());
+  ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized() ?? false);
+
   createWindow();
+
+  // pos_bridge.py otomatik başlat
+  const bridgePath = path.join(__dirname, '..', 'pos_bridge.py');
+  startBridgeProcess('python', bridgePath).then(ready => {
+    console.log(ready ? '[BRIDGE] Otomatik başlatıldı ✓' : '[BRIDGE] Başlatılamadı');
+  });
 });
 
 app.on('window-all-closed', () => {

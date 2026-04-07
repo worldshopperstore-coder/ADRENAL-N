@@ -26,4 +26,10 @@ contextBridge.exposeInMainWorld('electron', {
     /** Bridge process durumu */
     status: () => ipcRenderer.invoke('bridge:status'),
   },
+  window: {
+    minimize: () => ipcRenderer.send('window:minimize'),
+    maximize: () => ipcRenderer.send('window:maximize'),
+    close: () => ipcRenderer.send('window:close'),
+    isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+  },
 });

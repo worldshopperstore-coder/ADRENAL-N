@@ -13,6 +13,8 @@ import net from 'net';
 import { spawn, type ChildProcess } from 'child_process';
 import path from 'path';
 
+export { startBridgeProcess };
+
 let bridgeProcess: ChildProcess | null = null;
 let bridgeReady = false;
 

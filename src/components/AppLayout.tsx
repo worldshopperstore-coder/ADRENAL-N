@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { LogOut, Package, Droplets, Share2, LayoutDashboard, Briefcase, User, Menu, X, Shield, BarChart3, Users, Wallet, TrendingUp, FileText, ChevronLeft, Settings, Bug } from 'lucide-react';
+import { LogOut, Package, Droplets, Share2, LayoutDashboard, Briefcase, User, Menu, X, Shield, BarChart3, Users, Wallet, TrendingUp, FileText, ChevronLeft, Settings, Bug, Minus, Square, Copy } from 'lucide-react';
 import { loadAdvancesFromSupabase } from '@/utils/kasaSettingsDB';
 import { loadExchangeRates, loadExchangeRatesFromSupabase, saveExchangeRates } from '@/utils/dailyData';
 import { getKasaTheme } from '@/utils/kasaTheme';
@@ -124,7 +124,32 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
   return (
     <div className="min-h-screen bg-gray-950 flex">
       {/* Electron titlebar drag region — only over main content area */}
-      <div className={`electron-drag fixed top-0 right-0 h-8 bg-gray-950 z-[60] select-none transition-all duration-300 ${sidebarCollapsed ? 'md:left-16' : 'md:left-64'} left-0`} />
+      <div className={`electron-drag fixed top-0 right-0 h-9 bg-gray-950/80 z-[60] select-none transition-all duration-300 ${sidebarCollapsed ? 'md:left-16' : 'md:left-64'} left-0 flex items-center justify-end`}>
+        {/* Custom window controls */}
+        <div className="flex items-center electron-no-drag">
+          <button
+            onClick={() => (window as any).electron?.window?.minimize()}
+            className="w-11 h-9 flex items-center justify-center text-gray-500 hover:text-gray-200 hover:bg-gray-800/80 transition-colors"
+            title="Küçült"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => (window as any).electron?.window?.maximize()}
+            className="w-11 h-9 flex items-center justify-center text-gray-500 hover:text-gray-200 hover:bg-gray-800/80 transition-colors"
+            title="Büyüt / Küçült"
+          >
+            <Copy className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => (window as any).electron?.window?.close()}
+            className="w-11 h-9 flex items-center justify-center text-gray-500 hover:text-white hover:bg-red-600 transition-colors rounded-tr-none"
+            title="Kapat"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
       {/* Mobile Menu Button */}
       <button
