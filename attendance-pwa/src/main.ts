@@ -434,7 +434,7 @@ async function handleSelfServiceAutoCheckin(user: PersonnelInfo, kasa: string) {
       const now = new Date().toISOString();
       const { error } = await supabase.from('attendance').update({ status: 'checked_out', check_out: now, checkout_token: null }).eq('id', existing.id);
       if (error) { showError('Çıkış kaydedilemedi: ' + error.message); return; }
-      clearSession(true);
+      clearSession(false);
       showSuccess('Güle Güle!', esc(user.fullName), new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), false);
       return;
     }
