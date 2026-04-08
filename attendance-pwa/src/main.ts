@@ -435,7 +435,7 @@ async function handleSelfServiceAutoCheckin(user: PersonnelInfo, kasa: string) {
       const { error } = await supabase.from('attendance').update({ status: 'checked_out', check_out: now, checkout_token: null }).eq('id', existing.id);
       if (error) { showError('Çıkış kaydedilemedi: ' + error.message); return; }
       clearSession(false);
-      showSuccess('Güle Güle!', esc(user.fullName), new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), false);
+      showSelfSuccess('Güle Güle!', esc(user.fullName), new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), false);
       return;
     }
     if (existing.status === 'checked_out') {
@@ -460,8 +460,7 @@ async function handleSelfServiceAutoCheckin(user: PersonnelInfo, kasa: string) {
   };
   const { error: insErr } = await supabase.from('attendance').upsert(newRecord);
   if (insErr) { showError('Giriş kaydedilemedi: ' + insErr.message); return; }
-  saveSession(user, newRecord);
-  showSuccess('Hoş Geldiniz!', user.fullName, new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), true);
+  showSelfSuccess('Hoş Geldiniz!', user.fullName, new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), true);
 }
 
 function showSelfLogin(kasa?: string) {
@@ -528,9 +527,12 @@ function showSelfLogin(kasa?: string) {
 
       if (existing) {
         if (existing.status === 'checked_in') {
-          // Already checked in — go to dashboard
-          saveSession(user, existing);
-          showDashboard();
+          // Already checked in — do checkout
+          showProcessing('Çıkış kaydediliyor...');
+          const now2 = new Date().toISOString();
+          const { error: outErr } = await supabase.from('attendance').update({ status: 'checked_out', check_out: now2, checkout_token: null }).eq('id', existing.id);
+          if (outErr) { showError('Çıkış kaydedilemedi: ' + outErr.message); return; }
+          showSelfSuccess('Güle Güle!', user.fullName, new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), false);
           return;
         }
         if (existing.status === 'checked_out') {
@@ -556,8 +558,7 @@ function showSelfLogin(kasa?: string) {
       const { error: insErr } = await supabase.from('attendance').upsert(newRecord);
       if (insErr) { showError('Giriş kaydedilemedi: ' + insErr.message); return; }
 
-      saveSession(user, newRecord);
-      showSuccess('Hoş Geldiniz!', user.fullName, new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), true);
+      showSelfSuccess('Hoş Geldiniz!', user.fullName, new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), true);
     } catch (e: any) {
       if (e?.message?.includes('Failed to fetch') || e?.message?.includes('NetworkError')) {
         showError('İnternet bağlantısı kurulamadı.');
@@ -597,6 +598,32 @@ function showProcessing(msg: string) {
         <p style="color:var(--orange);font-size:15px;font-weight:600">${esc(msg)}</p>
       </div>
     </div>`;
+}
+
+function showSelfSuccess(title: string, name: string, time: string, isCheckin: boolean) {
+  const clr = isCheckin ? 'var(--green)' : 'var(--orange)';
+  const clrRaw = isCheckin ? '#22c55e' : '#f97316';
+  const dateStr = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+  document.getElementById('app')!.innerHTML = `${CSS}
+    <div class="page" style="align-items:center;justify-content:center">
+      ${WAVE}
+      <div style="position:relative;z-index:2;text-align:center;padding:24px;max-width:340px;width:100%" class="scale-in">
+        <div style="width:80px;height:80px;margin:0 auto 20px;background:${clrRaw}12;border:3px solid ${clrRaw}35;border-radius:50%;display:flex;align-items:center;justify-content:center;color:${clr};box-shadow:0 0 40px ${clrRaw}15">
+          ${isCheckin ? I.ok : I.out}
+        </div>
+        <h1 style="font-size:26px;font-weight:800;letter-spacing:-.3px;margin:0 0 4px">${esc(title)}</h1>
+        <p style="color:${clr};font-size:20px;font-weight:700;margin:0 0 20px">${esc(name)}</p>
+        <div class="card" style="padding:16px;margin-bottom:20px">
+          <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:4px">
+            <div style="color:${clr}">${I.clk}</div>
+            <span style="font-size:24px;font-weight:700">${esc(time)}</span>
+          </div>
+          <p style="color:var(--text3);font-size:11px">${esc(dateStr)}</p>
+        </div>
+        <p style="color:var(--text3);font-size:11px;margin-top:12px">Bu sayfayı kapatabilirsiniz.</p>
+      </div>
+    </div>`;
+  if (navigator.vibrate) navigator.vibrate(isCheckin ? [100, 50, 100] : [150]);
 }
 
 function showSuccess(title: string, name: string, time: string, isCheckin: boolean) {
