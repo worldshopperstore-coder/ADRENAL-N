@@ -624,7 +624,7 @@ function showSelfSuccess(title: string, name: string, time: string, isCheckin: b
       </div>
     </div>`;
   if (navigator.vibrate) navigator.vibrate(isCheckin ? [100, 50, 100] : [150]);
-  if (!isCheckin) setTimeout(() => showScanner('checkin'), 4000);
+  setTimeout(() => showScanner('checkin'), 4000);
 }
 
 function showSuccess(title: string, name: string, time: string, isCheckin: boolean) {
