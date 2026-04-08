@@ -6,7 +6,7 @@ const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://mipa
 const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'sb_publishable_Cby57dwYK-5-gpuUGGE_aQ_nFzy41cv';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const PWA_VERSION = 'v5.1';
+const PWA_VERSION = 'v5.2';
 
 // ── Types ──
 interface AttendanceRecord {
@@ -422,46 +422,70 @@ async function handleSelfServiceQR(kasa: string) {
 
 async function handleSelfServiceAutoCheckin(user: PersonnelInfo, kasa: string) {
   showProcessing('İşleniyor...');
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const rowId = `${user.id}_${today}`;
+    const { data: existing, error: selErr } = await supabase.from('attendance').select('*').eq('id', rowId).single();
 
-  const today = new Date().toISOString().slice(0, 10);
-  const rowId = `${user.id}_${today}`;
-  const { data: existing } = await supabase.from('attendance').select('*').eq('id', rowId).single();
-
-  if (existing) {
-    if (existing.status === 'checked_in') {
-      // Zaten giriş yapmış — çıkış yap
-      showProcessing('Çıkış kaydediliyor...');
-      const now = new Date().toISOString();
-      const { error } = await supabase.from('attendance').update({ status: 'checked_out', check_out: now, checkout_token: null }).eq('id', existing.id);
-      if (error) { showError('Çıkış kaydedilemedi: ' + error.message); return; }
-      clearSession(false);
-      showSelfSuccess('Güle Güle!', esc(user.fullName), new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), false);
+    if (selErr && selErr.code !== 'PGRST116') {
+      // PGRST116 = row not found, diğer hatalar gerçek hata
+      showError('Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.');
       return;
     }
-    if (existing.status === 'checked_out') {
-      showError('Bugün zaten giriş ve çıkış yapmışsınız.');
-      return;
+
+    if (existing) {
+      if (existing.status === 'checked_in' || existing.status === 'checkout_pending') {
+        // Zaten giriş yapmış — çıkış yap
+        showProcessing('Çıkış kaydediliyor...');
+        const now = new Date().toISOString();
+        const { error } = await supabase.from('attendance').update({ status: 'checked_out', check_out: now, checkout_token: null }).eq('id', existing.id);
+        if (error) { showError('Çıkış kaydedilemedi: ' + error.message); return; }
+        clearSession(false);
+        showSelfSuccess('Güle Güle!', esc(user.fullName), new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), false);
+        return;
+      }
+      if (existing.status === 'checked_out') {
+        showError('Bugün zaten giriş ve çıkış yapmışsınız.');
+        return;
+      }
+      if (existing.status === 'pending') {
+        // Kasa üzerinden oluşturulmuş ama henüz giriş yapılmamış — giriş yap
+        showProcessing('Giriş kaydediliyor...');
+        const now = new Date().toISOString();
+        const { error } = await supabase.from('attendance').update({ status: 'checked_in', check_in: now, session_token: `SELF-${user.id}-${Date.now()}` }).eq('id', existing.id);
+        if (error) { showError('Giriş kaydedilemedi: ' + error.message); return; }
+        existing.status = 'checked_in'; existing.check_in = now; existing.session_token = `SELF-${user.id}-${Date.now()}`;
+        saveSession(user, existing);
+        showDashboard();
+        return;
+      }
+    }
+
+    // Giriş yap
+    showProcessing('Giriş kaydediliyor...');
+    const now = new Date().toISOString();
+    const newRecord: any = {
+      id: rowId,
+      personnel_id: user.id,
+      personnel_name: user.fullName,
+      kasa_id: kasa,
+      date: today,
+      check_in: now,
+      check_out: null,
+      status: 'checked_in',
+      session_token: `SELF-${user.id}-${Date.now()}`,
+    };
+    const { error: insErr } = await supabase.from('attendance').upsert(newRecord);
+    if (insErr) { showError('Giriş kaydedilemedi: ' + insErr.message); return; }
+    saveSession(user, newRecord);
+    showDashboard();
+  } catch (e: any) {
+    if (e?.message?.includes('Failed to fetch') || e?.message?.includes('NetworkError')) {
+      showError('İnternet bağlantısı kurulamadı. WiFi veya mobil verinizi kontrol edin.');
+    } else {
+      showError('Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.');
     }
   }
-
-  // Giriş yap
-  showProcessing('Giriş kaydediliyor...');
-  const now = new Date().toISOString();
-  const newRecord: any = {
-    id: rowId,
-    personnel_id: user.id,
-    personnel_name: user.fullName,
-    kasa_id: kasa,
-    date: today,
-    check_in: now,
-    check_out: null,
-    status: 'checked_in',
-    session_token: `SELF-${user.id}-${Date.now()}`,
-  };
-  const { error: insErr } = await supabase.from('attendance').upsert(newRecord);
-  if (insErr) { showError('Giriş kaydedilemedi: ' + insErr.message); return; }
-  saveSession(user, newRecord);
-  showDashboard();
 }
 
 function showSelfLogin(kasa?: string) {
@@ -569,20 +593,6 @@ function showSelfLogin(kasa?: string) {
 
   loginBtn.addEventListener('click', doLogin);
   passInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
-}
-
-async function selfServiceCheckout() {
-  if (!currentUser || !currentAttendance) return;
-  showProcessing('Konum doğrulanıyor...');
-  const gps = await checkGPS();
-  if (!gps.ok) { showError(gps.error || 'Konum doğrulanamadı.'); return; }
-
-  showProcessing('Çıkış kaydediliyor...');
-  const now = new Date().toISOString();
-  const { error } = await supabase.from('attendance').update({ status: 'checked_out', check_out: now, checkout_token: null }).eq('id', currentAttendance.id);
-  if (error) { showError('Çıkış kaydedilemedi: ' + error.message); return; }
-  clearSession(true);
-  showSuccess('Güle Güle!', esc(currentUser.fullName), new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), false);
 }
 
 // ════════════════════════════════════════
@@ -723,7 +733,12 @@ function showDashboard() {
   supabase.from('attendance').select('*').eq('id', currentAttendance.id).single().then(({ data }) => {
     if (data) {
       currentAttendance = data;
-      if (data.status === 'checked_out') { clearSession(true); isSelfService ? showSelfLogin() : showScanner('checkin'); return; }
+      if (data.status === 'checked_out') {
+        const wasSelf = data.session_token?.startsWith('SELF-') || isSelfService;
+        clearSession(wasSelf ? false : true);
+        if (wasSelf) { showScanner('checkin'); } else { showScanner('checkin'); }
+        return;
+      }
       if (currentUser) saveSession(currentUser, data);
     }
     renderDash();
