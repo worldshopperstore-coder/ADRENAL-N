@@ -460,7 +460,8 @@ async function handleSelfServiceAutoCheckin(user: PersonnelInfo, kasa: string) {
   };
   const { error: insErr } = await supabase.from('attendance').upsert(newRecord);
   if (insErr) { showError('Giriş kaydedilemedi: ' + insErr.message); return; }
-  showSelfSuccess('Hoş Geldiniz!', user.fullName, new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), true);
+  saveSession(user, newRecord);
+  showDashboard();
 }
 
 function showSelfLogin(kasa?: string) {
@@ -527,12 +528,9 @@ function showSelfLogin(kasa?: string) {
 
       if (existing) {
         if (existing.status === 'checked_in') {
-          // Already checked in — do checkout
-          showProcessing('Çıkış kaydediliyor...');
-          const now2 = new Date().toISOString();
-          const { error: outErr } = await supabase.from('attendance').update({ status: 'checked_out', check_out: now2, checkout_token: null }).eq('id', existing.id);
-          if (outErr) { showError('Çıkış kaydedilemedi: ' + outErr.message); return; }
-          showSelfSuccess('Güle Güle!', user.fullName, new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), false);
+          // Already checked in — show dashboard
+          saveSession(user, existing);
+          showDashboard();
           return;
         }
         if (existing.status === 'checked_out') {
@@ -558,7 +556,8 @@ function showSelfLogin(kasa?: string) {
       const { error: insErr } = await supabase.from('attendance').upsert(newRecord);
       if (insErr) { showError('Giriş kaydedilemedi: ' + insErr.message); return; }
 
-      showSelfSuccess('Hoş Geldiniz!', user.fullName, new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), true);
+      saveSession(user, newRecord);
+      showDashboard();
     } catch (e: any) {
       if (e?.message?.includes('Failed to fetch') || e?.message?.includes('NetworkError')) {
         showError('İnternet bağlantısı kurulamadı.');
@@ -932,7 +931,9 @@ async function renderHome(c: HTMLElement) {
   } else {
     document.getElementById('co-btn')?.addEventListener('click', async () => {
       if (!currentUser || !currentAttendance) return;
-      if (isSelfService) { await selfServiceCheckout(); return; }
+      // Self-service personeli: direkt QR scanner aç, SELF- QR okutunca çıkış yapacak
+      const isSelf = currentAttendance.session_token?.startsWith('SELF-') || isSelfService;
+      if (isSelf) { showScanner('checkin'); return; }
       const tk = `OUT-${currentUser.id}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
       showScanner('checkout');
       try {
