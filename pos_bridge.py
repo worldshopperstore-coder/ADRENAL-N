@@ -39,8 +39,18 @@ BRIDGE_PORT = int(os.environ.get('BRIDGE_PORT', '5555'))
 conn = None
 
 def get_connection():
-    """Lazy SQL Server bağlantısı"""
+    """Lazy SQL Server bağlantısı — bağlantı kopmuşsa otomatik yenile"""
     global conn
+    if conn is not None:
+        # Bağlantı hala canlı mı kontrol et
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            cur.fetchone()
+        except Exception:
+            print("[BRIDGE] SQL bağlantısı kopmuş, yeniden bağlanıyor...", flush=True)
+            close_connection()
+    
     if conn is None:
         conn = pymssql.connect(
             server=DB_HOST,
@@ -49,10 +59,11 @@ def get_connection():
             password=DB_PASS,
             database=DB_NAME,
             charset='utf8',
-            login_timeout=5,
+            login_timeout=10,
             timeout=30,
         )
         conn.autocommit(False)
+        print(f"[BRIDGE] SQL bağlantısı kuruldu: {DB_NAME}@{DB_HOST}", flush=True)
     return conn
 
 
@@ -295,9 +306,15 @@ def process_sale(payload: dict) -> dict:
             db.rollback()
         except:
             pass
-        # Bağlantı kopmuş olabilir, yenile
-        if 'connection' in str(e).lower() or 'closed' in str(e).lower():
-            reconnect()
+        # Bağlantı kopmuş olabilir, yenile ve bir kez daha dene
+        err_str = str(e).lower()
+        if 'connection' in err_str or 'closed' in err_str or 'not connected' in err_str:
+            print(f"[BRIDGE] SQL bağlantı hatası, yeniden deneniyor: {e}", flush=True)
+            try:
+                reconnect()
+                return process_sale(payload)
+            except Exception as e2:
+                return {'success': False, 'error': f'Retry sonrası hata: {str(e2)}'}
         return {'success': False, 'error': str(e)}
 
 
@@ -553,6 +570,13 @@ def get_today_sales() -> dict:
         return {'success': True, 'recordCount': count, 'ticketCount': ticket_count}
         
     except Exception as e:
+        err_str = str(e).lower()
+        if 'connection' in err_str or 'closed' in err_str or 'not connected' in err_str:
+            try:
+                reconnect()
+                return get_today_sales()
+            except Exception as e2:
+                return {'success': False, 'error': str(e2)}
         return {'success': False, 'error': str(e)}
 
 
@@ -594,7 +618,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 cur.fetchone()
                 self._send_json(200, {'status': 'ok', 'database': DB_NAME, 'host': DB_HOST})
             except Exception as e:
-                self._send_json(500, {'status': 'error', 'error': str(e)})
+                # Bağlantı kopuksa yenile ve tekrar dene
+                try:
+                    reconnect()
+                    db = get_connection()
+                    cur = db.cursor()
+                    cur.execute("SELECT 1")
+                    cur.fetchone()
+                    self._send_json(200, {'status': 'ok', 'database': DB_NAME, 'host': DB_HOST, 'reconnected': True})
+                except Exception as e2:
+                    self._send_json(500, {'status': 'error', 'error': str(e2)})
         
         elif path == '/today-sales':
             result = get_today_sales()

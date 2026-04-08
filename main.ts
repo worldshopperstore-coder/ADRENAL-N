@@ -125,6 +125,11 @@ app.on('ready', () => {
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(() => {});
   }, 5000);
+
+  // Her 30 dakikada bir güncelleme kontrol et
+  setInterval(() => {
+    autoUpdater.checkForUpdates().catch(() => {});
+  }, 30 * 60 * 1000);
 });
 
 app.on('window-all-closed', () => {
