@@ -1,6 +1,6 @@
 {
   "name": "daily-report-system",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Adrenalin Dünyası - Satış ve Yönetim Sistemi",
   "main": "dist/main.cjs",
   "type": "module",
