@@ -31,7 +31,7 @@ const isSelfService = urlParams.get('mode') === 'self';
 const selfKasa = urlParams.get('kasa') || 'yasam_destek';
 
 // GPS target: Antalya Aquarium
-const GPS_TARGET = { lat: 36.8768, lng: 30.6545, radiusM: 200 };
+const GPS_TARGET = { lat: 36.8792, lng: 30.6605, radiusM: 200 };
 
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
@@ -55,7 +55,7 @@ function checkGPS(): Promise<{ ok: boolean; dist?: number; error?: string }> {
       (pos) => {
         const dist = haversineDistance(pos.coords.latitude, pos.coords.longitude, GPS_TARGET.lat, GPS_TARGET.lng);
         if (isLocalhost) { resolve({ ok: true, dist }); return; } // Localhost'ta mesafe kontrolü yapma
-        resolve(dist <= GPS_TARGET.radiusM ? { ok: true, dist } : { ok: false, dist, error: `İşyerinden çok uzaktasınız (${Math.round(dist)}m). Maksimum mesafe: ${GPS_TARGET.radiusM}m` });
+        resolve(dist <= GPS_TARGET.radiusM ? { ok: true, dist } : { ok: false, dist, error: `İşyerinden çok uzaktasınız (${Math.round(dist)}m). Konum: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}` });
       },
       (err) => {
         // Localhost'ta GPS hatası olursa atla (test mode)
@@ -421,9 +421,7 @@ async function handleSelfServiceQR(kasa: string) {
 }
 
 async function handleSelfServiceAutoCheckin(user: PersonnelInfo, kasa: string) {
-  showProcessing('Konum doğrulanıyor...');
-  const gps = await checkGPS();
-  if (!gps.ok) { showError(gps.error || 'Konum doğrulanamadı.'); return; }
+  showProcessing('İşleniyor...');
 
   const today = new Date().toISOString().slice(0, 10);
   const rowId = `${user.id}_${today}`;
@@ -517,12 +515,8 @@ function showSelfLogin(kasa?: string) {
       if (person.password !== password) { errDiv.textContent = 'Şifre hatalı.'; errDiv.style.display = 'block'; loginBtn.textContent = 'Giriş Yap'; loginBtn.removeAttribute('disabled'); return; }
       if (person.kasaId !== activeKasa) { errDiv.textContent = 'Bu departmana erişim yetkiniz yok.'; errDiv.style.display = 'block'; loginBtn.textContent = 'Giriş Yap'; loginBtn.removeAttribute('disabled'); return; }
 
-      // GPS check
-      showProcessing('Konum doğrulanıyor...');
-      const gps = await checkGPS();
-      if (!gps.ok) { showError(gps.error || 'Konum doğrulanamadı.'); return; }
-
       // Check existing attendance for today
+      showProcessing('İşleniyor...');
       const today = new Date().toISOString().slice(0, 10);
       const rowId = `${person.id}_${today}`;
       const { data: existing } = await supabase.from('attendance').select('*').eq('id', rowId).single();
