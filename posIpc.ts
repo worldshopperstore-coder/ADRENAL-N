@@ -222,11 +222,20 @@ function startBridgeExe(cmd: string, args: string[]): Promise<boolean> {
     // Zaten çalışan bir pos_bridge var mı? (önceki session'dan kalan)
     const alreadyRunning = await checkExistingBridge();
     if (alreadyRunning) {
-      console.log('[BRIDGE] Zaten port 5555 açık — mevcut bridge kullanılıyor ✓');
+      console.log('[BRIDGE] Zaten port 5555 açık ve sağlıklı — mevcut bridge kullanılıyor ✓');
       bridgeReady = true;
       resolve(true);
       return;
     }
+
+    // Eski/zombie bridge process'lerini temizle (port 5555'i serbest bırak)
+    try {
+      require('child_process').execSync('taskkill /F /IM pos_bridge.exe /T', { stdio: 'ignore' });
+      console.log('[BRIDGE] Eski bridge processleri temizlendi');
+    } catch (_) { /* zaten çalışmıyorsa ignore */ }
+
+    // Port'un serbest kalması için kısa bekle
+    await new Promise(r => setTimeout(r, 500));
 
     bridgeReady = false;
 
