@@ -191,15 +191,24 @@ function startBridgeProcess(pythonPath: string, bridgePath: string, env?: Record
 }
 
 /** EXE veya python ile bridge başlat. cmd=exe path, args=[] veya cmd='python', args=[script] */
-/** Port 5555'te zaten bir pos_bridge çalışıyor mu kontrol et */
+/** Port 5555'te zaten bir pos_bridge çalışıyor mu kontrol et — health check ile doğrula */
 function checkExistingBridge(): Promise<boolean> {
   return new Promise((resolve) => {
-    const sock = new net.Socket();
-    sock.setTimeout(1000);
-    sock.once('connect', () => { sock.destroy(); resolve(true); });
-    sock.once('error', () => { sock.destroy(); resolve(false); });
-    sock.once('timeout', () => { sock.destroy(); resolve(false); });
-    sock.connect(5555, '127.0.0.1');
+    const http = require('http');
+    const req = http.get('http://127.0.0.1:5555/health', { timeout: 2000 }, (res: any) => {
+      let data = '';
+      res.on('data', (chunk: string) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          resolve(json.status === 'ok');
+        } catch {
+          resolve(false);
+        }
+      });
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
   });
 }
 
