@@ -3,7 +3,7 @@ import {
   Users, Plus, Edit2, Trash2, ArrowLeft, Search, CheckCircle, XCircle,
   TreePine, Monitor, Users2, Camera, X, Calendar, TrendingUp, Package,
   ArrowLeftRight, Star, BarChart2, Clock, Phone, User, Lock, Eye, EyeOff, MapPin,
-  AlertTriangle, Timer, Coffee, Umbrella, PlusCircle, Minus,
+  AlertTriangle, Timer, Coffee, Umbrella, PlusCircle, Minus, Heart,
 } from 'lucide-react';
 import type { Personnel } from '@/types/personnel';
 import {
@@ -30,12 +30,13 @@ import { INITIAL_PACKAGES } from '@/data/packages';
 import ShiftBoardModal from './ShiftBoardModal';
 import AnnouncementsAdminTab from './AnnouncementsAdminTab';
 
-type KasaId = 'wildpark' | 'sinema' | 'face2face';
+type KasaId = 'wildpark' | 'sinema' | 'face2face' | 'yasam_destek';
 
 const KASAS = [
   { id: 'wildpark' as KasaId, name: 'WildPark', Icon: TreePine,  accent: 'emerald', text: 'text-emerald-400', bg: 'bg-emerald-500/10', borderAccent: 'border-emerald-500/20' },
   { id: 'sinema' as KasaId,   name: 'Sinema',   Icon: Monitor,   accent: 'violet',  text: 'text-violet-400',  bg: 'bg-violet-500/10',  borderAccent: 'border-violet-500/20'  },
   { id: 'face2face' as KasaId,name: 'Face2Face', Icon: Users2,    accent: 'sky',     text: 'text-sky-400',     bg: 'bg-sky-500/10',     borderAccent: 'border-sky-500/20'     },
+  { id: 'yasam_destek' as KasaId, name: 'Yaşam Destek', Icon: Heart, accent: 'rose', text: 'text-rose-400', bg: 'bg-rose-500/10', borderAccent: 'border-rose-500/20' },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -340,10 +341,11 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
   };
 
   const kasa = KASAS.find(k => k.id === person.kasaId);
+  const isYasamDestek = person.kasaId === 'yasam_destek';
   const TABS = [
     { id: 'overview' as const, label: 'Genel Bakış', icon: BarChart2 },
     { id: 'puantaj' as const, label: 'Puantaj', icon: Clock },
-    { id: 'sales' as const, label: 'Satış Detay', icon: TrendingUp },
+    ...(!isYasamDestek ? [{ id: 'sales' as const, label: 'Satış Detay', icon: TrendingUp }] : []),
     { id: 'leaves' as const, label: 'İzinler', icon: Umbrella },
   ];
 
@@ -462,7 +464,7 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
                   </div>
 
                   {/* Weekly Target Progress */}
-                  <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
+                  {!isYasamDestek && <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-semibold text-white flex items-center gap-2">
                         <TrendingUp className="w-4 h-4 text-orange-400" /> Haftalık Hedef Karşılaştırma
@@ -490,10 +492,10 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
                         %{summary.targetPct}
                       </div>
                     </div>
-                  </div>
+                  </div>}
 
                   {/* Sales Summary */}
-                  <div className="grid grid-cols-3 gap-3">
+                  {!isYasamDestek && <div className="grid grid-cols-3 gap-3">
                     {[
                       { label: 'Toplam Ciro', value: `₺${fmtNum(summary.totalRevenue)}`, icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
                       { label: 'Kişi Sayısı', value: fmtNum(summary.totalPersons), icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10' },
@@ -509,7 +511,7 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
                         <p className={`text-xl font-bold ${m.color}`}>{m.value}</p>
                       </div>
                     ))}
-                  </div>
+                  </div>}
                 </>
               )}
 

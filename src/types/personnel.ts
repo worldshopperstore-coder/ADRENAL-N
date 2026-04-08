@@ -5,7 +5,7 @@ export interface Personnel {
   fullName: string;
   phone?: string;
   profileImage?: string; // base64 data URL or empty
-  kasaId: 'wildpark' | 'sinema' | 'face2face' | 'genel'; // genel = Genel Müdür
+  kasaId: 'wildpark' | 'sinema' | 'face2face' | 'yasam_destek' | 'genel'; // genel = Genel Müdür
   role: 'personel' | 'genel_mudur';
   weeklyTargetHours?: number; // Haftalık hedef çalışma saati (default: 45)
   isActive: boolean; // Aktif/Pasif durum

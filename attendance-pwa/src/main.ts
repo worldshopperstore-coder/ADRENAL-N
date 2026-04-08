@@ -25,6 +25,53 @@ let activeTab: 'home' | 'team' | 'schedule' = 'home';
 let liveTimerInterval: ReturnType<typeof setInterval> | null = null;
 let isOnline = navigator.onLine;
 
+// ── Self-Service Mode ──
+const urlParams = new URLSearchParams(window.location.search);
+const isSelfService = urlParams.get('mode') === 'self';
+const selfKasa = urlParams.get('kasa') || 'yasam_destek';
+
+// GPS target: Antalya Aquarium
+const GPS_TARGET = { lat: 36.8570, lng: 30.6350, radiusM: 200 };
+
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+function checkGPS(): Promise<{ ok: boolean; dist?: number; error?: string }> {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      // Localhost'ta GPS yoksa atla
+      if (isLocalhost) { resolve({ ok: true, dist: 0 }); return; }
+      resolve({ ok: false, error: 'Cihazınızda GPS desteklenmiyor.' }); return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const dist = haversineDistance(pos.coords.latitude, pos.coords.longitude, GPS_TARGET.lat, GPS_TARGET.lng);
+        if (isLocalhost) { resolve({ ok: true, dist }); return; } // Localhost'ta mesafe kontrolü yapma
+        resolve(dist <= GPS_TARGET.radiusM ? { ok: true, dist } : { ok: false, dist, error: `İşyerinden çok uzaktasınız (${Math.round(dist)}m). Maksimum mesafe: ${GPS_TARGET.radiusM}m` });
+      },
+      (err) => {
+        // Localhost'ta GPS hatası olursa atla (test mode)
+        if (isLocalhost) { resolve({ ok: true, dist: 0 }); return; }
+        const msgs: Record<number, string> = {
+          1: 'Konum izni verilmedi. Lütfen tarayıcı ayarlarından konum iznini açın.',
+          2: 'Konum bilgisi alınamadı. Lütfen GPS\'inizi açın.',
+          3: 'Konum isteği zaman aşımına uğradı.'
+        };
+        resolve({ ok: false, error: msgs[err.code] || 'Konum alınamadı.' });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  });
+}
+
 // ── Helpers ──
 const esc = (s: string) => {
   const d = document.createElement('div');
@@ -95,7 +142,7 @@ async function tryRecoverSession(): Promise<boolean> {
 }
 
 // ── Constants ──
-const KASA_NAMES: Record<string, string> = { wildpark: 'WildPark', sinema: 'XD Sinema', face2face: 'Face2Face', genel: 'Genel Yönetim' };
+const KASA_NAMES: Record<string, string> = { wildpark: 'WildPark', sinema: 'XD Sinema', face2face: 'Face2Face', genel: 'Genel Yönetim', yasam_destek: 'Yaşam Destek' };
 const LEAVE_COLORS: Record<string, string> = { 'Yıllık İzin': '#3b82f6', 'Hastalık İzni': '#ef4444', 'Mazeret İzni': '#f59e0b', 'İzin': '#ea580c' };
 const DAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -213,6 +260,14 @@ function showSplash(): Promise<void> {
 // ════════════════════════════════════════
 async function renderApp() {
   stopLiveTimer();
+  if (isSelfService) {
+    // Self-service mode: login → direct check-in/out with GPS
+    if (loadSession()) { showDashboard(); return; }
+    const recovered = await tryRecoverSession();
+    if (recovered) { showDashboard(); return; }
+    showSelfLogin();
+    return;
+  }
   if (loadSession()) { showDashboard(); return; }
   const recovered = await tryRecoverSession();
   if (recovered) { showDashboard(); return; }
@@ -338,6 +393,130 @@ async function handleCheckoutScan(token: string) {
 }
 
 // ════════════════════════════════════════
+// SELF-SERVICE MODE (Yaşam Destek etc.)
+// ════════════════════════════════════════
+function showSelfLogin() {
+  stopLiveTimer();
+  const app = document.getElementById('app')!;
+  const kasaName = KASA_NAMES[selfKasa] || selfKasa;
+  app.innerHTML = `${CSS}
+    <div class="page">
+      ${WAVE}
+      <div class="page-content" style="align-items:center;padding:0 20px">
+        <div style="text-align:center;padding:max(60px,var(--safe-top)) 0 20px;width:100%;max-width:340px" class="fade-in">
+          <div style="width:64px;height:64px;margin:0 auto 14px;background:rgba(244,63,94,.1);border:2px solid rgba(244,63,94,.25);border-radius:50%;display:flex;align-items:center;justify-content:center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+          </div>
+          <h1 style="font-size:22px;font-weight:800;letter-spacing:-.3px;margin:0 0 4px">${esc(kasaName)}</h1>
+          <p style="color:var(--text2);font-size:12px;margin:0">Puantaj Self-Servis Giriş</p>
+        </div>
+        <div style="width:100%;max-width:340px" class="slide-up">
+          <div class="card" style="padding:20px">
+            <div id="self-error" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:10px;padding:10px;margin-bottom:14px;font-size:11px;color:#ef4444;text-align:center"></div>
+            <label style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px;display:block">Kullanıcı Adı</label>
+            <input id="self-user" type="text" autocomplete="username" autocapitalize="none" style="width:100%;padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:#fff;font-size:14px;margin-bottom:12px;outline:none;box-sizing:border-box" placeholder="kullanici.adi">
+            <label style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px;display:block">Şifre</label>
+            <input id="self-pass" type="password" autocomplete="current-password" style="width:100%;padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:#fff;font-size:14px;margin-bottom:16px;outline:none;box-sizing:border-box" placeholder="••••">
+            <button id="self-login-btn" class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;font-weight:700">Giriş Yap</button>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:max(16px,var(--safe-bottom));display:flex;align-items:center;gap:4px">
+          <span style="font-weight:800;font-size:10px;color:var(--text3)">adrenalin</span>
+          <span style="color:var(--orange);font-size:7px;font-weight:700">®</span>
+          <span style="color:rgba(255,255,255,.08);font-size:8px;margin-left:4px">${PWA_VERSION}</span>
+        </div>
+      </div>
+    </div>`;
+
+  const loginBtn = document.getElementById('self-login-btn')!;
+  const userInput = document.getElementById('self-user') as HTMLInputElement;
+  const passInput = document.getElementById('self-pass') as HTMLInputElement;
+  const errDiv = document.getElementById('self-error')!;
+
+  const doLogin = async () => {
+    const username = userInput.value.trim();
+    const password = passInput.value.trim();
+    if (!username || !password) { errDiv.textContent = 'Kullanıcı adı ve şifre gerekli.'; errDiv.style.display = 'block'; return; }
+    loginBtn.textContent = 'Kontrol ediliyor...';
+    loginBtn.setAttribute('disabled', 'true');
+    try {
+      const { data: person, error } = await supabase.from('personnel').select('id, fullName, kasaId, role, password').eq('username', username).single();
+      if (error || !person) { errDiv.textContent = 'Kullanıcı bulunamadı.'; errDiv.style.display = 'block'; loginBtn.textContent = 'Giriş Yap'; loginBtn.removeAttribute('disabled'); return; }
+      if (person.password !== password) { errDiv.textContent = 'Şifre hatalı.'; errDiv.style.display = 'block'; loginBtn.textContent = 'Giriş Yap'; loginBtn.removeAttribute('disabled'); return; }
+      if (person.kasaId !== selfKasa) { errDiv.textContent = 'Bu departmana erişim yetkiniz yok.'; errDiv.style.display = 'block'; loginBtn.textContent = 'Giriş Yap'; loginBtn.removeAttribute('disabled'); return; }
+
+      // GPS check
+      showProcessing('Konum doğrulanıyor...');
+      const gps = await checkGPS();
+      if (!gps.ok) { showError(gps.error || 'Konum doğrulanamadı.'); return; }
+
+      // Check existing attendance for today
+      const today = new Date().toISOString().slice(0, 10);
+      const rowId = `${person.id}_${today}`;
+      const { data: existing } = await supabase.from('attendance').select('*').eq('id', rowId).single();
+
+      const user: PersonnelInfo = { id: person.id, fullName: person.fullName, kasaId: person.kasaId || selfKasa, role: person.role };
+
+      if (existing) {
+        if (existing.status === 'checked_in') {
+          // Already checked in — go to dashboard
+          saveSession(user, existing);
+          showDashboard();
+          return;
+        }
+        if (existing.status === 'checked_out') {
+          showError('Bugün zaten giriş ve çıkış yapmışsınız.');
+          return;
+        }
+      }
+
+      // Create new attendance (self-service check-in)
+      showProcessing('Giriş kaydediliyor...');
+      const now = new Date().toISOString();
+      const newRecord: any = {
+        id: rowId,
+        personnel_id: person.id,
+        personnel_name: person.fullName,
+        kasa_id: person.kasaId || selfKasa,
+        date: today,
+        check_in: now,
+        check_out: null,
+        status: 'checked_in',
+        session_token: `SELF-${person.id}-${Date.now()}`,
+      };
+      const { error: insErr } = await supabase.from('attendance').upsert(newRecord);
+      if (insErr) { showError('Giriş kaydedilemedi: ' + insErr.message); return; }
+
+      saveSession(user, newRecord);
+      showSuccess('Hoş Geldiniz!', user.fullName, new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), true);
+    } catch (e: any) {
+      if (e?.message?.includes('Failed to fetch') || e?.message?.includes('NetworkError')) {
+        showError('İnternet bağlantısı kurulamadı.');
+      } else {
+        showError('Beklenmeyen bir hata: ' + (e?.message || ''));
+      }
+    }
+  };
+
+  loginBtn.addEventListener('click', doLogin);
+  passInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+}
+
+async function selfServiceCheckout() {
+  if (!currentUser || !currentAttendance) return;
+  showProcessing('Konum doğrulanıyor...');
+  const gps = await checkGPS();
+  if (!gps.ok) { showError(gps.error || 'Konum doğrulanamadı.'); return; }
+
+  showProcessing('Çıkış kaydediliyor...');
+  const now = new Date().toISOString();
+  const { error } = await supabase.from('attendance').update({ status: 'checked_out', check_out: now, checkout_token: null }).eq('id', currentAttendance.id);
+  if (error) { showError('Çıkış kaydedilemedi: ' + error.message); return; }
+  clearSession(true);
+  showSuccess('Güle Güle!', esc(currentUser.fullName), new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), false);
+}
+
+// ════════════════════════════════════════
 // PROCESSING / SUCCESS / ERROR
 // ════════════════════════════════════════
 function showProcessing(msg: string) {
@@ -444,11 +623,11 @@ function updateLiveTimer() {
 // DASHBOARD
 // ════════════════════════════════════════
 function showDashboard() {
-  if (!currentUser || !currentAttendance) { showScanner('checkin'); return; }
+  if (!currentUser || !currentAttendance) { isSelfService ? showSelfLogin() : showScanner('checkin'); return; }
   supabase.from('attendance').select('*').eq('id', currentAttendance.id).single().then(({ data }) => {
     if (data) {
       currentAttendance = data;
-      if (data.status === 'checked_out') { clearSession(true); showScanner('checkin'); return; }
+      if (data.status === 'checked_out') { clearSession(true); isSelfService ? showSelfLogin() : showScanner('checkin'); return; }
       if (currentUser) saveSession(currentUser, data);
     }
     renderDash();
@@ -656,6 +835,7 @@ async function renderHome(c: HTMLElement) {
   } else {
     document.getElementById('co-btn')?.addEventListener('click', async () => {
       if (!currentUser || !currentAttendance) return;
+      if (isSelfService) { await selfServiceCheckout(); return; }
       const tk = `OUT-${currentUser.id}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
       showScanner('checkout');
       try {

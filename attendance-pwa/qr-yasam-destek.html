@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>QR Kod - Yaşam Destek Puantaj</title>
+  <style>
+    body { margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #fff; }
+    img { display: block; }
+  </style>
+</head>
+<body>
+  <img id="qr" width="600" height="600" alt="QR Code">
+  <script>
+    const url = 'https://puantajadr.vercel.app/?mode=self&kasa=yasam_destek';
+    document.getElementById('qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=' + encodeURIComponent(url);
+  </script>
+</body>
+</html>
