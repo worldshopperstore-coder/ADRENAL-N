@@ -57,8 +57,9 @@ export async function getPersonnelLeaves(personnelId: string, startDate?: string
     .eq('personnel_id', personnelId)
     .order('start_date', { ascending: false });
 
-  if (startDate) query = query.gte('start_date', startDate);
-  if (endDate) query = query.lte('end_date', endDate);
+  // Overlap: start_date <= rangeEnd AND end_date >= rangeStart
+  if (endDate) query = query.lte('start_date', endDate);
+  if (startDate) query = query.gte('end_date', startDate);
 
   const { data } = await query;
   return (data || []) as LeaveRecord[];

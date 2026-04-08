@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/config/supabase';
 import type { PackageItem } from '@/data/packages';
+import { CROSS_SALE_SHARES, detectCrossPackageType } from '@/data/crossSaleShares';
+import type { SellerKasa, ShareCurrency } from '@/data/crossSaleShares';
 
 // ── Types ──
 type KasaId = 'wildpark' | 'sinema' | 'face2face';
@@ -46,20 +48,6 @@ interface DayRow {
 const TR_MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 const ADR_KASAS: KasaId[] = ['wildpark', 'sinema'];
 const PRUVA_KASAS: KasaId[] = ['face2face'];
-
-const detectVenues = (packageName: string): string[] => {
-  const name = packageName.toUpperCase();
-  const venues: string[] = [];
-  if (name.includes('XD') || name.includes('SİNEMA') || name.includes('SINEMA')) venues.push('sinema');
-  if (name.includes('WP') || name.includes('WILD')) venues.push('wildpark');
-  if (name.includes('F2F') || name.includes('FACE')) venues.push('face2face');
-  if (name.includes('MARKET3') || name.includes('MARKET 3')) {
-    if (!venues.includes('sinema')) venues.push('sinema');
-    if (!venues.includes('wildpark')) venues.push('wildpark');
-    if (!venues.includes('face2face')) venues.push('face2face');
-  }
-  return venues;
-};
 
 const fmtTR = (dateStr: string) => {
   const d = new Date(dateStr + 'T12:00:00');
@@ -142,77 +130,68 @@ export default function CrossSalesAccountingTab() {
     load();
   }, [selectedMonth]);
 
-  // Find the standalone base price (M.Y or Visitor) for a venue+currency
-  const getStandalonePrice = (venue: string, currency: string, isMunferit: boolean): { adult: number; child: number } | null => {
-    const baseName = isMunferit ? 'M.Y' : 'Visitor';
-    const baseCategory = isMunferit ? 'Münferit' : 'Visitor';
-    const pkg = allPackages.find(p =>
-      p.kasaId === venue && p.name === baseName && p.currency === currency && p.category === baseCategory
-    );
-    return pkg ? { adult: pkg.adultPrice, child: pkg.childPrice } : null;
-  };
-
-  // Calculate Pruva share for a single sale (in TL)
-  // Uses proportional split based on standalone venue prices
+  // Calculate Pruva share for a single cross-sale (in TL)
+  // Sabit hak ediş tablosundan birim payları alır
   const calcPruvaShareTL = (sale: SaleItem, kasaId: KasaId, date: string): number => {
     const isCross = sale.isCrossSale || sale.category?.startsWith('Çapraz');
     const rates = getRates(date);
-    const saleTotalTL = sale.kkTl + sale.cashTl + (sale.cashUsd * rates.usd) + (sale.cashEur * rates.eur);
 
     if (!isCross) {
-      // Non-cross sale: 100% belongs to the host company
-      return kasaId === 'face2face' ? saleTotalTL : 0;
+      // Normal satış: tamamı satıcı şirkete ait
+      return 0; // Mutabakatta sadece çapraz satışlar var
     }
 
-    // Detect which venues are in this cross-sale package
-    const venues = detectVenues(sale.packageName);
-    if (!venues.includes('face2face')) return 0; // No Pruva involvement
-    if (venues.length <= 1) return kasaId === 'face2face' ? saleTotalTL : 0;
+    // Paket tipini belirle
+    const pkgType = detectCrossPackageType(sale.packageName);
+    if (!pkgType) return 0; // F2F içermeyen çapraz (XD+WP) → mutabakatta geçersiz
 
-    // Determine if this is Münferit or Visitor type
-    const isMunferit = sale.currency === 'TL' && !sale.category?.includes('Visitor');
+    // Satan kasanın pay tablosunu bul
+    const sellerShares = CROSS_SALE_SHARES[kasaId as SellerKasa];
+    if (!sellerShares) return 0;
 
-    // Get standalone prices for each venue
-    let totalStandaloneAdult = 0, totalStandaloneChild = 0;
-    let f2fAdult = 0, f2fChild = 0;
-    let allFound = true;
+    const pkgShares = sellerShares[pkgType];
+    if (!pkgShares) return 0; // Bu kasa bu paketi satamaz
 
-    for (const venue of venues) {
-      const base = getStandalonePrice(venue, sale.currency, isMunferit);
-      if (base) {
-        totalStandaloneAdult += base.adult;
-        totalStandaloneChild += base.child;
-        if (venue === 'face2face') {
-          f2fAdult = base.adult;
-          f2fChild = base.child;
-        }
-      } else {
-        allFound = false;
-      }
-    }
+    const currency = (sale.currency || 'TL') as ShareCurrency;
+    const shares = pkgShares[currency];
+    if (!shares) return 0;
 
-    if (allFound && (totalStandaloneAdult > 0 || totalStandaloneChild > 0)) {
-      // Proportional split: Pruva gets its venue's proportion of the combined price
-      const adultTotal = sale.adultQty > 0 && totalStandaloneAdult > 0
-        ? (f2fAdult / totalStandaloneAdult) * sale.adultQty
-        : 0;
-      const childTotal = sale.childQty > 0 && totalStandaloneChild > 0
-        ? (f2fChild / totalStandaloneChild) * sale.childQty
-        : 0;
-      const totalQtyWeighted = adultTotal + childTotal;
-      const totalQty = sale.adultQty + sale.childQty;
-      if (totalQty <= 0) return 0;
-      return saleTotalTL * (totalQtyWeighted / totalQty);
-    }
+    // F2F (PRUVA) payını hesapla: birim pay × adet
+    const f2fAmount = (shares.f2f.adult * sale.adultQty) + (shares.f2f.child * sale.childQty);
 
-    // Fallback: equal split by venue count
-    const venueCount = venues.length;
-    if (kasaId === 'face2face') {
-      const adrVenues = venues.filter(v => v !== 'face2face').length;
-      return saleTotalTL * (1 - adrVenues / venueCount);
-    } else {
-      return saleTotalTL / venueCount;
-    }
+    // EUR/USD ise TL'ye çevir
+    if (currency === 'USD') return f2fAmount * rates.usd;
+    if (currency === 'EUR') return f2fAmount * rates.eur;
+    return f2fAmount; // TL
+  };
+
+  // ADR payını hesapla (XD + WP toplamı, TL cinsinden)
+  const calcAdrShareTL = (sale: SaleItem, kasaId: KasaId, date: string): number => {
+    const isCross = sale.isCrossSale || sale.category?.startsWith('Çapraz');
+    const rates = getRates(date);
+
+    if (!isCross) return 0;
+
+    const pkgType = detectCrossPackageType(sale.packageName);
+    if (!pkgType) return 0;
+
+    const sellerShares = CROSS_SALE_SHARES[kasaId as SellerKasa];
+    if (!sellerShares) return 0;
+
+    const pkgShares = sellerShares[pkgType];
+    if (!pkgShares) return 0;
+
+    const currency = (sale.currency || 'TL') as ShareCurrency;
+    const shares = pkgShares[currency];
+    if (!shares) return 0;
+
+    // ADR payı = XD payı + WP payı
+    const adrAmount = (shares.xd.adult * sale.adultQty) + (shares.xd.child * sale.childQty)
+                    + (shares.wp.adult * sale.adultQty) + (shares.wp.child * sale.childQty);
+
+    if (currency === 'USD') return adrAmount * rates.usd;
+    if (currency === 'EUR') return adrAmount * rates.eur;
+    return adrAmount;
   };
 
   // Process data into daily rows
@@ -250,10 +229,9 @@ export default function CrossSalesAccountingTab() {
             const isCross = !!(sale.isCrossSale || sale.category?.startsWith('Çapraz'));
             if (!isCross) continue; // Only cross-sales matter for mutabakat
 
-            const rates = getRates(date);
-            const saleTotalTL = sale.kkTl + sale.cashTl + (sale.cashUsd * rates.usd) + (sale.cashEur * rates.eur);
             const pruvaShare = calcPruvaShareTL(sale, kasaId, date);
-            const adrShare = saleTotalTL - pruvaShare;
+            const adrShare = calcAdrShareTL(sale, kasaId, date);
+            const saleTotalTL = pruvaShare + adrShare;
             dayTotal += saleTotalTL;
             dayPruva += pruvaShare;
             dayAdr += adrShare;
@@ -292,7 +270,7 @@ export default function CrossSalesAccountingTab() {
       pruvaRows: pruva.rows, pruvaTotalPruva: pruva.totalPruva, pruvaTotalAdr: pruva.totalAdr, pruvaTotalAll: pruva.totalAll,
       pruvaHakEdis, adrHakEdis, faturaTutari,
     };
-  }, [salesData, allPackages, dailyRates, selectedMonth]);
+  }, [salesData, dailyRates, selectedMonth]);
 
   const monthOptions = useMemo(() => {
     const opts = [];

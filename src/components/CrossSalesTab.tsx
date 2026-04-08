@@ -61,7 +61,7 @@ export function generateCrossHTMLReport(crossSales: CrossSale[]) {
   const kasaId = session.kasa?.id || '';
   const kasaSettings = JSON.parse(localStorage.getItem(`kasaSettings_${kasaId}`) || '{}');
   const usdRate = kasaSettings.usdRate || 30;
-  const eurRate = kasaSettings.eurRate || 50.4877;
+  const eurRate = kasaSettings.eurRate || 33;
   const currentDate = new Date().toLocaleDateString('tr-TR');
   const totals = getCrossTotals(crossSales);
   const cashTlTotal = totals.cashTl + (totals.cashUsd * usdRate) + (totals.cashEur * eurRate);
@@ -215,22 +215,7 @@ export default function CrossSalesTab() {
   };
 
   // ==================== ŞİRKET TESPİT FONKSİYONU ====================
-
-  // Paket adından hangi mekanların dahil olduğunu tespit et
-  const detectVenues = (packageName: string): string[] => {
-    const name = packageName.toUpperCase();
-    const venues: string[] = [];
-    if (name.includes('XD') || name.includes('SİNEMA') || name.includes('SINEMA')) venues.push('sinema');
-    if (name.includes('WP') || name.includes('WILD')) venues.push('wildpark');
-    if (name.includes('F2F') || name.includes('FACE')) venues.push('face2face');
-    // MARKET3 = 3lü paket (tüm mekanlar)
-    if (name.includes('MARKET3') || name.includes('MARKET 3')) {
-      if (!venues.includes('sinema')) venues.push('sinema');
-      if (!venues.includes('wildpark')) venues.push('wildpark');
-      if (!venues.includes('face2face')) venues.push('face2face');
-    }
-    return venues;
-  };
+  // detectVenues modül seviyesinde tanımlı (satır 30), burada tekrar tanımlanmıyor
 
   // Şirket: Adrenalin (WP+Sinema) vs Pruva (F2F)
   const getCompany = (kasaId: string) => kasaId === 'face2face' ? 'Pruva' : 'Adrenalin';
@@ -301,7 +286,7 @@ export default function CrossSalesTab() {
     // Kurları localStorage'dan al
     const kasaSettings = JSON.parse(localStorage.getItem(`kasaSettings_${session.kasa?.id}`) || '{}');
     const usdRate = kasaSettings.usdRate || 30;
-    const eurRate = kasaSettings.eurRate || 50.4877;
+    const eurRate = kasaSettings.eurRate || 33;
     
     const totals = getCrossTotals(crossSales);
     
@@ -699,7 +684,7 @@ export default function CrossSalesTab() {
   const session = getUserSession();
   const kasaSettings = JSON.parse(localStorage.getItem(`kasaSettings_${session.kasa?.id}`) || '{}');
   const usdRateComp = kasaSettings.usdRate || 30;
-  const eurRateComp = kasaSettings.eurRate || 50.4877;
+  const eurRateComp = kasaSettings.eurRate || 33;
   const grandTotal = totals.kkTl + totals.cashTl + (totals.cashUsd * usdRateComp) + (totals.cashEur * eurRateComp);
 
   return (

@@ -31,14 +31,14 @@ const KASA_INFO: Record<KasaId, { name: string; Icon: React.FC<any>; bar: string
   face2face: { name: 'Face2Face', Icon: Users2,   bar: 'bg-sky-500',     text: 'text-sky-400',     border: 'border-gray-800', bg: 'bg-gray-900' },
 };
 
-const TR_MONTHS = ['Ocak','�ubat','Mart','Nisan','May�s','Haziran',
-                   'Temmuz','A�ustos','Eyl�l','Ekim','Kas�m','Aral�k'];
-const TR_DAYS   = ['Paz','Pzt','Sal','�ar','Per','Cum','Cmt'];
+const TR_MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
+                   'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+const TR_DAYS   = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
 
 const PERIOD_OPTS: { key: FilterPeriod; label: string }[] = [
-  { key: 'today',  label: 'Bug�n'    },
+  { key: 'today',  label: 'Bugün'    },
   { key: 'week',   label: 'Bu Hafta' },
-  { key: '15days', label: '15 G�n'   },
+  { key: '15days', label: '15 Gün'   },
   { key: 'month',  label: 'Bu Ay'    },
 ];
 
@@ -136,7 +136,7 @@ function groupSalesByPackage(sales: DatedSale[], crossSaleIds: Set<string>): Gro
       map[key] = {
         packageName: s.packageName,
         category: s.category,
-        personnelName: s.personnelName || s.personnelId || '�',
+        personnelName: s.personnelName || s.personnelId || '?',
         adultQty: 0, childQty: 0,
         kkTl: 0, cashTl: 0, cashUsd: 0, cashEur: 0,
         count: 0, isCross: false, hasRefund: false, refundReason: undefined, kkRefundTxId: undefined,
@@ -175,13 +175,13 @@ function buildDayHtml(
     const bgStyle = g.hasRefund ? 'background:#fff5f5;' : '';
     return `<tr style="${borderStyle};${bgStyle}">
       <td style="color:#9ca3af">${String(i+1).padStart(2,'0')}</td>
-      <td><strong>${g.hasRefund?'<span style="color:#ef4444;font-size:10px;border:1px solid #fca5a5;padding:1px 4px;border-radius:3px;margin-right:4px">�ade Edildi</span>':''}${g.isCross?'? ':''}${esc(g.packageName)}</strong>${g.category?`<div style="color:#9ca3af;font-size:9px">${esc(g.category)}</div>`:''}${g.hasRefund&&g.refundReason?`<div style="color:#ef4444;font-size:9px;margin-top:2px">Neden: ${esc(g.refundReason)}</div>`:''}${g.kkRefundTxId?`<div style="color:#9ca3af;font-size:9px">Kredi Kart� ��lem No: ${esc(g.kkRefundTxId)}</div>`:''}</td>
+      <td><strong>${g.hasRefund?'<span style="color:#ef4444;font-size:10px;border:1px solid #fca5a5;padding:1px 4px;border-radius:3px;margin-right:4px">İade Edildi</span>':''}${g.isCross?'? ':''}${esc(g.packageName)}</strong>${g.category?`<div style="color:#9ca3af;font-size:9px">${esc(g.category)}</div>`:''}${g.hasRefund&&g.refundReason?`<div style="color:#ef4444;font-size:9px;margin-top:2px">Neden: ${esc(g.refundReason)}</div>`:''}${g.kkRefundTxId?`<div style="color:#9ca3af;font-size:9px">Kredi Kartı İşlem No: ${esc(g.kkRefundTxId)}</div>`:''}</td>
       <td>${esc(g.personnelName)}</td>
-      <td style="text-align:center">${g.adultQty}Y / ${g.childQty}�</td>
-      <td style="text-align:right;font-weight:600">${g.kkTl>0?'?'+fmtNum(g.kkTl,2):'�'}</td>
-      <td style="text-align:right;font-weight:600">${g.cashTl>0?'?'+fmtNum(g.cashTl,2):'�'}</td>
-      <td style="text-align:right;font-weight:600">${g.cashUsd>0?'$'+fmtNum(g.cashUsd,2):'�'}</td>
-      <td style="text-align:right;font-weight:600">${g.cashEur>0?'�'+fmtNum(g.cashEur,2):'�'}</td>
+      <td style="text-align:center">${g.adultQty}Y / ${g.childQty}Ç</td>
+      <td style="text-align:right;font-weight:600">${g.kkTl>0?'₺'+fmtNum(g.kkTl,2):'—'}</td>
+      <td style="text-align:right;font-weight:600">${g.cashTl>0?'₺'+fmtNum(g.cashTl,2):'—'}</td>
+      <td style="text-align:right;font-weight:600">${g.cashUsd>0?'$'+fmtNum(g.cashUsd,2):'—'}</td>
+      <td style="text-align:right;font-weight:600">${g.cashEur>0?'€'+fmtNum(g.cashEur,2):'—'}</td>
     </tr>`;
   }).join('');
 
@@ -194,13 +194,13 @@ function buildDayHtml(
     persMap[pId].count++;
   }
   const persRows = Object.values(persMap).sort((a,b)=>b.revenue-a.revenue).map(p =>
-    `<tr><td>${esc(p.name)}</td><td>${p.count} sat��</td><td style="text-align:right;font-weight:700">?${fmtNum(p.revenue,2)}</td></tr>`
+    `<tr><td>${esc(p.name)}</td><td>${p.count} satış</td><td style="text-align:right;font-weight:700">₺${fmtNum(p.revenue,2)}</td></tr>`
   ).join('');
 
   return `<!DOCTYPE html>
 <html lang="tr"><head>
 <meta charset="UTF-8"/>
-<title>${kasaName} � ${fmtTR(date)} G�nl�k Rapor</title>
+<title>${kasaName} — ${fmtTR(date)} Günlük Rapor</title>
 <style>
   *{box-sizing:border-box}
   body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1f2937;margin:0;padding:24px;font-size:13px}
@@ -231,31 +231,31 @@ function buildDayHtml(
 </head><body>
 <div class="header">
   <div style="font-size:24px;font-weight:900;font-style:italic;margin-bottom:4px"><span style="color:#f97316">adrenalin</span><span style="color:#fb923c">.</span></div>
-  <h1>${kasaName} � G�nl�k Sat�� Raporu</h1>
+  <h1>${kasaName} — Günlük Satış Raporu</h1>
   <div class="meta">
     <span>📅 ${fmtTR(date)} ${weekDay(date)}</span>
     <span class="sep">|</span>
-    <span>${allSales.length} sat�� i�lemi</span>
-    <span class="tag blue">${t.adultQty} Yeti�kin</span>
-    <span class="tag green">${t.childQty} �ocuk</span>
-    ${crossSales.length > 0 ? `<span class="tag orange">${crossSales.length} �apraz</span>` : ''}
+    <span>${allSales.length} satış işlemi</span>
+    <span class="tag blue">${t.adultQty} Yetişkin</span>
+    <span class="tag green">${t.childQty} Çocuk</span>
+    ${crossSales.length > 0 ? `<span class="tag orange">${crossSales.length} Çapraz</span>` : ''}
   </div>
 </div>
 <div class="metrics">
   <div class="card c-green">
     <div class="lbl">Toplam Ciro</div>
-    <div class="num tl">?${fmtNum(t.totalTl,2)}</div>
-    <div class="hint">${allSales.length} sat�� � TL e�de�eri</div>
+    <div class="num tl">₺${fmtNum(t.totalTl,2)}</div>
+    <div class="hint">${allSales.length} satış — TL eşdeğeri</div>
   </div>
   <div class="card c-tl">
     <div class="lbl">Nakit TL</div>
-    <div class="num tl">?${fmtNum(t.cashTl,2)}</div>
+    <div class="num tl">₺${fmtNum(t.cashTl,2)}</div>
     <div class="hint">Nakit tahsilat</div>
   </div>
   <div class="card c-blue">
-    <div class="lbl">Kredi Kart�</div>
-    <div class="num kk">?${fmtNum(t.kkTl,2)}</div>
-    <div class="hint">Kart ile �deme</div>
+    <div class="lbl">Kredi Kartı</div>
+    <div class="num kk">₺${fmtNum(t.kkTl,2)}</div>
+    <div class="hint">Kart ile ödeme</div>
   </div>
   <div class="card c-usd">
     <div class="lbl">Nakit USD</div>
@@ -264,27 +264,27 @@ function buildDayHtml(
   </div>
   <div class="card c-eur">
     <div class="lbl">Nakit EUR</div>
-    <div class="num eur">�${fmtNum(t.cashEur,2)}</div>
+    <div class="num eur">€${fmtNum(t.cashEur,2)}</div>
     <div class="hint">Euro nakit</div>
   </div>
 </div>
 ${persMap && Object.keys(persMap).length > 1 ? `
 <section>
-  <h2>Personel �zeti</h2>
-  <table><thead><tr><th>Personel</th><th>Sat�� #</th><th style="text-align:right">Ciro (TL e�d.)</th></tr></thead>
+  <h2>Personel Özeti</h2>
+  <table><thead><tr><th>Personel</th><th>Satış #</th><th style="text-align:right">Ciro (TL eşd.)</th></tr></thead>
   <tbody>${persRows}</tbody></table>
 </section>` : ''}
 <section>
-  <h2>Sat�� Detaylar�</h2>
+  <h2>Satış Detayları</h2>
   <table>
     <thead><tr>
-      <th>#</th><th>Paket</th><th>Personel</th><th style="text-align:center">Y / �</th>
-      <th style="text-align:right">KK (?)</th><th style="text-align:right">Nakit (?)</th><th style="text-align:right">Nakit ($)</th><th style="text-align:right">Nakit (�)</th>
+      <th>#</th><th>Paket</th><th>Personel</th><th style="text-align:center">Y / Ç</th>
+      <th style="text-align:right">KK (?)</th><th style="text-align:right">Nakit (?)</th><th style="text-align:right">Nakit ($)</th><th style="text-align:right">Nakit (€)</th>
     </tr></thead>
-    <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:#4b5563;padding:20px">Bu g�n sat�� verisi bulunamad�</td></tr>'}</tbody>
+    <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:#4b5563;padding:20px">Bu gün satış verisi bulunamadı</td></tr>'}</tbody>
   </table>
 </section>
-<div class="footer">Olu�turulma: ${new Date().toLocaleString('tr-TR')} � Adrenalin Kasa Sistemi</div>
+<div class="footer">Oluşturulma: ${new Date().toLocaleString('tr-TR')} — Adrenalin Kasa Sistemi</div>
 </body></html>`;
 }
 
@@ -300,19 +300,19 @@ function buildMonthHtml(
     return `<tr>
       <td>${fmtTR(d.date)} ${weekDay(d.date)}</td>
       <td>${d.sales.length}</td>
-      <td>${dt.adultQty}Y + ${dt.childQty}�</td>
-      <td style="text-align:right">?${fmtNum(dt.kkTl,2)}</td>
-      <td style="text-align:right">?${fmtNum(dt.cashTl,2)}</td>
+      <td>${dt.adultQty}Y + ${dt.childQty}Ç</td>
+      <td style="text-align:right">₺${fmtNum(dt.kkTl,2)}</td>
+      <td style="text-align:right">₺${fmtNum(dt.cashTl,2)}</td>
       <td style="text-align:right">$${fmtNum(dt.cashUsd,2)}</td>
-      <td style="text-align:right">�${fmtNum(dt.cashEur,2)}</td>
-      <td style="text-align:right;font-weight:700">?${fmtNum(dt.totalTl,2)}</td>
+      <td style="text-align:right">€${fmtNum(dt.cashEur,2)}</td>
+      <td style="text-align:right;font-weight:700">₺${fmtNum(dt.totalTl,2)}</td>
     </tr>`;
   }).join('');
 
   return `<!DOCTYPE html>
 <html lang="tr"><head>
 <meta charset="UTF-8"/>
-<title>${kasaName} � ${monthLbl} Ayl�k Rapor</title>
+<title>${kasaName} — ${monthLbl} Aylık Rapor</title>
 <style>
   *{box-sizing:border-box}
   body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1f2937;margin:0;padding:24px;font-size:13px}
@@ -335,21 +335,21 @@ function buildMonthHtml(
 </head><body>
 <div class="header">
   <div style="font-size:24px;font-weight:900;font-style:italic;margin-bottom:4px"><span style="color:#f97316">adrenalin</span><span style="color:#fb923c">.</span></div>
-  <h1>${kasaName} � ${monthLbl} Ayl�k Rapor</h1>
-  <p>Toplam ${allSales.length} sat�� � ${t.adultQty} Yeti�kin � ${t.childQty} �ocuk</p>
+  <h1>${kasaName} — ${monthLbl} Aylık Rapor</h1>
+  <p>Toplam ${allSales.length} satış — ${t.adultQty} Yetişkin — ${t.childQty} Çocuk</p>
 </div>
 <div class="metrics">
   <div class="card">
     <div class="lbl">Toplam Ciro</div>
-    <div class="num">?${fmtNum(t.totalTl,2)}</div>
+    <div class="num">₺${fmtNum(t.totalTl,2)}</div>
   </div>
   <div class="card">
     <div class="lbl">Nakit TL</div>
-    <div class="num">?${fmtNum(t.cashTl,2)}</div>
+    <div class="num">₺${fmtNum(t.cashTl,2)}</div>
   </div>
   <div class="card">
-    <div class="lbl">Kredi Kart�</div>
-    <div class="num">?${fmtNum(t.kkTl,2)}</div>
+    <div class="lbl">Kredi Kartı</div>
+    <div class="num">₺${fmtNum(t.kkTl,2)}</div>
   </div>
   <div class="card">
     <div class="lbl">Nakit USD</div>
@@ -357,14 +357,14 @@ function buildMonthHtml(
   </div>
   <div class="card">
     <div class="lbl">Nakit EUR</div>
-    <div class="num">�${fmtNum(t.cashEur,2)}</div>
+    <div class="num">€${fmtNum(t.cashEur,2)}</div>
   </div>
 </div>
 <table>
-  <thead><tr><th>Tarih</th><th>Sat�� #</th><th>Ki�i</th><th style="text-align:right">K.Kart�</th><th style="text-align:right">Nakit TL</th><th style="text-align:right">Nakit $</th><th style="text-align:right">Nakit �</th><th style="text-align:right">G�nl�k Ciro</th></tr></thead>
-  <tbody>${dayRows || '<tr><td colspan="8" style="text-align:center;padding:20px;color:#9ca3af">Bu ay i�in sat�� verisi bulunamad�</td></tr>'}</tbody>
+  <thead><tr><th>Tarih</th><th>Satış #</th><th>Kişi</th><th style="text-align:right">K.Kartı</th><th style="text-align:right">Nakit TL</th><th style="text-align:right">Nakit $</th><th style="text-align:right">Nakit €</th><th style="text-align:right">Günlük Ciro</th></tr></thead>
+  <tbody>${dayRows || '<tr><td colspan="8" style="text-align:center;padding:20px;color:#9ca3af">Bu ay için satış verisi bulunamadı</td></tr>'}</tbody>
 </table>
-<div class="footer">Olu�turulma: ${new Date().toLocaleString('tr-TR')} � Adrenalin Kasa Sistemi</div>
+<div class="footer">Oluşturulma: ${new Date().toLocaleString('tr-TR')} — Adrenalin Kasa Sistemi</div>
 </body></html>`;
 }
 
@@ -462,7 +462,7 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
           <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className={`font-bold text-sm ${info.text}`}>Bug�n � Canl�</span>
+              <span className={`font-bold text-sm ${info.text}`}>Bugün — Canlı</span>
               <span className="text-gray-500 text-xs">{fmtTR(todayStr)}</span>
             </div>
             <div className="flex gap-2">
@@ -493,11 +493,11 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
             return (
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
                 {[
-                  { label: 'Toplam Ciro',  val: `?${fmtNum(t.totalTl,2)}`,    color: 'text-green-400 font-bold' },
-                  { label: 'Kredi Kart�',  val: `?${fmtNum(t.kkTl,2)}`,       color: 'text-blue-400'            },
-                  { label: 'Nakit TL',     val: `?${fmtNum(t.cashTl,2)}`,      color: 'text-green-300'           },
+                  { label: 'Toplam Ciro',  val: `₺${fmtNum(t.totalTl,2)}`,    color: 'text-green-400 font-bold' },
+                  { label: 'Kredi Kartı',  val: `₺${fmtNum(t.kkTl,2)}`,       color: 'text-blue-400'            },
+                  { label: 'Nakit TL',     val: `₺${fmtNum(t.cashTl,2)}`,      color: 'text-green-300'           },
                   { label: 'Nakit $',      val: `$${fmtNum(t.cashUsd,2)}`,      color: 'text-yellow-400'          },
-                  { label: 'Nakit �',      val: `�${fmtNum(t.cashEur,2)}`,      color: 'text-orange-400'          },
+                  { label: 'Nakit €',      val: `€${fmtNum(t.cashEur,2)}`,      color: 'text-orange-400'          },
                 ].map(m => (
                   <div key={m.label} className="bg-gray-900/60 rounded-lg px-3 py-2">
                     <div className="text-gray-500">{m.label}</div>
@@ -522,14 +522,14 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
             const list = Object.values(persMap).sort((a,b) => b.revenue - a.revenue);
             return (
               <div className="mt-3 pt-3 border-t border-gray-700/50">
-                <p className="text-xs text-gray-500 mb-2 flex items-center gap-1"><User className="w-3 h-3" /> Personel Da��l�m�</p>
+                <p className="text-xs text-gray-500 mb-2 flex items-center gap-1"><User className="w-3 h-3" /> Personel Dağılımı</p>
                 <div className="flex flex-wrap gap-2">
                   {list.map(p => (
                     <div key={p.name} className="bg-gray-900/60 rounded-lg px-3 py-2 text-xs">
                       <span className="text-white font-semibold">{p.name}</span>
-                      <span className="text-gray-500 ml-2">{p.count} sat��</span>
-                      <span className="text-green-400 ml-2">?{fmtNum(p.revenue,0)}</span>
-                      {p.cross > 0 && <span className="text-orange-400 ml-2">{p.cross}�</span>}
+                      <span className="text-gray-500 ml-2">{p.count} satış</span>
+                      <span className="text-green-400 ml-2">₺{fmtNum(p.revenue,0)}</span>
+                      {p.cross > 0 && <span className="text-orange-400 ml-2">{p.cross}×</span>}
                     </div>
                   ))}
                 </div>
@@ -538,7 +538,7 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
           })()}
 
           {todayRow.sales.length === 0 && (
-            <p className="text-gray-600 text-sm text-center py-2">Bug�n hen�z sat�� yap�lmam��</p>
+            <p className="text-gray-600 text-sm text-center py-2">Bugün henüz satış yapılmamış</p>
           )}
         </div>
       )}
@@ -564,21 +564,21 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
                   : <ChevronRight className="w-4 h-4 text-gray-400" />}
                 <div>
                   <span className="text-white font-bold text-base">{mg.label}</span>
-                  <span className="text-gray-500 text-xs ml-2">{activeDays} g�nl�k veri � {mgSales.length} sat��</span>
-                  {mgCross.length > 0 && <span className="text-orange-400 text-xs ml-2">{mgCross.length} �apraz</span>}
+                  <span className="text-gray-500 text-xs ml-2">{activeDays} günlük veri — {mgSales.length} satış</span>
+                  {mgCross.length > 0 && <span className="text-orange-400 text-xs ml-2">{mgCross.length} Çapraz</span>}
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right hidden md:block">
-                  <div className="text-green-400 font-bold text-sm">?{fmtNum(mt.totalTl,2)}</div>
+                  <div className="text-green-400 font-bold text-sm">₺{fmtNum(mt.totalTl,2)}</div>
                   <div className="text-gray-500 text-xs flex gap-2">
-                    <span className="text-blue-400">KK: ?{fmtNum(mt.kkTl,0)}</span>
-                    <span>�</span>
-                    <span className="text-green-300">N: ?{fmtNum(mt.cashTl,0)}</span>
-                    <span>�</span>
+                    <span className="text-blue-400">KK: ₺{fmtNum(mt.kkTl,0)}</span>
+                    <span>€</span>
+                    <span className="text-green-300">N: ₺{fmtNum(mt.cashTl,0)}</span>
+                    <span>€</span>
                     <span className="text-yellow-400">${fmtNum(mt.cashUsd,2)}</span>
-                    <span>�</span>
-                    <span className="text-orange-400">�{fmtNum(mt.cashEur,2)}</span>
+                    <span>€</span>
+                    <span className="text-orange-400">€{fmtNum(mt.cashEur,2)}</span>
                   </div>
                 </div>
                 {/* Month download */}
@@ -594,7 +594,7 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
                     <Download className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    title="PDF yazd�r"
+                    title="PDF yazdır"
                     onClick={() => {
                       const html = buildMonthHtml(mg.label, info.name, '', mg.days, usdRate, eurRate);
                       printAsPdf(html);
@@ -613,11 +613,11 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
                 {/* Month total strip */}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3 px-5 py-3 bg-gray-900/30 border-b border-gray-700/50">
                   {[
-                    { label: 'Ayl�k Ciro',    val: `?${fmtNum(mt.totalTl,2)}`,    color: 'text-green-400 font-bold text-base' },
-                    { label: 'Kredi Kart�',   val: `?${fmtNum(mt.kkTl,2)}`,       color: 'text-blue-400'                      },
-                    { label: 'Nakit TL',      val: `?${fmtNum(mt.cashTl,2)}`,      color: 'text-green-300'                     },
+                    { label: 'Aylık Ciro',    val: `₺${fmtNum(mt.totalTl,2)}`,    color: 'text-green-400 font-bold text-base' },
+                    { label: 'Kredi Kartı',   val: `₺${fmtNum(mt.kkTl,2)}`,       color: 'text-blue-400'                      },
+                    { label: 'Nakit TL',      val: `₺${fmtNum(mt.cashTl,2)}`,      color: 'text-green-300'                     },
                     { label: 'Nakit $',       val: `$${fmtNum(mt.cashUsd,2)}`,      color: 'text-yellow-400'                    },
-                    { label: 'Nakit �',       val: `�${fmtNum(mt.cashEur,2)}`,      color: 'text-orange-400'                    },
+                    { label: 'Nakit €',       val: `€${fmtNum(mt.cashEur,2)}`,      color: 'text-orange-400'                    },
                   ].map(m => (
                     <div key={m.label} className="text-xs">
                       <div className="text-gray-500">{m.label}</div>
@@ -648,18 +648,18 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
                               {fmtTR(day.date)}
                             </span>
                             <span className="text-gray-500 text-xs">{weekDay(day.date)}</span>
-                            {isToday && <span className="text-xs bg-blue-600/30 text-blue-400 px-1.5 py-0.5 rounded font-medium">Bug�n</span>}
-                            {day.sales.length === 0 && <span className="text-gray-700 text-xs">� sat�� yok</span>}
+                            {isToday && <span className="text-xs bg-blue-600/30 text-blue-400 px-1.5 py-0.5 rounded font-medium">Bugün</span>}
+                            {day.sales.length === 0 && <span className="text-gray-700 text-xs">— satış yok</span>}
                           </div>
                           <div className="flex items-center gap-4">
                             {day.sales.length > 0 && (
                               <div className="hidden md:flex gap-3 text-xs">
-                                <span className="text-gray-500">{day.sales.length} sat��</span>
-                                <span className="text-green-400 font-semibold">?{fmtNum(dt.totalTl,0)}</span>
-                                {dt.kkTl > 0 && <span className="text-blue-400">KK:?{fmtNum(dt.kkTl,0)}</span>}
+                                <span className="text-gray-500">{day.sales.length} satış</span>
+                                <span className="text-green-400 font-semibold">₺{fmtNum(dt.totalTl,0)}</span>
+                                {dt.kkTl > 0 && <span className="text-blue-400">KK:₺{fmtNum(dt.kkTl,0)}</span>}
                                 {dt.cashUsd > 0 && <span className="text-yellow-400">${fmtNum(dt.cashUsd,2)}</span>}
-                                {dt.cashEur > 0 && <span className="text-orange-400">�{fmtNum(dt.cashEur,2)}</span>}
-                                {day.crossSales.length > 0 && <span className="text-orange-400">{day.crossSales.length}�</span>}
+                                {dt.cashEur > 0 && <span className="text-orange-400">€{fmtNum(dt.cashEur,2)}</span>}
+                                {day.crossSales.length > 0 && <span className="text-orange-400">{day.crossSales.length}×</span>}
                               </div>
                             )}
                             {day.sales.length > 0 && (
@@ -675,7 +675,7 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
                                   <Download className="w-3.5 sm:w-3 h-3.5 sm:h-3" />
                                 </button>
                                 <button
-                                  title="PDF yazd�r"
+                                  title="PDF yazdır"
                                   onClick={() => {
                                     const html = buildDayHtml(day.date, info.name, '', day.sales, day.crossSales, usdRate, eurRate);
                                     printAsPdf(html);
@@ -697,11 +697,11 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
                               {/* Mini summary cards */}
                               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                                 {[
-                                  { label: 'Toplam Ciro', val: `?${fmtNum(dayTot.totalTl,2)}`, color: 'text-green-400 font-bold' },
-                                  { label: 'Kredi Kart�', val: `?${fmtNum(dayTot.kkTl,2)}`,    color: 'text-blue-400'           },
-                                  { label: 'Nakit TL',    val: `?${fmtNum(dayTot.cashTl,2)}`,   color: 'text-green-300'          },
+                                  { label: 'Toplam Ciro', val: `₺${fmtNum(dayTot.totalTl,2)}`, color: 'text-green-400 font-bold' },
+                                  { label: 'Kredi Kartı', val: `₺${fmtNum(dayTot.kkTl,2)}`,    color: 'text-blue-400'           },
+                                  { label: 'Nakit TL',    val: `₺${fmtNum(dayTot.cashTl,2)}`,   color: 'text-green-300'          },
                                   { label: 'Nakit $',     val: `$${fmtNum(dayTot.cashUsd,2)}`,   color: 'text-yellow-400'         },
-                                  { label: 'Nakit �',     val: `�${fmtNum(dayTot.cashEur,2)}`,   color: 'text-orange-400'         },
+                                  { label: 'Nakit €',     val: `€${fmtNum(dayTot.cashEur,2)}`,   color: 'text-orange-400'         },
                                 ].map(m => (
                                   <div key={m.label} className="bg-gray-800/60 border border-gray-700/40 rounded-lg px-3 py-2 text-xs">
                                     <div className="text-gray-500 text-[10px] uppercase tracking-wide">{m.label}</div>
@@ -718,11 +718,11 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
                                       <th className="text-left px-3 py-2.5 text-gray-500 font-semibold w-8">#</th>
                                       <th className="text-left px-3 py-2.5 text-gray-500 font-semibold">Paket</th>
                                       <th className="text-left px-3 py-2.5 text-gray-500 font-semibold">Personel</th>
-                                      <th className="text-center px-3 py-2.5 text-gray-500 font-semibold">Y / �</th>
+                                      <th className="text-center px-3 py-2.5 text-gray-500 font-semibold">Y / Ç</th>
                                       <th className="text-right px-3 py-2.5 text-blue-500/70 font-semibold">KK (?)</th>
                                       <th className="text-right px-3 py-2.5 text-green-500/70 font-semibold">Nakit (?)</th>
                                       <th className="text-right px-3 py-2.5 text-yellow-500/70 font-semibold">Nakit ($)</th>
-                                      <th className="text-right px-3 py-2.5 text-orange-500/70 font-semibold">Nakit (�)</th>
+                                      <th className="text-right px-3 py-2.5 text-orange-500/70 font-semibold">Nakit (€)</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-gray-700/20">
@@ -734,13 +734,13 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
                                         <td className="px-3 py-2 text-gray-600 tabular-nums">{i + 1}</td>
                                         <td className="px-3 py-2 max-w-[220px]">
                                           <div className="text-white font-medium truncate" title={g.packageName}>
-                                            {g.hasRefund && <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded mr-1.5 font-semibold">�ade Edildi</span>}
+                                            {g.hasRefund && <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded mr-1.5 font-semibold">İade Edildi</span>}
                                             {g.isCross && <ArrowLeftRight className="w-3 h-3 inline text-orange-400 mr-1 shrink-0" />}
                                             {g.packageName}
                                           </div>
                                           {g.category && <div className="text-gray-600 text-[10px] truncate">{g.category}</div>}
                                           {g.hasRefund && g.refundReason && <div className="text-red-400 text-[10px] truncate mt-0.5" title={g.refundReason}>Neden: {g.refundReason}</div>}
-                                          {g.kkRefundTxId && <div className="text-gray-500 text-[10px] truncate">Kredi Kart� ��lem No: {g.kkRefundTxId}</div>}
+                                          {g.kkRefundTxId && <div className="text-gray-500 text-[10px] truncate">Kredi Kartı İşlem No: {g.kkRefundTxId}</div>}
                                         </td>
                                         <td className="px-3 py-2 text-gray-300">
                                           <div className="flex items-center gap-1">
@@ -754,16 +754,16 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
                                           <span className="text-gray-400">{g.childQty}</span>
                                         </td>
                                         <td className="px-3 py-2 text-right text-blue-400 tabular-nums font-medium">
-                                          {g.kkTl > 0 ? `?${fmtNum(g.kkTl,2)}` : <span className="text-gray-700">�</span>}
+                                          {g.kkTl > 0 ? `₺${fmtNum(g.kkTl,2)}` : <span className="text-gray-700">—</span>}
                                         </td>
                                         <td className="px-3 py-2 text-right text-green-400 tabular-nums font-medium">
-                                          {g.cashTl > 0 ? `?${fmtNum(g.cashTl,2)}` : <span className="text-gray-700">�</span>}
+                                          {g.cashTl > 0 ? `₺${fmtNum(g.cashTl,2)}` : <span className="text-gray-700">—</span>}
                                         </td>
                                         <td className="px-3 py-2 text-right text-yellow-400 tabular-nums font-medium">
-                                          {g.cashUsd > 0 ? `$${fmtNum(g.cashUsd,2)}` : <span className="text-gray-700">�</span>}
+                                          {g.cashUsd > 0 ? `$${fmtNum(g.cashUsd,2)}` : <span className="text-gray-700">—</span>}
                                         </td>
                                         <td className="px-3 py-2 text-right text-orange-400 tabular-nums font-medium">
-                                          {g.cashEur > 0 ? `�${fmtNum(g.cashEur,2)}` : <span className="text-gray-700">�</span>}
+                                          {g.cashEur > 0 ? `€${fmtNum(g.cashEur,2)}` : <span className="text-gray-700">—</span>}
                                         </td>
                                       </tr>
                                     ))}
@@ -771,13 +771,13 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
                                   <tfoot>
                                     <tr className="bg-gray-900/60 border-t-2 border-gray-600/50">
                                       <td colSpan={4} className="px-3 py-2.5 text-gray-400 font-semibold">
-                                        {day.sales.length} sat�� &nbsp;�&nbsp; {dayTot.adultQty} Yeti�kin &nbsp;�&nbsp; {dayTot.childQty} �ocuk
-                                        &nbsp;�&nbsp; <span className="text-green-400">?{fmtNum(dayTot.totalTl,2)} toplam ciro</span>
+                                        {day.sales.length} satış &nbsp;·&nbsp; {dayTot.adultQty} Yetişkin &nbsp;·&nbsp; {dayTot.childQty} Çocuk
+                                        &nbsp;·&nbsp; <span className="text-green-400">₺{fmtNum(dayTot.totalTl,2)} toplam ciro</span>
                                       </td>
-                                      <td className="px-3 py-2.5 text-right text-blue-400 font-bold tabular-nums">?{fmtNum(dayTot.kkTl,2)}</td>
-                                      <td className="px-3 py-2.5 text-right text-green-400 font-bold tabular-nums">?{fmtNum(dayTot.cashTl,2)}</td>
+                                      <td className="px-3 py-2.5 text-right text-blue-400 font-bold tabular-nums">₺{fmtNum(dayTot.kkTl,2)}</td>
+                                      <td className="px-3 py-2.5 text-right text-green-400 font-bold tabular-nums">₺{fmtNum(dayTot.cashTl,2)}</td>
                                       <td className="px-3 py-2.5 text-right text-yellow-400 font-bold tabular-nums">${fmtNum(dayTot.cashUsd,2)}</td>
-                                      <td className="px-3 py-2.5 text-right text-orange-400 font-bold tabular-nums">�{fmtNum(dayTot.cashEur,2)}</td>
+                                      <td className="px-3 py-2.5 text-right text-orange-400 font-bold tabular-nums">€{fmtNum(dayTot.cashEur,2)}</td>
                                     </tr>
                                   </tfoot>
                                 </table>
@@ -786,7 +786,7 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
                           );
                         })()}
                         {isDayOpen && day.sales.length === 0 && (
-                          <div className="px-5 pb-3 text-center text-gray-600 text-xs py-3">Bu g�n sat�� kayd� yok</div>
+                          <div className="px-5 pb-3 text-center text-gray-600 text-xs py-3">Bu gün satış kaydı yok</div>
                         )}
                       </div>
                     );
@@ -801,7 +801,7 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
       {monthGroups.length === 0 && (
         <div className="flex flex-col items-center justify-center h-40 text-gray-600">
           <AlertCircle className="w-8 h-8 mb-2" />
-          <p className="text-sm">Se�ilen d�nem i�in veri bulunamad�</p>
+          <p className="text-sm">Seçilen dönem için veri bulunamadı</p>
         </div>
       )}
     </div>
@@ -829,8 +829,8 @@ export default function ReportsTab() {
             <Calendar className="w-5 h-5 text-orange-400" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white tracking-tight">Sat�� Raporlar�</h2>
-            <p className="text-xs text-gray-500 mt-0.5">G�nl�k, haftal�k ve ayl�k sat�� raporlar�n� g�r�nt�leyin ve indirin</p>
+            <h2 className="text-xl font-bold text-white tracking-tight">Satış Raporları</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Günlük, haftalık ve aylık satış raporlarını görüntüleyin ve indirin</p>
           </div>
         </div>
 
@@ -859,16 +859,16 @@ export default function ReportsTab() {
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0`} style={{background: 'rgba(255,255,255,0.05)'}}><info.Icon className={`w-6 h-6 ${info.text}`} /></div>
                 <p className={`text-lg font-bold ${info.text}`}>{info.name}</p>
               </div>
-              <p className="text-gray-500 text-sm">Raporlar� g�r�nt�le</p>
+              <p className="text-gray-500 text-sm">Raporları görüntüle</p>
               <div className="flex flex-wrap gap-2 mt-4">
                 <div className="flex items-center gap-1 text-xs text-gray-500">
-                  <FileText className="w-3.5 h-3.5" /> HTML / PDF �ndir
+                  <FileText className="w-3.5 h-3.5" /> HTML / PDF İndir
                 </div>
                 <div className="flex items-center gap-1 text-xs text-gray-500">
-                  <TrendingUp className="w-3.5 h-3.5" /> Personel Bazl�
+                  <TrendingUp className="w-3.5 h-3.5" /> Personel Bazlı
                 </div>
                 <div className="flex items-center gap-1 text-xs text-gray-500">
-                  <ArrowLeftRight className="w-3.5 h-3.5" /> �apraz Sat��
+                  <ArrowLeftRight className="w-3.5 h-3.5" /> Çapraz Satış
                 </div>
               </div>
             </button>
@@ -878,11 +878,11 @@ export default function ReportsTab() {
         {/* Legend */}
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-gray-600 pt-2">
           <div className="flex items-center gap-1.5"><Banknote className="w-3.5 h-3.5 text-green-500" /> Nakit TL</div>
-          <div className="flex items-center gap-1.5"><CreditCard className="w-3.5 h-3.5 text-blue-500" /> Kredi Kart�</div>
+          <div className="flex items-center gap-1.5"><CreditCard className="w-3.5 h-3.5 text-blue-500" /> Kredi Kartı</div>
           <div className="flex items-center gap-1.5"><span className="text-yellow-500 font-bold text-sm">$</span> Nakit USD</div>
-          <div className="flex items-center gap-1.5"><span className="text-orange-500 font-bold text-sm">�</span> Nakit EUR</div>
-          <div className="flex items-center gap-1.5"><ArrowLeftRight className="w-3.5 h-3.5 text-orange-400" /> �apraz Sat��</div>
-          <div className="flex items-center gap-1.5"><RotateCcw className="w-3.5 h-3.5 text-red-400" /> �ade (negatif tutar)</div>
+          <div className="flex items-center gap-1.5"><span className="text-orange-500 font-bold text-sm">€</span> Nakit EUR</div>
+          <div className="flex items-center gap-1.5"><ArrowLeftRight className="w-3.5 h-3.5 text-orange-400" /> Çapraz Satış</div>
+          <div className="flex items-center gap-1.5"><RotateCcw className="w-3.5 h-3.5 text-red-400" /> İade (negatif tutar)</div>
         </div>
       </div>
     );
@@ -906,8 +906,8 @@ export default function ReportsTab() {
               <info.Icon className={`w-5 h-5 ${info.text}`} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white tracking-tight">{info.name} � Raporlar</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Aya g�re gruplu � g�n detay� i�in t�klay�n</p>
+              <h2 className="text-xl font-bold text-white tracking-tight">{info.name} — Raporlar</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Aya göre gruplu — gün detayı için tıklayın</p>
             </div>
           </div>
         </div>

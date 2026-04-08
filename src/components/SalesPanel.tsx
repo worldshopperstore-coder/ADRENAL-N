@@ -65,7 +65,7 @@ interface AddSaleForm {
   comment: string;
 }
 
-export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpdate }: { usdRate: number; eurRate: number; onSalesUpdate?: (sales: Sale[]) => void }) {
+export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }: { usdRate: number; eurRate: number; onSalesUpdate?: (sales: Sale[]) => void }) {
   const currentKasaId = getKasaId('sinema');
   const [kasaPackages, setKasaPackages] = useState<PackageItem[]>(
     INITIAL_PACKAGES.filter(p => p.kasaId === currentKasaId)

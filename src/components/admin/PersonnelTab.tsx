@@ -169,7 +169,7 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
       getAllCrossSalesForDateRange(startDate, endDate),
       getPersonnelAttendance(person.id, startDate, endDate),
       getPersonnelShift(person.id),
-      getPersonnelLeaves(person.id, startDate, endDate).catch(() => [] as LeaveRecord[]),
+      getPersonnelLeaves(person.id).catch(() => [] as LeaveRecord[]),
     ]).then(([s, cs, att, sch, lv]) => {
       setSales(s.filter(x => x.personnelId === person.id));
       setCrossSales(cs.filter(x => x.personnelId === person.id));
@@ -319,7 +319,7 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
     setLeaveSaving(true);
     const session = localStorage.getItem('userSession');
     const adminId = session ? (JSON.parse(session).personnel?.id ?? 'admin') : 'admin';
-    await createLeave({
+    const ok = await createLeave({
       personnel_id: person.id,
       personnel_name: person.fullName,
       kasa_id: person.kasaId,
@@ -330,6 +330,7 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
       created_by: adminId,
     });
     setLeaveSaving(false);
+    if (!ok) { alert('İzin kaydedilemedi. Lütfen tekrar deneyin.'); return; }
     setLeaveForm(false);
     setLf({ start: fmtDate(today), end: fmtDate(today), type: 'yillik', note: '' });
     loadData();
