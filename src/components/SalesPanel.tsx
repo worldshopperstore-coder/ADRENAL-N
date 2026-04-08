@@ -175,6 +175,13 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
         result.push({ name: p.name, baseName: p.name });
       }
     }
+    // Numaralı paketleri sırala (ör. "Acenta 6" < "Acenta 12")
+    result.sort((a, b) => {
+      const numA = parseInt(a.name.replace(/\D/g, '')) || 0;
+      const numB = parseInt(b.name.replace(/\D/g, '')) || 0;
+      if (numA && numB) return numA - numB;
+      return a.name.localeCompare(b.name, 'tr');
+    });
     return result;
   };
 
@@ -1716,7 +1723,35 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
                       )}
                     </div>
 
-                    {/* ── ADIM 2: DOLAR / EURO Seçimi (sadece dövizli kategorilerde) ── */}
+                    {/* ── ADIM 2: Kişi Sayısı (Numaratör) ── */}
+                    {(() => {
+                      const stepLocked = !formData.packageId;
+                      return (
+                        <div className={`relative ${stepLocked ? 'opacity-40 pointer-events-none' : ''}`}>
+                          {stepLocked && <div className="absolute inset-0 z-10" />}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Yetişkin</label>
+                              <div className="flex items-center bg-gray-800 border border-gray-700/80 rounded-xl overflow-hidden">
+                                <button type="button" onClick={() => setFormData({ ...formData, adultQty: String(Math.max(0, (parseInt(formData.adultQty) || 0) - 1)) })} className="w-9 h-10 text-gray-400 hover:bg-gray-700 hover:text-white text-base font-bold transition-colors flex items-center justify-center flex-shrink-0">−</button>
+                                <input type="number" min="0" value={formData.adultQty} onChange={(e) => setFormData({ ...formData, adultQty: e.target.value.replace(/[^0-9]/g, '') || '0' })} onFocus={(e) => { if (e.target.value === '0') e.target.select(); }} className="flex-1 h-10 bg-transparent text-white text-sm font-bold text-center min-w-[30px] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                <button type="button" onClick={() => setFormData({ ...formData, adultQty: String((parseInt(formData.adultQty) || 0) + 1) })} className="w-9 h-10 text-gray-400 hover:bg-gray-700 hover:text-white text-base font-bold transition-colors flex items-center justify-center flex-shrink-0">+</button>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Çocuk</label>
+                              <div className="flex items-center bg-gray-800 border border-gray-700/80 rounded-xl overflow-hidden">
+                                <button type="button" onClick={() => setFormData({ ...formData, childQty: String(Math.max(0, (parseInt(formData.childQty) || 0) - 1)) })} className="w-9 h-10 text-gray-400 hover:bg-gray-700 hover:text-white text-base font-bold transition-colors flex items-center justify-center flex-shrink-0">−</button>
+                                <input type="number" min="0" value={formData.childQty} onChange={(e) => setFormData({ ...formData, childQty: e.target.value.replace(/[^0-9]/g, '') || '0' })} onFocus={(e) => { if (e.target.value === '0') e.target.select(); }} className="flex-1 h-10 bg-transparent text-white text-sm font-bold text-center min-w-[30px] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                <button type="button" onClick={() => setFormData({ ...formData, childQty: String((parseInt(formData.childQty) || 0) + 1) })} className="w-9 h-10 text-gray-400 hover:bg-gray-700 hover:text-white text-base font-bold transition-colors flex items-center justify-center flex-shrink-0">+</button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* ── ADIM 3: DOLAR / EURO Seçimi (sadece dövizli kategorilerde) ── */}
                     {isDualCurrencyCategory(selectedCategory) && formData.packageId && (() => {
                       const selectedPkgName = kasaPackages.find(p => p.id === formData.packageId)?.name || '';
                       const usdPkg = kasaPackages.find(p => p.category === selectedCategory && p.name === selectedPkgName && p.currency === 'USD');
@@ -1754,38 +1789,11 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
                       );
                     })()}
 
-                    {/* ── ADIM 3: Kişi Sayısı (Numaratör) ── */}
-                    {(() => {
-                      const stepLocked = !formData.packageId || (isDualCurrencyCategory(selectedCategory) && !formData.selectedCurrency);
-                      return (
-                        <div className={`relative ${stepLocked ? 'opacity-40 pointer-events-none' : ''}`}>
-                          {stepLocked && <div className="absolute inset-0 z-10" />}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Yetişkin</label>
-                              <div className="flex items-center bg-gray-800 border border-gray-700/80 rounded-xl overflow-hidden">
-                                <button type="button" onClick={() => setFormData({ ...formData, adultQty: String(Math.max(0, (parseInt(formData.adultQty) || 0) - 1)) })} className="w-9 h-10 text-gray-400 hover:bg-gray-700 hover:text-white text-base font-bold transition-colors flex items-center justify-center flex-shrink-0">−</button>
-                                <input type="number" min="0" value={formData.adultQty} onChange={(e) => setFormData({ ...formData, adultQty: e.target.value.replace(/[^0-9]/g, '') || '0' })} onFocus={(e) => { if (e.target.value === '0') e.target.select(); }} className="flex-1 h-10 bg-transparent text-white text-sm font-bold text-center min-w-[30px] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                                <button type="button" onClick={() => setFormData({ ...formData, adultQty: String((parseInt(formData.adultQty) || 0) + 1) })} className="w-9 h-10 text-gray-400 hover:bg-gray-700 hover:text-white text-base font-bold transition-colors flex items-center justify-center flex-shrink-0">+</button>
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Çocuk</label>
-                              <div className="flex items-center bg-gray-800 border border-gray-700/80 rounded-xl overflow-hidden">
-                                <button type="button" onClick={() => setFormData({ ...formData, childQty: String(Math.max(0, (parseInt(formData.childQty) || 0) - 1)) })} className="w-9 h-10 text-gray-400 hover:bg-gray-700 hover:text-white text-base font-bold transition-colors flex items-center justify-center flex-shrink-0">−</button>
-                                <input type="number" min="0" value={formData.childQty} onChange={(e) => setFormData({ ...formData, childQty: e.target.value.replace(/[^0-9]/g, '') || '0' })} onFocus={(e) => { if (e.target.value === '0') e.target.select(); }} className="flex-1 h-10 bg-transparent text-white text-sm font-bold text-center min-w-[30px] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                                <button type="button" onClick={() => setFormData({ ...formData, childQty: String((parseInt(formData.childQty) || 0) + 1) })} className="w-9 h-10 text-gray-400 hover:bg-gray-700 hover:text-white text-base font-bold transition-colors flex items-center justify-center flex-shrink-0">+</button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
                     {/* ── ADIM 4: Ödeme Tipi ── */}
                     {(() => {
                       const qtyOk = (parseInt(formData.adultQty) || 0) + (parseInt(formData.childQty) || 0) > 0;
-                      const stepLocked = !formData.packageId || !qtyOk;
+                      const currencyOk = !isDualCurrencyCategory(selectedCategory) || !!formData.selectedCurrency;
+                      const stepLocked = !formData.packageId || !qtyOk || !currencyOk;
                       return (
                         <div className={`relative ${stepLocked ? 'opacity-40 pointer-events-none' : ''}`}>
                           {stepLocked && <div className="absolute inset-0 z-10" />}
