@@ -6,7 +6,7 @@ const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://mipa
 const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'sb_publishable_Cby57dwYK-5-gpuUGGE_aQ_nFzy41cv';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const PWA_VERSION = 'v5.0';
+const PWA_VERSION = 'v5.1';
 
 // ── Types ──
 interface AttendanceRecord {
