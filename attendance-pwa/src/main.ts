@@ -31,7 +31,7 @@ const isSelfService = urlParams.get('mode') === 'self';
 const selfKasa = urlParams.get('kasa') || 'yasam_destek';
 
 // GPS target: Antalya Aquarium
-const GPS_TARGET = { lat: 36.8570, lng: 30.6350, radiusM: 200 };
+const GPS_TARGET = { lat: 36.8768, lng: 30.6545, radiusM: 200 };
 
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
