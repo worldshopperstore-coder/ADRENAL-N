@@ -239,55 +239,94 @@ export default function App() {
     >
       {renderContent()}
 
-      {/* Güncelleme bildirimi */}
-      {updateVersion && !updateReady && updateProgress === null && (
-        <div className="fixed bottom-4 right-4 z-[90] bg-gray-900 border border-emerald-700/50 rounded-xl p-4 shadow-2xl max-w-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-emerald-600/20 border border-emerald-600/40 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Download className="w-4 h-4 text-emerald-400" />
+      {/* Güncelleme Pop-up */}
+      {updateVersion && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[95] flex items-center justify-center p-4">
+          <div className="bg-gradient-to-b from-gray-900 to-[#0c0c14] border border-gray-700/60 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            {/* Başlık */}
+            <div className="flex items-center gap-3 mb-5">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${
+                updateReady 
+                  ? 'bg-amber-600/20 border-amber-600/40' 
+                  : 'bg-emerald-600/20 border-emerald-600/40'
+              }`}>
+                {updateReady 
+                  ? <RefreshCw className="w-6 h-6 text-amber-400" />
+                  : <Download className="w-6 h-6 text-emerald-400" />
+                }
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">
+                  {updateReady ? 'Güncelleme Hazır' : 'Güncelleme Mevcut'}
+                </h3>
+                <p className="text-sm text-gray-400">v{updateVersion}</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white">Güncelleme Mevcut</p>
-              <p className="text-xs text-gray-400">v{updateVersion} hazır</p>
-            </div>
-          </div>
-          <button
-            onClick={() => { setUpdateProgress(0); window.electron?.updater.download(); }}
-            className="mt-3 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg transition-colors text-sm"
-          >
-            Güncelle
-          </button>
-        </div>
-      )}
 
-      {/* İndirme ilerlemesi */}
-      {updateProgress !== null && !updateReady && (
-        <div className="fixed bottom-4 right-4 z-[90] bg-gray-900 border border-blue-700/50 rounded-xl p-4 shadow-2xl max-w-xs w-72">
-          <p className="text-sm font-semibold text-white mb-2">İndiriliyor… %{updateProgress}</p>
-          <div className="w-full bg-gray-700 rounded-full h-2">
-            <div className="bg-blue-500 h-2 rounded-full transition-all duration-300" style={{ width: `${updateProgress}%` }} />
-          </div>
-        </div>
-      )}
+            {/* Progress Bar */}
+            {updateProgress !== null && !updateReady && (
+              <div className="mb-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-gray-400 font-medium">İndiriliyor...</span>
+                  <span className="text-xs text-emerald-400 font-bold">%{updateProgress}</span>
+                </div>
+                <div className="w-full bg-gray-800 rounded-full h-3 border border-gray-700/60 overflow-hidden">
+                  <div 
+                    className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-full rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${updateProgress}%` }} 
+                  />
+                </div>
+              </div>
+            )}
 
-      {/* Yeniden başlat */}
-      {updateReady && (
-        <div className="fixed bottom-4 right-4 z-[90] bg-gray-900 border border-amber-700/50 rounded-xl p-4 shadow-2xl max-w-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-amber-600/20 border border-amber-600/40 rounded-lg flex items-center justify-center flex-shrink-0">
-              <RefreshCw className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white">Güncelleme Hazır</p>
-              <p className="text-xs text-gray-400">Yeniden başlatarak güncelle</p>
+            {/* Açıklama */}
+            {updateProgress === null && !updateReady && (
+              <p className="text-sm text-gray-400 mb-5">
+                Yeni bir güncelleme mevcut. İndirmek için aşağıdaki butona tıklayın.
+              </p>
+            )}
+
+            {updateReady && (
+              <p className="text-sm text-gray-400 mb-5">
+                Güncelleme başarıyla indirildi. Uygulamayı yeniden başlatarak güncelleyin.
+              </p>
+            )}
+
+            {/* Butonlar */}
+            <div className="flex gap-2">
+              {!updateReady && updateProgress === null && (
+                <>
+                  <button
+                    onClick={() => setUpdateVersion(null)}
+                    className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white font-semibold py-2.5 rounded-xl transition-colors text-sm border border-gray-700"
+                  >
+                    Sonra
+                  </button>
+                  <button
+                    onClick={() => { setUpdateProgress(0); window.electron?.updater.download(); }}
+                    className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold py-2.5 rounded-xl transition-all text-sm shadow-lg shadow-emerald-500/20"
+                  >
+                    Güncelle
+                  </button>
+                </>
+              )}
+
+              {updateProgress !== null && !updateReady && (
+                <div className="w-full text-center text-xs text-gray-500 py-1">
+                  Lütfen bekleyin, indirme devam ediyor...
+                </div>
+              )}
+
+              {updateReady && (
+                <button
+                  onClick={() => window.electron?.updater.install()}
+                  className="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold py-2.5 rounded-xl transition-all text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" /> Yeniden Başlat
+                </button>
+              )}
             </div>
           </div>
-          <button
-            onClick={() => window.electron?.updater.install()}
-            className="mt-3 w-full bg-amber-600 hover:bg-amber-500 text-white font-semibold py-2 rounded-lg transition-colors text-sm"
-          >
-            Yeniden Başlat
-          </button>
         </div>
       )}
 

@@ -264,15 +264,20 @@ function startBridgeExe(cmd: string, args: string[]): Promise<boolean> {
 function stopBridgeProcess(): void {
   if (bridgeProcess) {
     bridgeProcess.kill('SIGTERM');
-    // Windows'ta SIGTERM çalışmayabilir, 2sn sonra zorla kapat
     setTimeout(() => {
       if (bridgeProcess) {
         bridgeProcess.kill('SIGKILL');
         bridgeProcess = null;
       }
     }, 2000);
-    bridgeReady = false;
   }
+  // bridgeProcess null olsa bile (checkExistingBridge ile bağlandıysak)
+  // tüm pos_bridge process'lerini öldür
+  try {
+    require('child_process').execSync('taskkill /F /IM pos_bridge.exe /T', { stdio: 'ignore' });
+  } catch (_) { /* zaten çalışmıyorsa ignore */ }
+  bridgeProcess = null;
+  bridgeReady = false;
 }
 
 // ── IPC Handlers ──────────────────────────────────────────
