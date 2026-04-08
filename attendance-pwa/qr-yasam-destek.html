@@ -11,8 +11,8 @@
 <body>
   <img id="qr" width="600" height="600" alt="QR Code">
   <script>
-    const url = 'https://puantajadr.vercel.app/?mode=self&kasa=yasam_destek';
-    document.getElementById('qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=' + encodeURIComponent(url);
+    const qrContent = 'SELF-yasam_destek';
+    document.getElementById('qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=' + encodeURIComponent(qrContent);
   </script>
 </body>
 </html>

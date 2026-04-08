@@ -340,6 +340,14 @@ async function startScanner(mode: 'checkin' | 'checkout') {
         if (navigator.vibrate) navigator.vibrate(50);
         let token = '';
         try { const url = new URL(decoded); token = url.searchParams.get('token') || ''; } catch { token = decoded; }
+
+        // Self-service QR: SELF-yasam_destek gibi
+        if (token.startsWith('SELF-')) {
+          const kasa = token.replace('SELF-', '');
+          await handleSelfServiceQR(kasa);
+          return;
+        }
+
         if (mode === 'checkin') {
           if (!token.startsWith('ATT-')) { showError('Ge\u00e7ersiz QR kod.'); return; }
           showProcessing('Yoklama onaylan\u0131yor...'); await handleCheckin(token);
@@ -395,10 +403,74 @@ async function handleCheckoutScan(token: string) {
 // ════════════════════════════════════════
 // SELF-SERVICE MODE (Yaşam Destek etc.)
 // ════════════════════════════════════════
-function showSelfLogin() {
+async function handleSelfServiceQR(kasa: string) {
+  // Daha önce login olmuş mu? (localStorage'da hatırla)
+  const savedHint = localStorage.getItem('pwa_user_hint');
+  if (savedHint) {
+    try {
+      const user: PersonnelInfo = JSON.parse(savedHint);
+      if (user.kasaId === kasa) {
+        // Hatırladık — direkt GPS → giriş/çıkış
+        await handleSelfServiceAutoCheckin(user, kasa);
+        return;
+      }
+    } catch {}
+  }
+  // İlk kez — login ekranı göster
+  showSelfLogin(kasa);
+}
+
+async function handleSelfServiceAutoCheckin(user: PersonnelInfo, kasa: string) {
+  showProcessing('Konum doğrulanıyor...');
+  const gps = await checkGPS();
+  if (!gps.ok) { showError(gps.error || 'Konum doğrulanamadı.'); return; }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const rowId = `${user.id}_${today}`;
+  const { data: existing } = await supabase.from('attendance').select('*').eq('id', rowId).single();
+
+  if (existing) {
+    if (existing.status === 'checked_in') {
+      // Zaten giriş yapmış — çıkış yap
+      showProcessing('Çıkış kaydediliyor...');
+      const now = new Date().toISOString();
+      const { error } = await supabase.from('attendance').update({ status: 'checked_out', check_out: now, checkout_token: null }).eq('id', existing.id);
+      if (error) { showError('Çıkış kaydedilemedi: ' + error.message); return; }
+      clearSession(true);
+      showSuccess('Güle Güle!', esc(user.fullName), new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), false);
+      return;
+    }
+    if (existing.status === 'checked_out') {
+      showError('Bugün zaten giriş ve çıkış yapmışsınız.');
+      return;
+    }
+  }
+
+  // Giriş yap
+  showProcessing('Giriş kaydediliyor...');
+  const now = new Date().toISOString();
+  const newRecord: any = {
+    id: rowId,
+    personnel_id: user.id,
+    personnel_name: user.fullName,
+    kasa_id: kasa,
+    date: today,
+    check_in: now,
+    check_out: null,
+    status: 'checked_in',
+    session_token: `SELF-${user.id}-${Date.now()}`,
+  };
+  const { error: insErr } = await supabase.from('attendance').upsert(newRecord);
+  if (insErr) { showError('Giriş kaydedilemedi: ' + insErr.message); return; }
+  saveSession(user, newRecord);
+  showSuccess('Hoş Geldiniz!', user.fullName, new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), true);
+}
+
+function showSelfLogin(kasa?: string) {
   stopLiveTimer();
+  const activeKasa = kasa || selfKasa;
   const app = document.getElementById('app')!;
-  const kasaName = KASA_NAMES[selfKasa] || selfKasa;
+  const kasaName = KASA_NAMES[activeKasa] || activeKasa;
   app.innerHTML = `${CSS}
     <div class="page">
       ${WAVE}
@@ -443,7 +515,7 @@ function showSelfLogin() {
       const { data: person, error } = await supabase.from('personnel').select('id, fullName, kasaId, role, password').eq('username', username).single();
       if (error || !person) { errDiv.textContent = 'Kullanıcı bulunamadı.'; errDiv.style.display = 'block'; loginBtn.textContent = 'Giriş Yap'; loginBtn.removeAttribute('disabled'); return; }
       if (person.password !== password) { errDiv.textContent = 'Şifre hatalı.'; errDiv.style.display = 'block'; loginBtn.textContent = 'Giriş Yap'; loginBtn.removeAttribute('disabled'); return; }
-      if (person.kasaId !== selfKasa) { errDiv.textContent = 'Bu departmana erişim yetkiniz yok.'; errDiv.style.display = 'block'; loginBtn.textContent = 'Giriş Yap'; loginBtn.removeAttribute('disabled'); return; }
+      if (person.kasaId !== activeKasa) { errDiv.textContent = 'Bu departmana erişim yetkiniz yok.'; errDiv.style.display = 'block'; loginBtn.textContent = 'Giriş Yap'; loginBtn.removeAttribute('disabled'); return; }
 
       // GPS check
       showProcessing('Konum doğrulanıyor...');
@@ -455,7 +527,10 @@ function showSelfLogin() {
       const rowId = `${person.id}_${today}`;
       const { data: existing } = await supabase.from('attendance').select('*').eq('id', rowId).single();
 
-      const user: PersonnelInfo = { id: person.id, fullName: person.fullName, kasaId: person.kasaId || selfKasa, role: person.role };
+      const user: PersonnelInfo = { id: person.id, fullName: person.fullName, kasaId: person.kasaId || activeKasa, role: person.role };
+
+      // Kullanıcıyı hatırla — bir daha login gerekmez
+      localStorage.setItem('pwa_user_hint', JSON.stringify(user));
 
       if (existing) {
         if (existing.status === 'checked_in') {
@@ -477,7 +552,7 @@ function showSelfLogin() {
         id: rowId,
         personnel_id: person.id,
         personnel_name: person.fullName,
-        kasa_id: person.kasaId || selfKasa,
+        kasa_id: person.kasaId || activeKasa,
         date: today,
         check_in: now,
         check_out: null,
