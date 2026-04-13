@@ -1,4 +1,5 @@
-import { app, BrowserWindow, Menu, ipcMain } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, dialog } from 'electron';
+import fs from 'fs';
 import path from 'path';
 import { registerPosIpcHandlers, cleanupBridge, startBridgeExe } from './posIpc';
 import { autoUpdater } from 'electron-updater';
@@ -119,6 +120,32 @@ app.on('ready', () => {
 
   ipcMain.handle('updater:install', () => {
     autoUpdater.quitAndInstall();
+  });
+
+  // ── Rapor PDF Kaydetme ───────────────────────────────
+  ipcMain.handle('report:save-pdf', async (_event, { html, defaultFileName }: { html: string; defaultFileName: string }) => {
+    try {
+      const desktopPath = app.getPath('desktop');
+      const filePath = path.join(desktopPath, defaultFileName);
+      
+      // Gizli pencere oluştur ve HTML'i yükle
+      const pdfWin = new BrowserWindow({ show: false, width: 850, height: 1100, webPreferences: { contextIsolation: true } });
+      await pdfWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+      
+      // PDF oluştur
+      const pdfBuffer = await pdfWin.webContents.printToPDF({
+        printBackground: true,
+        pageSize: 'A4',
+        margins: { top: 0.4, bottom: 0.4, left: 0.4, right: 0.4 },
+      });
+      pdfWin.close();
+      
+      // Masaüstüne kaydet
+      fs.writeFileSync(filePath, pdfBuffer);
+      return { success: true, filePath };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
   });
 
   // 5 saniye sonra güncelleme kontrol et

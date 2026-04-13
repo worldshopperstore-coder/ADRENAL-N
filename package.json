@@ -1,6 +1,6 @@
 {
   "name": "daily-report-system",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Adrenalin Dünyası - Satış ve Yönetim Sistemi",
   "main": "dist/main.cjs",
   "type": "module",
@@ -74,8 +74,8 @@
       "artifactName": "${productName}-${version}-Setup.${ext}"
     },
     "nsis": {
-      "oneClick": true,
-      "allowToChangeInstallationDirectory": false,
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
@@ -83,7 +83,9 @@
       "uninstallerSidebar": "build/installerSidebar.bmp",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Adrenalin Dünyası"
+      "shortcutName": "Adrenalin Dünyası",
+      "runAfterFinish": true,
+      "include": "build/installer.nsh"
     },
     "mac": {
       "target": [

@@ -773,7 +773,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
   };
 
   // İade tutanağı HTML/PDF
-  const generateRefundReport = (originalSale: Sale, refundSale: Sale, reason: string, kkTxId: string = '', atlantisOk: boolean = false, atlantisError: string = '') => {
+  const generateRefundReport = async (originalSale: Sale, refundSale: Sale, reason: string, kkTxId: string = '', atlantisOk: boolean = false, atlantisError: string = '') => {
     const session = getUserSession();
     const userName = session.personnel?.fullName || 'Kullanıcı';
     const kasaName = session.kasa?.name || 'Kasa';
@@ -813,7 +813,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
   .stamp span { display: inline-block; border: 2px solid #c00; color: #c00; padding: 5px 20px; border-radius: 4px; font-weight: 700; font-size: 14px; transform: rotate(-5deg); }
 </style></head><body>
 <div class="header">
-  <div style="font-size:24px;font-weight:900;font-style:italic;margin-bottom:4px"><span style="color:#f97316">adrenalin</span><span style="color:#fb923c">.</span></div>
   <h1>İADE TUTANAĞI</h1>
   <div class="meta"><strong>${kasaName}</strong> — Tarih: ${currentDate} — Saat: ${currentTime}</div>
 </div>
@@ -855,6 +854,18 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
 
     const w = window.open('', 'reportWindow', 'width=850,height=700,scrollbars=yes,resizable=yes');
     if (w) { w.document.write(html); w.document.close(); }
+
+    // PDF olarak masaüstüne kaydet
+    try {
+      const electron = (window as any).electron;
+      if (electron?.report?.savePDF) {
+        const fileName = `Iade_Tutanagi_${kasaName}_${currentDate.replace(/\./g, '-')}.pdf`;
+        const result = await electron.report.savePDF(html, fileName);
+        if (result.success) {
+          alert('PDF masaüstüne kaydedildi: ' + result.filePath);
+        }
+      }
+    } catch {}
   };
   
   // Excel Export Function
@@ -1405,7 +1416,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
 </style></head><body>
 
 <div class="header">
-  <div style="font-size:24px;font-weight:900;font-style:italic;margin-bottom:4px"><span style="color:#f97316">adrenalin</span><span style="color:#fb923c">.</span></div>
   <h1>GÜNLÜK SATIŞ RAPORU</h1>
   <div class="meta">
     <span><strong>${kasaName}</strong></span>
@@ -1474,6 +1484,18 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
 
     const w = window.open('', 'reportWindow', 'width=850,height=700,scrollbars=yes,resizable=yes');
     if (w) { w.document.write(html); w.document.close(); }
+
+    // PDF olarak masaüstüne kaydet
+    try {
+      const electron = (window as any).electron;
+      if (electron?.report?.savePDF) {
+        const fileName = `Gunluk_Rapor_${kasaName}_${currentDate.replace(/\./g, '-')}.pdf`;
+        const result = await electron.report.savePDF(html, fileName);
+        if (result.success) {
+          alert('PDF masaüstüne kaydedildi: ' + result.filePath);
+        }
+      }
+    } catch {}
   };
 
   const totals = useMemo(() => ({
@@ -2624,8 +2646,8 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
 
       {/* ── POS SONUÇ MODAL ── */}
       {showPosResultModal && posResult && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowPosResultModal(false); }}>
-          <div className="bg-gradient-to-b from-gray-900 to-[#0c0c14] border border-gray-700/60 rounded-2xl w-full max-w-md shadow-2xl p-6">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) { setShowPosResultModal(false); setPosResult(null); } }}>
+          <div className="bg-gradient-to-b from-gray-900 to-[#0c0c14] border border-gray-700/60 rounded-2xl w-full max-w-sm shadow-2xl p-6">
             {/* Başarı/Hata İkonu */}
             <div className="text-center mb-5">
               {posResult.success ? (
@@ -2641,13 +2663,13 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
               <h3 className={`text-lg font-bold ${posResult.success ? 'text-emerald-400' : 'text-red-400'}`}>
                 {posResult.success ? 'Satış Başarılı!' : 'İşlem Başarısız'}
               </h3>
-              
-              {posResult.success && posResult.terminalRecordId && (
-                <p className="text-sm text-gray-400 mt-1">
-                  Kayıt No: <span className="text-white font-bold">#{posResult.terminalRecordId}</span>
-                </p>
+
+              {/* Başarılıysa bilet sayısı */}
+              {posResult.success && posResult.printResult && posResult.printResult.printed > 0 && (
+                <p className="text-sm text-gray-400 mt-2">{posResult.printResult.printed} bilet basıldı</p>
               )}
               
+              {/* Hata mesajı */}
               {posResult.error && (
                 <p className="text-sm text-red-300 mt-2 bg-red-900/20 rounded-lg p-2 border border-red-700/30">
                   {posResult.error}
@@ -2655,42 +2677,11 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
               )}
             </div>
 
-            {/* Bilet Bilgileri */}
-            {posResult.success && posResult.ticketIds && posResult.ticketIds.length > 0 && (
-              <div className="bg-gray-800/50 rounded-xl p-3 mb-4 border border-gray-700/50">
-                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2">Bilet Detayları</p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="text-gray-400">Bilet Sayısı:</div>
-                  <div className="text-white font-bold">{posResult.ticketIds.length}</div>
-                  <div className="text-gray-400">Bilet ID'leri:</div>
-                  <div className="text-white font-mono text-xs">{posResult.ticketIds.join(', ')}</div>
-                </div>
-                {/* Yazdırma Sonucu — sadece başarılıysa göster */}
-                {posResult.printResult && posResult.printResult.printed > 0 && posResult.printResult.failed === 0 && (
-                  <div className="mt-2 text-xs px-2 py-1 rounded bg-emerald-900/30 text-emerald-300">
-                    🖨️ {posResult.printResult.printed} bilet basıldı
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* POS Durumu */}
-            {posResult.posMessage && (
-              <div className={`text-xs px-3 py-2 rounded-lg mb-4 border ${
-                posResult.posSuccess
-                  ? 'bg-emerald-900/20 border-emerald-700/30 text-emerald-300'
-                  : 'bg-yellow-900/20 border-yellow-700/30 text-yellow-300'
-              }`}>
-                POS: {posResult.posMessage}
-              </div>
-            )}
-
             {/* Butonlar */}
             <div className="flex gap-2.5">
               {posResult.success && posResult.ticketIds && posResult.ticketIds.length > 0 && (
                 <button
                   onClick={async () => {
-                    // Manuel bilet basımı (tekrar bas)
                     try {
                       const saleInfo = posResult._saleInfo;
                       if (!saleInfo || !posResult.ticketIds || !posResult.terminalRecordId) return;

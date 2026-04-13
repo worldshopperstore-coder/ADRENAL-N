@@ -54,7 +54,7 @@ function getCrossTotals(crossSales: CrossSale[]) {
   };
 }
 
-export function generateCrossHTMLReport(crossSales: CrossSale[]) {
+export async function generateCrossHTMLReport(crossSales: CrossSale[]) {
   const session = getUserSession();
   const userName = session.personnel?.fullName || 'Kullanıcı';
   const kasaName = session.kasa?.name || 'Kasa';
@@ -119,7 +119,6 @@ export function generateCrossHTMLReport(crossSales: CrossSale[]) {
 </style></head><body>
 
 <div class="header">
-  <div style="font-size:24px;font-weight:900;font-style:italic;margin-bottom:4px"><span style="color:#f97316">adrenalin</span><span style="color:#fb923c">.</span></div>
   <h1>⇄ ÇAPRAZ SATIŞ RAPORU</h1>
   <div class="meta">
     <span><strong>${kasaName}</strong></span>
@@ -179,6 +178,18 @@ export function generateCrossHTMLReport(crossSales: CrossSale[]) {
 
   const w = window.open('', 'reportWindow', 'width=850,height=800,scrollbars=yes,resizable=yes');
   if (w) { w.document.write(html); w.document.close(); }
+
+  // PDF olarak masaüstüne kaydet
+  try {
+    const electron = (window as any).electron;
+    if (electron?.report?.savePDF) {
+      const fileName = `Capraz_Rapor_${kasaName}_${currentDate.replace(/\./g, '-')}.pdf`;
+      const result = await electron.report.savePDF(html, fileName);
+      if (result.success) {
+        alert('PDF masaüstüne kaydedildi: ' + result.filePath);
+      }
+    }
+  } catch {}
 }
 
 export default function CrossSalesTab() {

@@ -39,6 +39,11 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('bridge:status-update', (_event: any, data: any) => callback(data));
     },
   },
+  report: {
+    /** HTML içeriğini PDF olarak masaüstüne kaydet */
+    savePDF: (html: string, defaultFileName: string) =>
+      ipcRenderer.invoke('report:save-pdf', { html, defaultFileName }) as Promise<{ success: boolean; filePath?: string; error?: string }>,
+  },
   updater: {
     /** Güncelleme kontrol et */
     check: () => ipcRenderer.invoke('updater:check') as Promise<{ available: boolean; version?: string }>,
