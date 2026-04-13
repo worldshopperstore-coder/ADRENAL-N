@@ -1,17 +1,9 @@
 ; ── Adrenalin Dünyası Custom Installer Theme ──
 ; Koyu tema + turuncu vurgular
 
-!include "MUI2.nsh"
-
 ; Renkler: Koyu arka plan, turuncu vurgu
 !define MUI_BGCOLOR "0C0C14"
 !define MUI_TEXTCOLOR "FFFFFF"
-
-; Sidebar ve header görselleri
-!define MUI_WELCOMEFINISHPAGE_BITMAP "$PLUGINSDIR\..\installerSidebar.bmp"
-!define MUI_HEADERIMAGE
-!define MUI_HEADERIMAGE_BITMAP "$PLUGINSDIR\..\installerHeader.bmp"
-!define MUI_HEADERIMAGE_RIGHT
 
 ; Hoş geldin sayfası
 !define MUI_WELCOMEPAGE_TITLE "Adrenalin Dünyası Kurulum Sihirbazı"
