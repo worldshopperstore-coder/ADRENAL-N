@@ -102,10 +102,12 @@ const DAY_TR: Record<WeekDays, string> = { monday:'Pzt', tuesday:'Sal', wednesda
 
 function getScheduledMinutes(schedule: WeekSchedule, day: WeekDays): number {
   const d = schedule[day];
-  if (d.isOff) return 0;
+  if (!d || d.isOff) return 0;
   const [sh,sm] = d.startTime.split(':').map(Number);
   const [eh,em] = d.endTime.split(':').map(Number);
-  return Math.max(0, (eh*60+em) - (sh*60+sm));
+  let diff = (eh*60+em) - (sh*60+sm);
+  if (diff < 0) diff += 24 * 60; // Gece geçen vardiyalar (ör: 23:00-01:00)
+  return Math.max(0, diff);
 }
 
 function minutesToHM(min: number): string {
@@ -230,7 +232,7 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
         const ciMin = ciDate.getHours() * 60 + ciDate.getMinutes();
         const schStartMin = schH * 60 + schM;
         if (ciMin > schStartMin + 5) { // 5dk tolerans
-          row.lateMin = ciMin - schStartMin;
+          row.lateMin = ciMin - (schStartMin + 5);
         }
         // Erken çıkma: actual check_out vs scheduled end
         const [eH, eM] = daySchedule.endTime.split(':').map(Number);
@@ -238,11 +240,11 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
         const coMin = coDate.getHours() * 60 + coDate.getMinutes();
         const schEndMin = eH * 60 + eM;
         if (coMin < schEndMin - 5) { // 5dk tolerans
-          row.earlyMin = schEndMin - coMin;
+          row.earlyMin = (schEndMin - 5) - coMin;
         }
         // Fazla mesai: scheduled'den fazla çalışma
         if (row.workedMin > scheduledMin + 15) { // 15dk tolerans
-          row.overtimeMin = row.workedMin - scheduledMin;
+          row.overtimeMin = row.workedMin - (scheduledMin + 15);
         }
         row.status = row.lateMin > 0 ? 'late' : 'normal';
       } else if (att?.check_in && !att?.check_out) {
@@ -276,8 +278,8 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
 
     // Haftalık hedef karşılaştırma
     const weeklyTarget = person.weeklyTargetHours ?? 45;
-    const totalDays = puantajRows.length;
-    const weeks = Math.max(1, totalDays / 7);
+    const scheduledWorkDays = puantajRows.filter(r => r.scheduledMin > 0 && r.status !== 'leave').length;
+    const weeks = Math.max(1, scheduledWorkDays / 6); // 6 iş günü/hafta
     const expectedTotalMin = weeklyTarget * 60 * weeks;
     const targetPct = expectedTotalMin > 0 ? Math.round((totalWorkedMin / expectedTotalMin) * 100) : 0;
 

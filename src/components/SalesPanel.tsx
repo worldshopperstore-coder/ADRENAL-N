@@ -61,7 +61,8 @@ interface AddSaleForm {
   splitCashUsd: string;
   splitCashEur: string;
   isCrossSale: boolean;
-  selectedCurrency: 'USD' | 'EUR' | '';
+  selectedCurrency: 'USD' | 'EUR' | 'TL' | '';
+  payInTL: boolean;
   comment: string;
 }
 
@@ -105,9 +106,9 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
   const [refundProcessing, setRefundProcessing] = useState(false);
   const CATEGORY_GROUPS = ['Münferit', 'Visitor', 'Çapraz Münferit', 'Çapraz Visitor', 'Acenta', 'Ücretsiz'] as const;
   const CATEGORY_CONFIG: Record<string, { icon: typeof Tag; color: string; bg: string; border: string; ring: string; badge: string; desc: string }> = {
-    'Münferit': { icon: Tag, color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', ring: 'ring-emerald-500/20', badge: 'from-emerald-500 to-emerald-600', desc: 'Bireysel TL satışlar' },
+    'Münferit': { icon: Tag, color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', ring: 'ring-emerald-500/20', badge: 'from-emerald-500 to-emerald-600', desc: 'Bireysel satışlar' },
     'Visitor': { icon: Globe, color: 'text-sky-400', bg: 'bg-sky-500/15', border: 'border-sky-500/30', ring: 'ring-sky-500/20', badge: 'from-sky-500 to-sky-600', desc: 'Yabancı turist USD/EUR' },
-    'Çapraz Münferit': { icon: ArrowLeftRight, color: 'text-orange-400', bg: 'bg-orange-500/15', border: 'border-orange-500/30', ring: 'ring-orange-500/20', badge: 'from-orange-500 to-orange-600', desc: 'Kasalar arası TL' },
+    'Çapraz Münferit': { icon: ArrowLeftRight, color: 'text-orange-400', bg: 'bg-orange-500/15', border: 'border-orange-500/30', ring: 'ring-orange-500/20', badge: 'from-orange-500 to-orange-600', desc: 'Kasalar arası satışlar' },
     'Çapraz Visitor': { icon: Shuffle, color: 'text-rose-400', bg: 'bg-rose-500/15', border: 'border-rose-500/30', ring: 'ring-rose-500/20', badge: 'from-rose-500 to-rose-600', desc: 'Kasalar arası USD/EUR' },
     'Acenta': { icon: Building2, color: 'text-violet-400', bg: 'bg-violet-500/15', border: 'border-violet-500/30', ring: 'ring-violet-500/20', badge: 'from-violet-500 to-violet-600', desc: 'Acenta anlaşmalı' },
     'Ücretsiz': { icon: Tag, color: 'text-lime-400', bg: 'bg-lime-500/15', border: 'border-lime-500/30', ring: 'ring-lime-500/20', badge: 'from-lime-500 to-lime-600', desc: 'Ücretsiz giriş biletleri' },
@@ -157,12 +158,14 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
     splitCashEur: '',
     isCrossSale: false,
     selectedCurrency: '',
+    payInTL: false,
     comment: '',
   });
 
   // ── Dövizli kategori yardımcıları ──────────────────────
   // Visitor, Çapraz Visitor, Acenta gibi hem USD hem EUR olan kategoriler
-  const isDualCurrencyCategory = (cat: string) => ['Visitor', 'Çapraz Visitor', 'Acenta'].includes(cat);
+  const isMultiCurrencyCategory = (cat: string) => ['Münferit', 'Visitor', 'Çapraz Münferit', 'Çapraz Visitor', 'Acenta'].includes(cat);
+  const isDualCurrencyCategory = (cat: string) => isMultiCurrencyCategory(cat);
 
   // Bir kategorideki benzersiz paket isimlerini getir (USD/EUR tekrarlarını kaldır)
   const getUniquePackageNames = (cat: string): { name: string; baseName: string }[] => {
@@ -186,7 +189,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
   };
 
   // Paket adı + para birimi → gerçek paket ID'si
-  const resolvePackageId = (packageName: string, currency: 'USD' | 'EUR', cat: string): string => {
+  const resolvePackageId = (packageName: string, currency: 'USD' | 'EUR' | 'TL', cat: string): string => {
     const pkg = kasaPackages.find(p => p.category === cat && p.name === packageName && p.currency === currency);
     return pkg?.id || '';
   };
@@ -263,7 +266,31 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
 
     const adultQty = parseInt(formData.adultQty) || 0;
     const childQty = parseInt(formData.childQty) || 0;
-    const total = adultQty * selectedPackage.adultPrice + childQty * selectedPackage.childPrice;
+    const rawTotal = adultQty * selectedPackage.adultPrice + childQty * selectedPackage.childPrice;
+
+    // Para birimi dönüşümü
+    const pkgCurrency = selectedPackage.currency;
+    const selCurrency = formData.selectedCurrency || pkgCurrency;
+    let total = rawTotal;
+    let effectiveCurrency = pkgCurrency;
+
+    if (formData.payInTL && pkgCurrency !== 'TL') {
+      // Visitor/Acenta: döviz paketi → TL ödeme (seçilen para birimine göre kur)
+      const rate = selCurrency === 'EUR' ? eurRate : usdRate;
+      total = Math.ceil(rawTotal * rate);
+      effectiveCurrency = 'TL';
+    } else if (selCurrency === 'USD' && pkgCurrency === 'TL') {
+      // Münferit TL paketi → USD ödeme (yukarı yuvarlama)
+      total = usdRate > 0 ? Math.ceil(rawTotal / usdRate) : rawTotal;
+      effectiveCurrency = 'USD';
+    } else if (selCurrency === 'EUR' && pkgCurrency === 'TL') {
+      // Münferit TL paketi → EUR ödeme (yukarı yuvarlama)
+      total = eurRate > 0 ? Math.ceil(rawTotal / eurRate) : rawTotal;
+      effectiveCurrency = 'EUR';
+    } else if (selCurrency !== pkgCurrency && selCurrency !== '') {
+      // Seçilen currency ile paket currency aynı değilse paketi takip et
+      effectiveCurrency = selCurrency as any;
+    }
 
     let kkTl: number, cashTl: number, cashUsd: number, cashEur: number;
     let paymentType: 'Nakit' | 'Kredi Kartı' | 'Çoklu';
@@ -280,7 +307,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
         return;
       }
 
-      const saleCurrency = selectedPackage.currency;
+      const saleCurrency = effectiveCurrency;
       const totalInTl = saleCurrency === 'USD' ? total * usdRate : saleCurrency === 'EUR' ? total * eurRate : total;
       const paidTl = kkTl + cashTl + (cashUsd * usdRate) + (cashEur * eurRate);
       if (Math.abs(totalInTl - paidTl) > 0.99) {
@@ -292,7 +319,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
       paymentType = methodCount > 1 ? 'Çoklu' : kkTl > 0 ? 'Kredi Kartı' : 'Nakit';
     } else {
       // Simple payment mode
-      const distribution = calculateSaleDistribution(total, selectedPackage.currency, formData.paymentType, usdRate, eurRate);
+      const distribution = calculateSaleDistribution(total, effectiveCurrency, formData.paymentType, usdRate, eurRate);
       kkTl = distribution.kkTl;
       cashTl = distribution.cashTl;
       cashUsd = distribution.cashUsd;
@@ -308,7 +335,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
       category: selectedPackage.category,
       adultQty,
       childQty,
-      currency: selectedPackage.currency as any,
+      currency: effectiveCurrency as any,
       paymentType,
       total,
       kkTl,
@@ -345,6 +372,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
       splitCashEur: '',
       isCrossSale: false,
       selectedCurrency: '',
+      payInTL: false,
       comment: '',
     });
     setSplitMode(false);
@@ -400,9 +428,21 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
       // Kredi kartı seçilmişse ve dövizli paketse, TL'ye çevirip KK olarak gönder
       if (formData.paymentType === 'Kredi Kartı' && selectedPackage.currency !== 'TL') {
         const total = adultQty * selectedPackage.adultPrice + childQty * selectedPackage.childPrice;
-        const rate = selectedPackage.currency === 'USD' ? usdRate : eurRate;
+        const selCur = formData.selectedCurrency || selectedPackage.currency;
+        const rate = selCur === 'EUR' ? eurRate : usdRate;
+        const tlAmount = formData.payInTL ? Math.ceil(total * rate) : total * rate;
         splitPayments = {
-          kkTl: total * rate,
+          kkTl: tlAmount,
+          cashTl: 0,
+          cashUsd: 0,
+          cashEur: 0,
+        };
+        paymentType = 'Kredi Kartı';
+      } else if (formData.paymentType === 'Kredi Kartı' && selectedPackage.currency === 'TL' && (formData.selectedCurrency === 'USD' || formData.selectedCurrency === 'EUR')) {
+        // Münferit TL paketi döviz ile KK ödeme — TL'ye çevir
+        const total = adultQty * selectedPackage.adultPrice + childQty * selectedPackage.childPrice;
+        splitPayments = {
+          kkTl: total,
           cashTl: 0,
           cashUsd: 0,
           cashEur: 0,
@@ -460,7 +500,25 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
       setPosProcessingStep('done');
 
       // ── Supabase'e kayıt (pasif modla aynı) ──────────
-      const total = adultQty * selectedPackage.adultPrice + childQty * selectedPackage.childPrice;
+      const rawTotal2 = adultQty * selectedPackage.adultPrice + childQty * selectedPackage.childPrice;
+      // Para birimi dönüşümü
+      const pkgCur = selectedPackage.currency;
+      const selCur = formData.selectedCurrency || pkgCur;
+      let total: number;
+      let effectiveCur = pkgCur;
+      if (formData.payInTL && pkgCur !== 'TL') {
+        const r = selCur === 'EUR' ? eurRate : usdRate;
+        total = Math.ceil(rawTotal2 * r);
+        effectiveCur = 'TL';
+      } else if (selCur === 'USD' && pkgCur === 'TL') {
+        total = usdRate > 0 ? Math.ceil(rawTotal2 / usdRate) : rawTotal2;
+        effectiveCur = 'USD';
+      } else if (selCur === 'EUR' && pkgCur === 'TL') {
+        total = eurRate > 0 ? Math.ceil(rawTotal2 / eurRate) : rawTotal2;
+        effectiveCur = 'EUR';
+      } else {
+        total = rawTotal2;
+      }
       let kkTl: number, cashTl: number, cashUsd: number, cashEur: number;
 
       if (splitMode && splitPayments) {
@@ -469,7 +527,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
         cashUsd = splitPayments.cashUsd || 0;
         cashEur = splitPayments.cashEur || 0;
       } else {
-        const distribution = calculateSaleDistribution(total, selectedPackage.currency, formData.paymentType, usdRate, eurRate);
+        const distribution = calculateSaleDistribution(total, effectiveCur, formData.paymentType, usdRate, eurRate);
         kkTl = distribution.kkTl;
         cashTl = distribution.cashTl;
         cashUsd = distribution.cashUsd;
@@ -482,7 +540,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
         category: selectedPackage.category,
         adultQty,
         childQty,
-        currency: selectedPackage.currency as any,
+        currency: effectiveCur as any,
         paymentType,
         total,
         kkTl,
@@ -509,7 +567,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
       setSales((prev) => [...prev, newSale]);
 
       // Form sıfırla
-      setFormData({ packageId: '', adultQty: '0', childQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: false, selectedCurrency: '', comment: '' });
+      setFormData({ packageId: '', adultQty: '0', childQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: false, selectedCurrency: '', payInTL: false, comment: '' });
       setSplitMode(false);
       setSelectedCategory('');
       setShowAddForm(false);
@@ -1685,11 +1743,13 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
                               const pkgName = e.target.value;
                               const isCross = selectedCategory.startsWith('Çapraz');
                               if (!pkgName) {
-                                setFormData({ ...formData, packageId: '', isCrossSale: isCross, selectedCurrency: '' });
+                                setFormData({ ...formData, packageId: '', isCrossSale: isCross, selectedCurrency: '', payInTL: false });
                               } else {
-                                const defaultCurrency: 'USD' | 'EUR' = 'USD';
+                                // Münferit/Çapraz Münferit → varsayılan TL, diğerleri → USD
+                                const isTlNative = ['Münferit', 'Çapraz Münferit'].includes(selectedCategory);
+                                const defaultCurrency: 'USD' | 'EUR' | 'TL' = isTlNative ? 'TL' : 'USD';
                                 const resolvedId = resolvePackageId(pkgName, defaultCurrency, selectedCategory);
-                                setFormData({ ...formData, packageId: resolvedId, isCrossSale: isCross, selectedCurrency: defaultCurrency });
+                                setFormData({ ...formData, packageId: resolvedId, isCrossSale: isCross, selectedCurrency: defaultCurrency, payInTL: false });
                               }
                             }}
                             className={`w-full px-3 py-2.5 bg-gray-800 border rounded-xl text-white text-sm focus:outline-none transition-colors appearance-none pr-8 ${CATEGORY_CONFIG[selectedCategory].border}`}
@@ -1751,40 +1811,120 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
                       );
                     })()}
 
-                    {/* ── ADIM 3: DOLAR / EURO Seçimi (sadece dövizli kategorilerde) ── */}
+                    {/* ── ADIM 3: Para Birimi + TL ile Öde Seçimi ── */}
                     {isDualCurrencyCategory(selectedCategory) && formData.packageId && (() => {
                       const selectedPkgName = kasaPackages.find(p => p.id === formData.packageId)?.name || '';
                       const usdPkg = kasaPackages.find(p => p.category === selectedCategory && p.name === selectedPkgName && p.currency === 'USD');
                       const eurPkg = kasaPackages.find(p => p.category === selectedCategory && p.name === selectedPkgName && p.currency === 'EUR');
+                      const tlPkg = kasaPackages.find(p => p.category === selectedCategory && p.name === selectedPkgName && p.currency === 'TL');
+                      const isTlNative = ['Münferit', 'Çapraz Münferit'].includes(selectedCategory);
+
                       return (
-                        <div>
+                        <div className="space-y-2">
                           <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Para Birimi</label>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => { if (usdPkg) setFormData({ ...formData, packageId: usdPkg.id, selectedCurrency: 'USD' }); }}
-                              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all text-sm font-bold ${
-                                formData.selectedCurrency === 'USD'
-                                  ? 'bg-amber-500/20 border-amber-400/60 text-amber-300'
-                                  : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
-                              }`}
-                            >
-                              <DollarSign className="w-4 h-4" /> USD
-                              {usdPkg && <span className="text-[10px] opacity-60 ml-0.5">{usdPkg.adultPrice}/{usdPkg.childPrice}</span>}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => { if (eurPkg) setFormData({ ...formData, packageId: eurPkg.id, selectedCurrency: 'EUR' }); }}
-                              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all text-sm font-bold ${
-                                formData.selectedCurrency === 'EUR'
-                                  ? 'bg-blue-500/20 border-blue-400/60 text-blue-300'
-                                  : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
-                              }`}
-                            >
-                              <Euro className="w-4 h-4" /> EUR
-                              {eurPkg && <span className="text-[10px] opacity-60 ml-0.5">{eurPkg.adultPrice}/{eurPkg.childPrice}</span>}
-                            </button>
-                          </div>
+                          {isTlNative ? (
+                            /* ── Münferit / Çapraz Münferit: TL bazlı, dövizle ödeme seçeneği ── */
+                            <div className="space-y-2">
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (tlPkg) setFormData({ ...formData, packageId: tlPkg.id, selectedCurrency: 'TL', payInTL: false });
+                                  }}
+                                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all text-sm font-bold ${
+                                    formData.selectedCurrency === 'TL'
+                                      ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300'
+                                      : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
+                                  }`}
+                                >
+                                  <span className="text-sm font-black">₺</span> TL
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (tlPkg) setFormData({ ...formData, packageId: tlPkg.id, selectedCurrency: 'USD', payInTL: false });
+                                  }}
+                                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all text-sm font-bold ${
+                                    formData.selectedCurrency === 'USD'
+                                      ? 'bg-amber-500/20 border-amber-400/60 text-amber-300'
+                                      : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
+                                  }`}
+                                >
+                                  <DollarSign className="w-4 h-4" /> USD
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (tlPkg) setFormData({ ...formData, packageId: tlPkg.id, selectedCurrency: 'EUR', payInTL: false });
+                                  }}
+                                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all text-sm font-bold ${
+                                    formData.selectedCurrency === 'EUR'
+                                      ? 'bg-blue-500/20 border-blue-400/60 text-blue-300'
+                                      : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
+                                  }`}
+                                >
+                                  <Euro className="w-4 h-4" /> EUR
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* ── Visitor / Çapraz Visitor / Acenta: Döviz bazlı, TL ile ödeme seçeneği ── */
+                            <div className="space-y-2">
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (usdPkg) setFormData({ ...formData, packageId: usdPkg.id, selectedCurrency: 'USD', payInTL: false });
+                                  }}
+                                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all text-sm font-bold ${
+                                    formData.selectedCurrency === 'USD'
+                                      ? 'bg-amber-500/20 border-amber-400/60 text-amber-300'
+                                      : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
+                                  }`}
+                                >
+                                  <DollarSign className="w-4 h-4" /> USD
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (eurPkg) setFormData({ ...formData, packageId: eurPkg.id, selectedCurrency: 'EUR', payInTL: false });
+                                  }}
+                                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all text-sm font-bold ${
+                                    formData.selectedCurrency === 'EUR'
+                                      ? 'bg-blue-500/20 border-blue-400/60 text-blue-300'
+                                      : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
+                                  }`}
+                                >
+                                  <Euro className="w-4 h-4" /> EUR
+                                </button>
+                              </div>
+                              {/* TL ile Öde toggle — sadece döviz seçildiyse göster */}
+                              {(formData.selectedCurrency === 'USD' || formData.selectedCurrency === 'EUR') && (
+                                <button
+                                  type="button"
+                                  onClick={() => setFormData({ ...formData, payInTL: !formData.payInTL })}
+                                  className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg border transition-all text-xs font-bold ${
+                                    formData.payInTL
+                                      ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300'
+                                      : 'bg-gray-800/40 border-gray-700/40 text-gray-500 hover:text-gray-300 hover:border-gray-600'
+                                  }`}
+                                >
+                                  <span className="font-black">₺</span>
+                                  {formData.payInTL ? 'TL ile Ödeme Aktif' : 'Müşteri TL ile ödemek istiyor'}
+                                  {formData.payInTL && (() => {
+                                    const selPkg = kasaPackages.find(p => p.id === formData.packageId);
+                                    if (!selPkg) return null;
+                                    const adQ = parseInt(formData.adultQty) || 0;
+                                    const chQ = parseInt(formData.childQty) || 0;
+                                    const raw = adQ * selPkg.adultPrice + chQ * selPkg.childPrice;
+                                    const r = formData.selectedCurrency === 'USD' ? usdRate : eurRate;
+                                    const tlTotal = Math.ceil(raw * r);
+                                    return raw > 0 ? <span className="ml-1 opacity-70">{tlTotal}₺</span> : null;
+                                  })()}
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -1874,8 +2014,23 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
                   const selectedPkg = kasaPackages.find(p => p.id === formData.packageId);
                   const adultQ = parseInt(formData.adultQty) || 0;
                   const childQ = parseInt(formData.childQty) || 0;
-                  const saleTotal = selectedPkg ? (adultQ * selectedPkg.adultPrice + childQ * selectedPkg.childPrice) : 0;
-                  const saleCurrency = selectedPkg?.currency || 'TL';
+                  const rawSaleTotal = selectedPkg ? (adultQ * selectedPkg.adultPrice + childQ * selectedPkg.childPrice) : 0;
+                  const pkgCur = selectedPkg?.currency || 'TL';
+                  const selCur = formData.selectedCurrency || pkgCur;
+                  // Efektif toplam ve para birimi hesapla
+                  let saleTotal = rawSaleTotal;
+                  let saleCurrency = pkgCur;
+                  if (formData.payInTL && pkgCur !== 'TL') {
+                    const r = selCur === 'EUR' ? eurRate : usdRate;
+                    saleTotal = Math.ceil(rawSaleTotal * r);
+                    saleCurrency = 'TL';
+                  } else if (selCur === 'USD' && pkgCur === 'TL') {
+                    saleTotal = usdRate > 0 ? Math.ceil(rawSaleTotal / usdRate) : rawSaleTotal;
+                    saleCurrency = 'USD';
+                  } else if (selCur === 'EUR' && pkgCur === 'TL') {
+                    saleTotal = eurRate > 0 ? Math.ceil(rawSaleTotal / eurRate) : rawSaleTotal;
+                    saleCurrency = 'EUR';
+                  }
                   const rate = saleCurrency === 'USD' ? usdRate : saleCurrency === 'EUR' ? eurRate : 0;
                   const totalInTl = saleCurrency === 'USD' ? saleTotal * usdRate : saleCurrency === 'EUR' ? saleTotal * eurRate : saleTotal;
                   const currSymbol = saleCurrency === 'USD' ? '$' : saleCurrency === 'EUR' ? '€' : '₺';
@@ -1967,7 +2122,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
                         </div>
                         {saleCurrency !== 'TL' && saleTotal > 0 && (
                           <div className="text-right mt-0.5">
-                            <span className="text-[11px] font-bold text-emerald-400">≈{totalInTl.toFixed(2)} ₺ <span className="text-[9px] text-gray-600">({rate.toFixed(2)})</span></span>
+                            <span className="text-[11px] font-bold text-emerald-400">{totalInTl.toFixed(2)} ₺ <span className="text-[9px] text-gray-600">({rate.toFixed(2)})</span></span>
                           </div>
                         )}
                       </div>
