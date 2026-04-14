@@ -18,8 +18,9 @@ export default function SettingsTab() {
     setKasaId(currentKasaId);
 
     if (session) {
-      const userData = JSON.parse(session);
-      const p = userData.personnel;
+      let userData: any;
+      try { userData = JSON.parse(session); } catch { userData = null; }
+      const p = userData?.personnel;
       setUserRole(p?.role || 'personel');
       setUserName(p?.fullName || '');
       setUserId(p?.id || '');

@@ -46,13 +46,14 @@ export default function App() {
   const checkMaintenanceDay = () => {
     const now = new Date();
     if (now.getDay() !== 6) return; // 6 = Cumartesi değilse çık
-    const key = `maintenance_seen_${now.toISOString().split('T')[0]}`;
+    const key = `maintenance_seen_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     if (localStorage.getItem(key)) return; // Bu cumartesi zaten gösterildi
     setMaintenanceNotice(`Bugün (Cumartesi) saat 23:00 - 23:30 arası sistem güncellemesi yapılacaktır. Lütfen bu saatten önce işlemlerinizi tamamlayınız ve verilerinizi kontrol ediniz.`);
   };
 
   const dismissMaintenance = () => {
-    const key = `maintenance_seen_${new Date().toISOString().split('T')[0]}`;
+    const d = new Date();
+    const key = `maintenance_seen_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     localStorage.setItem(key, 'true');
     setMaintenanceNotice(null);
   };
@@ -72,7 +73,8 @@ export default function App() {
         const restored = JSON.parse(savedSession);
         // Giriş tarihi bugün değilse oturumu sil
         const loginDate = localStorage.getItem('sessionLoginDate');
-        const today = new Date().toISOString().slice(0, 10);
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
         if (loginDate && loginDate !== today) {
           // Eski oturum — temizle
           localStorage.removeItem('userSession');
@@ -172,7 +174,8 @@ export default function App() {
     const newSession: UserSession = { kasa, personnel };
     setSession(newSession);
     localStorage.setItem('userSession', JSON.stringify(newSession));
-    localStorage.setItem('sessionLoginDate', new Date().toISOString().slice(0, 10));
+    const ld = new Date();
+    localStorage.setItem('sessionLoginDate', `${ld.getFullYear()}-${String(ld.getMonth()+1).padStart(2,'0')}-${String(ld.getDate()).padStart(2,'0')}`);
     localStorage.setItem('currentUserName', personnel.fullName);
     localStorage.setItem('currentUserId', personnel.id);
     localStorage.setItem('currentKasaId', kasa.id);

@@ -60,7 +60,7 @@ const VIEW_TABS: { key: View; icon: React.ReactNode; label: string }[] = [
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function getDateRange(period: Period): { start: string; end: string } {
   const today = new Date();
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   if (period === 'week') {
     const s = new Date(today); s.setDate(s.getDate() - 6);
     return { start: fmt(s), end: fmt(today) };

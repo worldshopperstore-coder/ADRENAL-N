@@ -1505,8 +1505,8 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
     cashEur: sales.reduce((sum, s) => sum + s.cashEur, 0),
   }), [sales]);
 
-  const totalAdultCount = sales.reduce((sum, s) => sum + s.adultQty, 0);
-  const totalChildCount = sales.reduce((sum, s) => sum + s.childQty, 0);
+  const totalAdultCount = sales.reduce((sum, s) => sum + (s.isRefund ? -s.adultQty : s.adultQty), 0);
+  const totalChildCount = sales.reduce((sum, s) => sum + (s.isRefund ? -s.childQty : s.childQty), 0);
   const refundCount = sales.filter(s => s.isRefund).length;
   const cashTlTotal = totals.cashTl + (totals.cashUsd * usdRate) + (totals.cashEur * eurRate);
   const grandTotal = totals.kkTl + cashTlTotal;

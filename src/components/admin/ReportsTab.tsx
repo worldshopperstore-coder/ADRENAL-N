@@ -46,7 +46,7 @@ const PERIOD_OPTS: { key: FilterPeriod; label: string }[] = [
 function esc(str: string): string {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-const fmt   = (d: Date) => d.toISOString().split('T')[0];
+const fmt   = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const fmtTR = (dateStr: string) => {
   const d = new Date(dateStr + 'T12:00:00');
   return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
