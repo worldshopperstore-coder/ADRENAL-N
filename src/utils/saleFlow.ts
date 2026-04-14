@@ -364,11 +364,13 @@ export async function processActiveSale(request: ActiveSaleRequest): Promise<Act
   const bridgeResult: BridgeResponse = await submitSale(payload);
   
   if (!bridgeResult.success) {
+    // ÖNEMLİ: POS ödeme alındı ama DB kaydı başarısız!
+    console.error('[SaleFlow] POS ödeme alındı ama DB kaydı başarısız:', bridgeResult.error);
     return {
       success: false,
       error: `DB kayıt hatası: ${bridgeResult.error}`,
-      posSuccess,
-      posMessage,
+      posSuccess: true,
+      posMessage: 'Ödeme alındı ama kayıt oluşturulamadı!',
       failedAt: 'bridge',
     };
   }

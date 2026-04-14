@@ -497,7 +497,11 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
         if (result.failedAt === 'pos') {
           errorMsg = `⚠️ İşlem onaylanmadı.`;
         } else if (result.failedAt === 'bridge') {
-          errorMsg = `❌ İşlem kaydedilemedi. Tekrar deneyin.`;
+          if (result.posSuccess) {
+            errorMsg = `⚠️ ÖDEME ALINDI ama sistem kaydı oluşturulamadı! Lütfen manuel kayıt yapın veya tekrar deneyin.`;
+          } else {
+            errorMsg = `❌ İşlem kaydedilemedi. Tekrar deneyin.`;
+          }
         } else if (result.failedAt === 'mapping') {
           errorMsg = `❌ Paket eşlemesi bulunamadı.`;
         }
