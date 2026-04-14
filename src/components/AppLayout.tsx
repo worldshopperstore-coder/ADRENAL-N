@@ -80,7 +80,9 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
     setHovered(true);
   };
   const handleMouseLeave = () => {
-    hoverTimerRef.current = setTimeout(() => setHovered(false), 200);
+    hoverTimerRef.current = setTimeout(() => {
+      if (!editingRates) setHovered(false);
+    }, 400);
   };
 
   const theme = getKasaTheme(session.kasa.id);
@@ -321,8 +323,8 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
                           <span className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">Kurlar</span>
                         </div>
                         <button
-                          onClick={() => setEditingRates(!editingRates)}
-                          className="flex items-center justify-center w-5 h-5 rounded bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-amber-400 transition-colors electron-no-drag"
+                          onClick={(e) => { e.stopPropagation(); setEditingRates(!editingRates); }}
+                          className="flex items-center justify-center w-5 h-5 rounded bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-amber-400 transition-colors electron-no-drag cursor-pointer z-10"
                           title={editingRates ? 'Kaydet' : 'Düzenle'}
                         >
                           {editingRates ? <Check className="w-3 h-3" /> : <Pencil className="w-3 h-3" />}
