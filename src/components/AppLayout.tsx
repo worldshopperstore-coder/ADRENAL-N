@@ -235,7 +235,7 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
           </div>
 
           {/* Kasa + User info */}
-          <div className={`mt-2.5 overflow-hidden ${sidebarCollapsed ? 'flex flex-col items-center gap-1.5' : 'space-y-1.5'}`}>
+          <div className={`mt-2.5 overflow-hidden electron-no-drag ${sidebarCollapsed ? 'flex flex-col items-center gap-1.5' : 'space-y-1.5'}`}>
             {sidebarCollapsed ? (
               <>
                 <div title={session?.personnel?.fullName || 'Kullanıcı'} className="w-8 h-8 rounded-lg flex items-center justify-center bg-orange-500/15 border border-orange-500/20 flex-shrink-0">
