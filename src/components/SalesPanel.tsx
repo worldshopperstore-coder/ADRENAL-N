@@ -13,7 +13,7 @@ import {
 import { getKasaSettings, loadAdvancesFromSupabase } from '@/utils/kasaSettingsDB';
 import { processActiveSale, processActiveRefund, checkIntegrationReady, hasContractMapping, type ActiveSaleRequest, type ActiveSaleResult } from '@/utils/saleFlow';
 import { isIntegrationEnabled } from '@/utils/posManager';
-import { printTickets, buildTicketPrintData } from '@/utils/ticketPrinter';
+import { printTickets, buildTicketPrintData, printCompTickets } from '@/utils/ticketPrinter';
 import { getWeeklyTarget, getWeeklyProgress, getCurrentWeekStart } from '@/utils/weeklyTargetsDB';
 import { generateCrossHTMLReport } from '@/components/CrossSalesTab';
 
@@ -55,6 +55,7 @@ interface AddSaleForm {
   packageId: string;
   adultQty: string;
   childQty: string;
+  compQty: string;
   paymentType: 'Nakit' | 'Kredi Kartı' | '';
   splitKkTl: string;
   splitCashTl: string;
@@ -151,6 +152,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
     packageId: '',
     adultQty: '0',
     childQty: '0',
+    compQty: '0',
     paymentType: '',
     splitKkTl: '',
     splitCashTl: '',
@@ -361,10 +363,22 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
       return updatedSales;
     });
 
+    // 0-3 yaş COMP biletlerini yazdır (DB'ye kaydedilmez)
+    const compQty = parseInt(formData.compQty) || 0;
+    if (compQty > 0) {
+      printCompTickets({
+        compQty,
+        packageName: selectedPackage.name,
+        kasaId: currentKasaId as any,
+        personnelName: getPersonnelName(),
+      }).catch(err => console.warn('[COMP Print]', err.message));
+    }
+
     setFormData({
       packageId: '',
       adultQty: '0',
       childQty: '0',
+      compQty: '0',
       paymentType: '',
       splitKkTl: '',
       splitCashTl: '',
@@ -566,8 +580,19 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
 
       setSales((prev) => [...prev, newSale]);
 
+      // 0-3 yaş COMP biletlerini yazdır (DB'ye kaydedilmez)
+      const compQtyVal = parseInt(formData.compQty) || 0;
+      if (compQtyVal > 0) {
+        printCompTickets({
+          compQty: compQtyVal,
+          packageName: selectedPackage.name,
+          kasaId: currentKasaId as any,
+          personnelName: getPersonnelName(),
+        }).catch(err => console.warn('[COMP Print]', err.message));
+      }
+
       // Form sıfırla
-      setFormData({ packageId: '', adultQty: '0', childQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: false, selectedCurrency: '', payInTL: false, comment: '' });
+      setFormData({ packageId: '', adultQty: '0', childQty: '0', compQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: false, selectedCurrency: '', payInTL: false, comment: '' });
       setSplitMode(false);
       setSelectedCategory('');
       setShowAddForm(false);
@@ -1701,7 +1726,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
                         key={group}
                         onClick={() => {
                           setSelectedCategory(group);
-                          setFormData({ ...formData, packageId: '', adultQty: '0', childQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: group.startsWith('Çapraz'), selectedCurrency: '' });
+                          setFormData({ ...formData, packageId: '', adultQty: '0', childQty: '0', compQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: group.startsWith('Çapraz'), selectedCurrency: '' });
                           setSplitMode(false);
                         }}
                         disabled={pkgCount === 0}
@@ -1811,23 +1836,34 @@ export default function SalesPanel({ usdRate = 30, eurRate = 33, onSalesUpdate }
                       return (
                         <div className={`relative ${stepLocked ? 'opacity-40 pointer-events-none' : ''}`}>
                           {stepLocked && <div className="absolute inset-0 z-10" />}
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className={`grid gap-2 ${(parseInt(formData.adultQty) || 0) >= 1 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                             <div>
-                              <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Yetişkin</label>
-                              <div className="flex items-center bg-gray-800 border border-gray-700/80 rounded-xl overflow-hidden">
-                                <button type="button" onClick={() => setFormData({ ...formData, adultQty: String(Math.max(0, (parseInt(formData.adultQty) || 0) - 1)) })} className="w-9 h-10 text-gray-400 hover:bg-gray-700 hover:text-white text-base font-bold transition-colors flex items-center justify-center flex-shrink-0">−</button>
-                                <input type="number" min="0" value={formData.adultQty} onChange={(e) => setFormData({ ...formData, adultQty: e.target.value.replace(/[^0-9]/g, '') || '0' })} onFocus={(e) => { if (e.target.value === '0') e.target.select(); }} className="flex-1 h-10 bg-transparent text-white text-sm font-bold text-center min-w-[30px] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                                <button type="button" onClick={() => setFormData({ ...formData, adultQty: String((parseInt(formData.adultQty) || 0) + 1) })} className="w-9 h-10 text-gray-400 hover:bg-gray-700 hover:text-white text-base font-bold transition-colors flex items-center justify-center flex-shrink-0">+</button>
+                              <label className="block text-xs text-gray-400 mb-1 font-medium uppercase tracking-wider">Yetişkin</label>
+                              <div className="flex items-center bg-gray-800 border border-gray-700/80 rounded-lg overflow-hidden">
+                                <button type="button" onClick={() => { const newVal = Math.max(0, (parseInt(formData.adultQty) || 0) - 1); setFormData({ ...formData, adultQty: String(newVal), ...(newVal === 0 ? { compQty: '0' } : {}) }); }} className="w-7 h-8 text-gray-400 hover:bg-gray-700 hover:text-white text-sm font-bold transition-colors flex items-center justify-center flex-shrink-0">−</button>
+                                <input type="number" min="0" value={formData.adultQty} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, '') || '0'; setFormData({ ...formData, adultQty: v, ...(parseInt(v) === 0 ? { compQty: '0' } : {}) }); }} onFocus={(e) => { if (e.target.value === '0') e.target.select(); }} className="flex-1 h-8 bg-transparent text-white text-xs font-bold text-center min-w-[20px] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                <button type="button" onClick={() => setFormData({ ...formData, adultQty: String((parseInt(formData.adultQty) || 0) + 1) })} className="w-7 h-8 text-gray-400 hover:bg-gray-700 hover:text-white text-sm font-bold transition-colors flex items-center justify-center flex-shrink-0">+</button>
                               </div>
                             </div>
                             <div>
-                              <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Çocuk</label>
-                              <div className="flex items-center bg-gray-800 border border-gray-700/80 rounded-xl overflow-hidden">
-                                <button type="button" onClick={() => setFormData({ ...formData, childQty: String(Math.max(0, (parseInt(formData.childQty) || 0) - 1)) })} className="w-9 h-10 text-gray-400 hover:bg-gray-700 hover:text-white text-base font-bold transition-colors flex items-center justify-center flex-shrink-0">−</button>
-                                <input type="number" min="0" value={formData.childQty} onChange={(e) => setFormData({ ...formData, childQty: e.target.value.replace(/[^0-9]/g, '') || '0' })} onFocus={(e) => { if (e.target.value === '0') e.target.select(); }} className="flex-1 h-10 bg-transparent text-white text-sm font-bold text-center min-w-[30px] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                                <button type="button" onClick={() => setFormData({ ...formData, childQty: String((parseInt(formData.childQty) || 0) + 1) })} className="w-9 h-10 text-gray-400 hover:bg-gray-700 hover:text-white text-base font-bold transition-colors flex items-center justify-center flex-shrink-0">+</button>
+                              <label className="block text-xs text-gray-400 mb-1 font-medium uppercase tracking-wider">Çocuk</label>
+                              <div className="flex items-center bg-gray-800 border border-gray-700/80 rounded-lg overflow-hidden">
+                                <button type="button" onClick={() => setFormData({ ...formData, childQty: String(Math.max(0, (parseInt(formData.childQty) || 0) - 1)) })} className="w-7 h-8 text-gray-400 hover:bg-gray-700 hover:text-white text-sm font-bold transition-colors flex items-center justify-center flex-shrink-0">−</button>
+                                <input type="number" min="0" value={formData.childQty} onChange={(e) => setFormData({ ...formData, childQty: e.target.value.replace(/[^0-9]/g, '') || '0' })} onFocus={(e) => { if (e.target.value === '0') e.target.select(); }} className="flex-1 h-8 bg-transparent text-white text-xs font-bold text-center min-w-[20px] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                <button type="button" onClick={() => setFormData({ ...formData, childQty: String((parseInt(formData.childQty) || 0) + 1) })} className="w-7 h-8 text-gray-400 hover:bg-gray-700 hover:text-white text-sm font-bold transition-colors flex items-center justify-center flex-shrink-0">+</button>
                               </div>
                             </div>
+                            {/* 0-3 Yaş COMP — yetişkin >= 1 iken yan yana görünür */}
+                            {(parseInt(formData.adultQty) || 0) >= 1 && (
+                              <div>
+                                <label className="block text-xs text-lime-400/80 mb-1 font-medium uppercase tracking-wider">0-3 Yaş</label>
+                                <div className="flex items-center bg-gray-800 border border-lime-500/30 rounded-lg overflow-hidden">
+                                  <button type="button" onClick={() => setFormData({ ...formData, compQty: String(Math.max(0, (parseInt(formData.compQty) || 0) - 1)) })} className="w-7 h-8 text-gray-400 hover:bg-gray-700 hover:text-white text-sm font-bold transition-colors flex items-center justify-center flex-shrink-0">−</button>
+                                  <input type="number" min="0" value={formData.compQty} onChange={(e) => setFormData({ ...formData, compQty: e.target.value.replace(/[^0-9]/g, '') || '0' })} onFocus={(e) => { if (e.target.value === '0') e.target.select(); }} className="flex-1 h-8 bg-transparent text-lime-300 text-xs font-bold text-center min-w-[20px] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                  <button type="button" onClick={() => setFormData({ ...formData, compQty: String((parseInt(formData.compQty) || 0) + 1) })} className="w-7 h-8 text-gray-400 hover:bg-gray-700 hover:text-white text-sm font-bold transition-colors flex items-center justify-center flex-shrink-0">+</button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

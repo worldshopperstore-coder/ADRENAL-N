@@ -44,7 +44,7 @@ const KASA_LABELS: Record<string, string> = {
 const TICKET_TYPE_LABELS: Record<string, string> = {
   ADU: 'ADU',
   CHL: 'CHL',
-  COMP: 'COMP',
+  COMP: 'INF',
 };
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -121,8 +121,12 @@ function generateTicketZPL(ticket: TicketPrintData): string {
 ^FO35,50^A@B,36,34,E:TT0003M_.FNT^FD${groupInfo}^FS
 ^FT120,748^A@B,28,28,E:TT0003M_.FNT^FD${kategoriZpl}^FS
 ^FT158,748^A@B,28,28,E:TT0003M_.FNT^FD${paketZpl}^FS
-^FO105,338^A@B,38,32,E:TT0003M_.FNT^FD${ticket.date}^FS
-^FO201,329^BQN,2,6^FDQA,${qrData}^FS`;
+^FO105,338^A@B,38,32,E:TT0003M_.FNT^FD${ticket.date}^FS`;
+
+  // COMP biletlerde QR kod basılmaz
+  if (ticket.ticketType !== 'COMP') {
+    zpl += `\n^FO201,329^BQN,2,6^FDQA,${qrData}^FS`;
+  }
 
   // Entrance satırları — QR'dan uzak, saat ile entrance yakın
   const entranceStartX = 390;
@@ -402,4 +406,44 @@ export async function printTestTicket(): Promise<{ success: boolean; error?: str
     return { success: true };
   }
   return { success: false, error: result.errors.join(', ') };
+}
+
+/**
+ * 0-3 yaş COMP biletlerini yazdır
+ * DB'ye kaydedilmez, sadece yazdırılır. QR kod basılmaz.
+ */
+export async function printCompTickets(request: {
+  compQty: number;
+  packageName: string;
+  kasaId: 'wildpark' | 'sinema' | 'face2face';
+  personnelName: string;
+}): Promise<{ success: boolean; printed: number; failed: number; errors: string[] }> {
+  if (request.compQty <= 0) return { success: true, printed: 0, failed: 0, errors: [] };
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  const kasaLabel = KASA_LABELS[request.kasaId] || request.kasaId.toUpperCase();
+
+  const tickets: TicketPrintData[] = [];
+  for (let i = 0; i < request.compQty; i++) {
+    tickets.push({
+      ticketId: 0,
+      terminalRecordId: 0,
+      packageName: request.packageName,
+      ticketType: 'COMP',
+      kasaId: request.kasaId,
+      kasaLabel,
+      products: [kasaLabel + ' ENTRANCE'],
+      price: 0,
+      currency: 'TL',
+      personnelName: request.personnelName,
+      date: dateStr,
+      time: timeStr,
+      groupIndex: i + 1,
+      groupTotal: request.compQty,
+    });
+  }
+
+  return printTickets(tickets);
 }
