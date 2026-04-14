@@ -6,7 +6,7 @@ import { supabase } from '@/config/supabase';
  */
 export function getTodayDate(): string {
   const today = new Date();
-  return today.toISOString().split('T')[0];
+  return `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
 }
 
 /**

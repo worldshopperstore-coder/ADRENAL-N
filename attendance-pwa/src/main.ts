@@ -30,8 +30,10 @@ const urlParams = new URLSearchParams(window.location.search);
 const isSelfService = urlParams.get('mode') === 'self';
 const selfKasa = urlParams.get('kasa') || 'yasam_destek';
 
-// GPS target: Antalya Aquarium
-const GPS_TARGET = { lat: 36.8792, lng: 30.6605, radiusM: 200 };
+/** Yerel tarih string'i (YYYY-MM-DD) — UTC kaymasını önler */
+function localDateStr(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
@@ -111,7 +113,7 @@ function loadSession(): boolean {
     const a = localStorage.getItem('pwa_attendance');
     if (u && a) {
       currentUser = JSON.parse(u); currentAttendance = JSON.parse(a);
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDateStr();
       if (currentAttendance && currentAttendance.date === today &&
           (currentAttendance.status === 'checked_in' || currentAttendance.status === 'checkout_pending')) return true;
     }
@@ -129,7 +131,7 @@ async function tryRecoverSession(): Promise<boolean> {
     const hint = localStorage.getItem('pwa_user_hint');
     if (!hint) return false;
     const user: PersonnelInfo = JSON.parse(hint);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateStr();
     const rowId = `${user.id}_${today}`;
     const { data, error } = await supabase.from('attendance').select('*').eq('id', rowId).single();
     if (error || !data) return false;
@@ -423,7 +425,7 @@ async function handleSelfServiceQR(kasa: string) {
 async function handleSelfServiceAutoCheckin(user: PersonnelInfo, kasa: string) {
   showProcessing('İşleniyor...');
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateStr();
     const rowId = `${user.id}_${today}`;
     const { data: existing, error: selErr } = await supabase.from('attendance').select('*').eq('id', rowId).single();
 
@@ -541,7 +543,7 @@ function showSelfLogin(kasa?: string) {
 
       // Check existing attendance for today
       showProcessing('İşleniyor...');
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDateStr();
       const rowId = `${person.id}_${today}`;
       const { data: existing } = await supabase.from('attendance').select('*').eq('id', rowId).single();
 
@@ -843,7 +845,7 @@ async function renderHome(c: HTMLElement) {
   const isPending = currentAttendance.status === 'checkout_pending';
 
   const today = new Date();
-  const todayDate = today.toISOString().slice(0, 10);
+  const todayDate = localDateStr(today);
   let shiftData: any[] | null = null;
   let teamAtt: any[] | null = null;
   try {
@@ -969,7 +971,7 @@ async function renderTeam(c: HTMLElement) {
   if (!currentUser) return;
   c.innerHTML = `<div style="text-align:center;padding:24px"><div style="width:28px;height:28px;margin:0 auto;border:2px solid rgba(249,115,22,.2);border-top-color:var(--orange);border-radius:50%;animation:spin .8s linear infinite"></div></div>`;
   const today = new Date();
-  const todayDate = today.toISOString().slice(0, 10);
+  const todayDate = localDateStr(today);
   const dayKey = DAY_KEYS[today.getDay()];
   let att: any[] | null = null;
   let pers: any[] | null = null;
@@ -1075,7 +1077,7 @@ async function renderSchedule(c: HTMLElement) {
   try {
     const [shiftRes, attRes] = await Promise.all([
       supabase.from('shifts').select('*').eq('personnel_id', currentUser.id).limit(1),
-      supabase.from('attendance').select('*').eq('personnel_id', currentUser.id).gte('date', wa.toISOString().slice(0, 10)).order('date', { ascending: false })
+      supabase.from('attendance').select('*').eq('personnel_id', currentUser.id).gte('date', localDateStr(wa)).order('date', { ascending: false })
     ]);
     shiftData = shiftRes.data; attData = attRes.data;
   } catch {

@@ -32,16 +32,21 @@ export interface DatedSale {
  */
 export async function getAllSalesForDateRange(
   startDate: string,
-  endDate: string
+  endDate: string,
+  kasaId?: string
 ): Promise<DatedSale[]> {
   try {
     if (!supabase) return [];
-    const { data, error } = await supabase
+    let query = supabase
       .from('sales')
       .select('*')
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: true });
+
+    if (kasaId) query = query.eq('kasaId', kasaId);
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
@@ -66,16 +71,21 @@ export async function getAllSalesForDateRange(
  */
 export async function getAllCrossSalesForDateRange(
   startDate: string,
-  endDate: string
+  endDate: string,
+  kasaId?: string
 ): Promise<DatedSale[]> {
   try {
     if (!supabase) return [];
-    const { data, error } = await supabase
+    let query = supabase
       .from('cross_sales')
       .select('*')
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: true });
+
+    if (kasaId) query = query.eq('kasaId', kasaId);
+
+    const { data, error } = await query;
 
     if (error) throw error;
 

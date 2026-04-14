@@ -34,14 +34,14 @@ export function getCurrentWeekStart(): string {
   const diff = day === 0 ? -6 : 1 - day; // Pazartesi
   const monday = new Date(now);
   monday.setDate(now.getDate() + diff);
-  return monday.toISOString().split('T')[0];
+  return `${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`;
 }
 
 /** Haftanın pazar tarihini döndür */
 export function getWeekEnd(weekStart: string): string {
   const d = new Date(weekStart);
   d.setDate(d.getDate() + 6);
-  return d.toISOString().split('T')[0];
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 // ── Supabase CRUD ─────────────────────────────────────────

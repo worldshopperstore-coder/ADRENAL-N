@@ -1,5 +1,10 @@
 import { supabase } from '@/config/supabase';
 
+/** Yerel tarih string'i (YYYY-MM-DD) — UTC kaymasını önler */
+function localDateStr(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 export interface AttendanceRecord {
   id: string;
   personnel_id: string;
@@ -28,7 +33,7 @@ export async function createAttendanceSession(
   sessionToken: string
 ): Promise<boolean> {
   if (!supabase) return false;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   const rowId = `${personnelId}_${today}`;
 
   // Mevcut kaydı kontrol et — zaten giriş/çıkış yapılmışsa dokunma
@@ -66,7 +71,7 @@ export async function createAttendanceSession(
 /** Yoklama durumunu kontrol et (PC polling) */
 export async function checkAttendanceStatus(personnelId: string): Promise<AttendanceRecord | null> {
   if (!supabase) return null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   
   const { data, error } = await supabase
     .from('attendance')
@@ -79,7 +84,7 @@ export async function checkAttendanceStatus(personnelId: string): Promise<Attend
 }
 
 /** Yoklama onayla (telefon PWA'dan çağrılır) */
-export async function confirmAttendance(sessionToken: string, lat: number, lng: number): Promise<{ success: boolean; message: string; personnelName?: string }> {
+export async function confirmAttendance(sessionToken: string): Promise<{ success: boolean; message: string; personnelName?: string }> {
   if (!supabase) return { success: false, message: 'Bağlantı hatası' };
 
   // Token ile kaydı bul
@@ -92,21 +97,6 @@ export async function confirmAttendance(sessionToken: string, lat: number, lng: 
 
   if (error || !data) {
     return { success: false, message: 'Geçersiz veya süresi dolmuş QR kod' };
-  }
-
-  // GPS kontrolü — QR taranırken personelin işyerinde olduğunu doğrula
-  const kasaLocations: Record<string, { lat: number; lng: number; radius: number }> = {
-    wildpark:  { lat: 36.8850, lng: 30.7025, radius: 200 },
-    sinema:    { lat: 36.8850, lng: 30.7025, radius: 200 },
-    face2face: { lat: 36.8850, lng: 30.7025, radius: 200 },
-  };
-
-  const kasaLoc = kasaLocations[data.kasa_id];
-  if (kasaLoc) {
-    const distance = haversineDistance(lat, lng, kasaLoc.lat, kasaLoc.lng);
-    if (distance > kasaLoc.radius) {
-      return { success: false, message: `İşyerine çok uzaksınız (${Math.round(distance)}m). Lütfen işyerinde olduğunuzdan emin olun.` };
-    }
   }
 
   // Giriş kaydı yap
@@ -129,7 +119,7 @@ export async function confirmAttendance(sessionToken: string, lat: number, lng: 
 /** Çıkış kaydı */
 export async function checkOutAttendance(personnelId: string): Promise<boolean> {
   if (!supabase) return false;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   
   const { error } = await supabase
     .from('attendance')
@@ -163,7 +153,7 @@ export async function getPersonnelAttendance(personnelId: string, startDate?: st
 /** Admin: Tüm personelin bugünkü yoklama durumu */
 export async function getTodayAttendance(): Promise<AttendanceRecord[]> {
   if (!supabase) return [];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   
   const { data } = await supabase
     .from('attendance')
@@ -177,7 +167,7 @@ export async function getTodayAttendance(): Promise<AttendanceRecord[]> {
 /** Çıkış talebi oluştur (telefondan) — PC'de QR gösterecek */
 export async function requestCheckout(personnelId: string): Promise<{ success: boolean; checkoutToken?: string }> {
   if (!supabase) return { success: false };
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   const token = generateSessionToken(personnelId).replace('ATT-', 'OUT-');
 
   const { error } = await supabase
@@ -193,7 +183,7 @@ export async function requestCheckout(personnelId: string): Promise<{ success: b
 /** Çıkış talebini iptal et */
 export async function cancelCheckoutRequest(personnelId: string): Promise<boolean> {
   if (!supabase) return false;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
 
   const { error } = await supabase
     .from('attendance')
@@ -207,7 +197,7 @@ export async function cancelCheckoutRequest(personnelId: string): Promise<boolea
 /** Bu kasada checkout bekleyen personel var mı? (PC polling) */
 export async function getCheckoutRequests(kasaId: string): Promise<AttendanceRecord[]> {
   if (!supabase) { console.log('[getCheckoutRequests] supabase null'); return []; }
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
 
   const { data, error } = await supabase
     .from('attendance')
@@ -243,15 +233,4 @@ export async function confirmCheckout(checkoutToken: string): Promise<{ success:
 
   if (updateError) return { success: false, message: 'Çıkış kaydedilemedi' };
   return { success: true, message: 'Çıkış onaylandı!', personnelName: data.personnel_name };
-}
-
-/** Haversine formülü: iki GPS noktası arası mesafe (metre) */
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }

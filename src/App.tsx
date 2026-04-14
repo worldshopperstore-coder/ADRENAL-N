@@ -95,6 +95,10 @@ export default function App() {
           } else {
             setActiveTab('dashboard');
           }
+          // Online durumunu güncelle (session restore)
+          if (restored?.personnel?.id) {
+            setPersonnelOnline(restored.personnel.id);
+          }
           // Yazıcı otomatik algıla (oturum restore)
           import('@/utils/posManager').then(m => m.autoDetectPrinter(restored.kasa.id)).catch(() => {});
         }
@@ -106,8 +110,36 @@ export default function App() {
     // Personel veritabanını başlat
     initializePersonnelDB();
 
+    // Uygulama kapanırken offline yap
+    const handleBeforeUnload = () => {
+      const s = localStorage.getItem('userSession');
+      if (s) {
+        try {
+          const { personnel } = JSON.parse(s);
+          if (personnel?.id) setPersonnelOffline(personnel.id);
+        } catch {}
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Online heartbeat — 60 saniyede bir online durumunu tazele
+    const heartbeat = setInterval(() => {
+      const s = localStorage.getItem('userSession');
+      if (s) {
+        try {
+          const { personnel } = JSON.parse(s);
+          if (personnel?.id) setPersonnelOnline(personnel.id);
+        } catch {}
+      }
+    }, 60_000);
+
     // Aktif mod durumunu Supabase'den çek (tüm kasalar senkron)
     import('@/utils/posManager').then(m => m.syncIntegrationFromSupabase()).catch(() => {});
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      clearInterval(heartbeat);
+    };
   }, []);
 
   // Auto-update dinleyici

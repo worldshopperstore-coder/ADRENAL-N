@@ -71,7 +71,7 @@ function guessCategory(packageName: string, category?: string): string {
 }
 
 const fmtNum = (n: number) => n.toLocaleString('tr-TR', { maximumFractionDigits: 0 });
-const fmtDate = (d: Date) => d.toISOString().split('T')[0];
+const fmtDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
 const CAT_COLORS: Record<string, { bar: string; text: string }> = {
   'Münferit':        { bar: 'bg-emerald-500', text: 'text-emerald-400' },
@@ -167,8 +167,8 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
   const loadData = useCallback(() => {
     setLoading(true);
     Promise.all([
-      getAllSalesForDateRange(startDate, endDate),
-      getAllCrossSalesForDateRange(startDate, endDate),
+      getAllSalesForDateRange(startDate, endDate, person.kasaId),
+      getAllCrossSalesForDateRange(startDate, endDate, person.kasaId),
       getPersonnelAttendance(person.id, startDate, endDate),
       getPersonnelShift(person.id),
       getPersonnelLeaves(person.id).catch(() => [] as LeaveRecord[]),
@@ -191,9 +191,10 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
     const d = new Date(startDate + 'T00:00:00');
     const end = new Date(endDate + 'T00:00:00');
     while (d <= end) {
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       const dayKey = dateToWeekDay(dateStr);
       const daySchedule = schedule[dayKey];
+      if (!daySchedule) { d.setDate(d.getDate() + 1); continue; }
       const scheduledMin = getScheduledMinutes(schedule, dayKey);
       const att = attendance.find(a => a.date === dateStr);
       const leave = isDateOnLeave(leaves, dateStr);
@@ -339,6 +340,7 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
   };
 
   const handleDeleteLeave = async (id: string) => {
+    if (!confirm('Bu izin kaydını silmek istediğinize emin misiniz?')) return;
     await deleteLeave(id);
     loadData();
   };
