@@ -86,6 +86,7 @@ export default function App() {
           localStorage.removeItem('currentKasaPaxName');
           localStorage.removeItem('attendanceConfirmed');
           localStorage.removeItem('sessionLoginDate');
+          setAttendanceConfirmed(false);
           if (restored?.personnel?.id) {
             setPersonnelOffline(restored.personnel.id);
           }
@@ -173,6 +174,9 @@ export default function App() {
   const handleLogin = (kasa: KasaInfo, personnel: Personnel) => {
     const newSession: UserSession = { kasa, personnel };
     setSession(newSession);
+    // Yeni giriş → puantaj tekrar gerekli
+    setAttendanceConfirmed(false);
+    localStorage.removeItem('attendanceConfirmed');
     localStorage.setItem('userSession', JSON.stringify(newSession));
     const ld = new Date();
     localStorage.setItem('sessionLoginDate', `${ld.getFullYear()}-${String(ld.getMonth()+1).padStart(2,'0')}-${String(ld.getDate()).padStart(2,'0')}`);
