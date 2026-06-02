@@ -30,12 +30,14 @@ import { INITIAL_PACKAGES } from '@/data/packages';
 import ShiftBoardModal from './ShiftBoardModal';
 import AnnouncementsAdminTab from './AnnouncementsAdminTab';
 
-type KasaId = 'wildpark' | 'sinema' | 'face2face';
+type KasaId = 'wildpark' | 'sinema' | 'face2face' | 'genel';
 
 const KASAS = [
   { id: 'wildpark' as KasaId, name: 'WildPark', Icon: TreePine,  accent: 'emerald', text: 'text-emerald-400', bg: 'bg-emerald-500/10', borderAccent: 'border-emerald-500/20' },
   { id: 'sinema' as KasaId,   name: 'Sinema',   Icon: Monitor,   accent: 'violet',  text: 'text-violet-400',  bg: 'bg-violet-500/10',  borderAccent: 'border-violet-500/20'  },
   { id: 'face2face' as KasaId,name: 'Face2Face', Icon: Users2,    accent: 'sky',     text: 'text-sky-400',     bg: 'bg-sky-500/10',     borderAccent: 'border-sky-500/20'     },
+  { id: 'genel' as KasaId,    name: 'Genel Müdür', Icon: User,     accent: 'amber',   text: 'text-amber-400',   bg: 'bg-amber-500/10',   borderAccent: 'border-amber-500/20'   },
+  { id: 'genel' as KasaId,    name: 'Genel Müdür', Icon: User,     accent: 'amber',   text: 'text-amber-400',   bg: 'bg-amber-500/10',   borderAccent: 'border-amber-500/20'   },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -87,12 +89,16 @@ interface FormState {
   phone: string;
   weeklyTargetHours: number;
   isActive: boolean;
-  profileImage: string;
+  role: 'personel' | 'genel_mudur';
 }
 
 const emptyForm: FormState = {
   fullName: '', username: '', password: '', phone: '',
   weeklyTargetHours: 45, isActive: true, profileImage: '',
+  role: 'personel
+  fullName: '', username: '', password: '', phone: '',
+  weeklyTargetHours: 45, isActive: true, profileImage: '',
+  role: 'personel',
 };
 
 // ── Personnel Detail Modal (Full Analytics) ────────────────────────────────
@@ -824,7 +830,7 @@ export default function PersonnelTab() {
       getAllPersonnelFromFirebase(),
       getTodayAttendance(),
     ]);
-    setAllPersonnel(data.filter(p => p.role !== 'genel_mudur' && p.kasaId !== 'genel'));
+    setAllPersonnel(data);
     setTodayAttendance(todayAtt);
     setLoading(false);
   }, []);
@@ -874,9 +880,11 @@ export default function PersonnelTab() {
       username: p.username,
       password: p.password,
       phone: p.phone || '',
+      role: p.role,
       weeklyTargetHours: p.weeklyTargetHours ?? 45,
       isActive: p.isActive,
       profileImage: p.profileImage || '',
+      role: p.role,
     });
     setFormError('');
     setShowPassword(false);
@@ -902,10 +910,7 @@ export default function PersonnelTab() {
     if (!form.fullName.trim() || !form.username.trim() || !form.password.trim()) {
       setFormError('Ad soyad, kullanıcı adı ve şifre zorunludur.');
       return;
-    }
-    setSavingForm(true);
-    let success = false;
-    let errorMsg = '';
+    const targetKasa = form.role === 'genel_mudur' ? 'genel' : selectedKasa;
     if (editTarget) {
       success = await updatePersonnelInFirebase(editTarget.id, {
         fullName: form.fullName,
@@ -915,13 +920,22 @@ export default function PersonnelTab() {
         profileImage: form.profileImage,
         weeklyTargetHours: form.weeklyTargetHours,
         isActive: form.isActive,
+        role: form.role,
+        kasaId: targetKasa,
         updatedAt: new Date().toISOString(),
       });
     } else {
       const newP: Personnel = {
-        id: `${selectedKasa}_${Date.now()}`,
-        kasaId: selectedKasa,
-        role: 'personel',
+        id: `${targetKasa}_${Date.now()}`,
+        kasaId: targetKasa,
+        role: form.rolesa,
+        updatedAt: new Date().toISOString(),
+      });
+    } else {
+      const newP: Personnel = {
+        id: `${targetKasa}_${Date.now()}`,
+        kasaId: targetKasa,
+        role: form.role,
         createdAt: new Date().toISOString(),
         fullName: form.fullName,
         username: form.username,
@@ -1256,11 +1270,27 @@ export default function PersonnelTab() {
                   <span className="text-xs text-gray-400 flex items-center gap-1"><Phone className="w-3 h-3" /> Telefon</span>
                   <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="05xx xxx xx xx"
                     className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500" />
+                </label>User className="w-3 h-3" /> Rol</span>
+                  <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as 'personel' | 'genel_mudur' }))}
+                    className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500">
+                    <option value="personel">Personel</option>
+                    <option value="genel_mudur">Genel Müdür</option>
+                  </select>
                 </label>
+                <label className="block">
+                  <span className="text-xs text-gray-400 flex items-center gap-1"><
                 <label className="block">
                   <span className="text-xs text-gray-400 flex items-center gap-1"><User className="w-3 h-3" /> Kullanıcı Adı *</span>
                   <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
                     className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-orange-500" />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-gray-400 flex items-center gap-1"><User className="w-3 h-3" /> Rol</span>
+                  <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as 'personel' | 'genel_mudur' }))}
+                    className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500">
+                    <option value="personel">Personel</option>
+                    <option value="genel_mudur">Genel Müdür</option>
+                  </select>
                 </label>
                 <label className="block">
                   <span className="text-xs text-gray-400 flex items-center gap-1"><Lock className="w-3 h-3" /> Şifre *</span>
