@@ -96,12 +96,15 @@ export default function ShiftBoardModal({ personnel, onClose }: Props) {
   const handleSave = async () => {
     setSaving(true);
     setSaveMsg(null);
-    const session = localStorage.getItem('userSession');
-    const adminId = session ? (JSON.parse(session).personnel?.id ?? 'admin') : 'admin';
+    let adminId = 'admin';
+    try {
+      const session = localStorage.getItem('userSession');
+      if (session) adminId = JSON.parse(session).personnel?.id ?? 'admin';
+    } catch {}
     const result = await savePersonnelShift(personnel.id, personnel.kasaId, schedule, adminId);
     setSaving(false);
     if (result.error) {
-      setSaveMsg({ ok: true, text: 'Kaydedildi (yerel). Supabase tablosu eksik olabilir.' });
+      setSaveMsg({ ok: false, text: '\u26a0 Supabase\'ye kaydedilemedi \u2014 yerel olarak sakland\u0131' });
     } else {
       setSaveMsg({ ok: true, text: '\u2713 Kaydedildi' });
     }

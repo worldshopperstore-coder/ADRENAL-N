@@ -372,8 +372,11 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
   // ── Leave handlers ─────────────────────────────────────────────────────
   const handleAddLeave = async () => {
     setLeaveSaving(true);
-    const session = localStorage.getItem('userSession');
-    const adminId = session ? (JSON.parse(session).personnel?.id ?? 'admin') : 'admin';
+    let adminId = 'admin';
+    try {
+      const session = localStorage.getItem('userSession');
+      if (session) adminId = JSON.parse(session).personnel?.id ?? 'admin';
+    } catch {}
     await createLeave({
       personnel_id: person.id,
       personnel_name: person.fullName,

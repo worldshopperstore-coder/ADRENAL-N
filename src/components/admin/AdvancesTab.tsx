@@ -115,14 +115,19 @@ function KasaAdvanceCard({ kasa }: KasaCardProps) {
   const handleSave = async () => {
     setSaving(true);
     setMsg(null);
-    const session = localStorage.getItem('userSession');
-    const updatedBy = session ? (JSON.parse(session).personnel?.fullName ?? 'admin') : 'admin';
+    let updatedBy = 'admin';
+    try {
+      const session = localStorage.getItem('userSession');
+      if (session) updatedBy = JSON.parse(session).personnel?.fullName ?? 'admin';
+    } catch {}
     const result = await saveAdvances(kasa.id, advances, updatedBy);
     setSaving(false);
     setOriginal(advances);
     setMsg({
       ok: result.supabaseOk,
-      text: result.supabaseOk ? '✓ Kaydedildi' : '✓ Yerel kaydedildi (Supabase tablo eksik olabilir)',
+      text: result.supabaseOk
+        ? '✓ Kaydedildi'
+        : '⚠ Supabase\'ye kaydedilemedi — yerel olarak saklandı',
     });
   };
 
