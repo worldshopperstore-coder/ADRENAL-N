@@ -114,68 +114,97 @@ const I = {
   x: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
   cam: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
   flame: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z"/></svg>`,
+  fire16: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c0 0-3 4-3 7a3 3 0 006 0c0-1-.5-2-1-2.5.5 1 0 2.5-1 2.5s-2-1.5-1-4c-1 2-2 3-2 5a4 4 0 008 0c0-4-4-8-6-8z"/></svg>`,
+  star: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
+  trophy: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0012 0V2z"/></svg>`,
+  sun: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>`,
+  moon: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>`,
 };
 
 // ── CSS ──
 const CSS = `<style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--bg:#09090b;--bg2:#111318;--card:rgba(255,255,255,.035);--border:rgba(255,255,255,.07);--orange:#f97316;--red:#ef4444;--green:#22c55e;--amber:#f59e0b;--text:#fff;--text2:rgba(255,255,255,.45);--text3:rgba(255,255,255,.2);--safe-top:max(0px,env(safe-area-inset-top));--safe-bottom:max(0px,env(safe-area-inset-bottom))}
+:root{
+  --bg:#08080a;--bg2:#0f1014;
+  --card:rgba(255,255,255,.04);--card2:rgba(255,255,255,.06);
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.12);
+  --orange:#f97316;--orange2:#fb923c;--red:#ef4444;--green:#22c55e;--green2:#4ade80;--amber:#f59e0b;
+  --text:#fff;--text2:rgba(255,255,255,.5);--text3:rgba(255,255,255,.22);
+  --safe-top:max(0px,env(safe-area-inset-top));--safe-bottom:max(0px,env(safe-area-inset-bottom))
+}
 body,html,#app{width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;color:var(--text);background:var(--bg)}
 body{overscroll-behavior:none;user-select:none;-webkit-user-select:none;touch-action:pan-y}
 input,button,select{font-family:inherit}
 
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-@keyframes scaleIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-@keyframes breathe{0%,100%{box-shadow:0 0 20px rgba(249,115,22,.15)}50%{box-shadow:0 0 40px rgba(249,115,22,.3)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+@keyframes breathe{0%,100%{box-shadow:0 0 24px rgba(249,115,22,.2),0 0 48px rgba(249,115,22,.08)}50%{box-shadow:0 0 40px rgba(249,115,22,.45),0 0 80px rgba(249,115,22,.2)}}
 @keyframes scanline{0%{top:0}100%{top:calc(100% - 2px)}}
+@keyframes ringPulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.8);opacity:0}}
+@keyframes greenGlow{0%,100%{box-shadow:0 0 12px rgba(34,197,94,.2)}50%{box-shadow:0 0 28px rgba(34,197,94,.5),0 0 48px rgba(34,197,94,.15)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
 
-.fade-in{animation:fadeIn .4s ease-out both}
-.scale-in{animation:scaleIn .4s cubic-bezier(.175,.885,.32,1.275) both}
-.slide-up{animation:slideUp .35s ease-out both}
+.fade-in{animation:fadeIn .45s ease-out both}
+.scale-in{animation:scaleIn .45s cubic-bezier(.175,.885,.32,1.275) both}
+.slide-up{animation:slideUp .4s ease-out both}
+.slide-in{animation:slideIn .35s ease-out both}
 
-.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;transition:transform .15s}
+.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:14px;transition:transform .15s,box-shadow .2s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .card:active{transform:scale(.98)}
-.card-glow-green{border-color:rgba(34,197,94,.2);box-shadow:0 0 20px rgba(34,197,94,.05)}
-.card-glow-amber{border-color:rgba(245,158,11,.2);box-shadow:0 0 20px rgba(245,158,11,.05)}
+.card-glass{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:16px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.card-glow-green{border-color:rgba(34,197,94,.25);box-shadow:0 0 0 1px rgba(34,197,94,.08) inset, 0 4px 24px rgba(34,197,94,.08)}
+.card-glow-amber{border-color:rgba(245,158,11,.25);box-shadow:0 0 0 1px rgba(245,158,11,.08) inset, 0 4px 24px rgba(245,158,11,.08)}
+.card-glow-orange{border-color:rgba(249,115,22,.25);box-shadow:0 4px 24px rgba(249,115,22,.12)}
 
-.btn{padding:14px 24px;border:none;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s;width:100%;touch-action:manipulation;position:relative;overflow:hidden}
-.btn:active{transform:scale(.96);opacity:.85}
-.btn-primary{background:linear-gradient(135deg,var(--orange),#ea580c);color:#fff;box-shadow:0 4px 20px rgba(249,115,22,.3)}
-.btn-danger{background:linear-gradient(135deg,#dc2626,var(--red));color:#fff;box-shadow:0 4px 20px rgba(220,38,38,.25)}
-.btn-ghost{background:rgba(255,255,255,.04);color:var(--text2);border:1px solid var(--border)}
+.btn{padding:15px 24px;border:none;border-radius:16px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .18s;width:100%;touch-action:manipulation;position:relative;overflow:hidden;letter-spacing:.01em}
+.btn:active{transform:scale(.95);opacity:.88}
+.btn-primary{background:linear-gradient(135deg,var(--orange),#dc4c00);color:#fff;box-shadow:0 4px 24px rgba(249,115,22,.35),0 1px 0 rgba(255,255,255,.12) inset}
+.btn-danger{background:linear-gradient(135deg,#b91c1c,#dc2626);color:#fff;box-shadow:0 4px 24px rgba(220,38,38,.3),0 1px 0 rgba(255,255,255,.1) inset}
+.btn-ghost{background:rgba(255,255,255,.05);color:var(--text2);border:1px solid var(--border2)}
+.btn-success{background:linear-gradient(135deg,#15803d,#16a34a);color:#fff;box-shadow:0 4px 24px rgba(22,163,74,.3)}
 
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:50;padding:4px 12px;padding-bottom:max(6px,var(--safe-bottom));background:rgba(9,9,11,.95);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--border)}
-.nav-bar{display:flex;gap:2px;border-radius:14px;padding:3px;background:rgba(255,255,255,.025)}
-.nav-btn{flex:1;padding:8px 4px;border-radius:12px;border:none;font-size:10px;font-weight:600;cursor:pointer;color:var(--text3);background:transparent;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:3px;touch-action:manipulation}
-.nav-btn.active{background:rgba(249,115,22,.1);color:#fdba74;box-shadow:0 2px 8px rgba(249,115,22,.12)}
-.nav-btn svg{transition:transform .2s}
-.nav-btn.active svg{transform:scale(1.1)}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:50;padding:4px 12px;padding-bottom:max(8px,var(--safe-bottom));background:rgba(8,8,10,.92);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-top:1px solid rgba(255,255,255,.06)}
+.nav-bar{display:flex;gap:2px;border-radius:16px;padding:4px;background:rgba(255,255,255,.03)}
+.nav-btn{flex:1;padding:8px 4px;border-radius:13px;border:none;font-size:10px;font-weight:700;cursor:pointer;color:var(--text3);background:transparent;transition:all .22s;display:flex;flex-direction:column;align-items:center;gap:3px;touch-action:manipulation;letter-spacing:.01em}
+.nav-btn.active{background:linear-gradient(135deg,rgba(249,115,22,.15),rgba(234,88,12,.08));color:#fdba74;box-shadow:0 2px 12px rgba(249,115,22,.15)}
+.nav-btn svg{transition:transform .22s}
+.nav-btn.active svg{transform:scale(1.12)}
 
-.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600}
-.stat{background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.02em}
+.stat{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:14px;padding:10px;text-align:center}
 
-.splash{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;transition:opacity .4s}
-.splash-logo{animation:breathe 2s ease-in-out infinite}
+.splash{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;transition:opacity .5s}
+.splash-logo{animation:breathe 2.2s ease-in-out infinite}
 
-.scan-frame{position:relative;border-radius:16px;overflow:hidden}
+.scan-frame{position:relative;border-radius:20px;overflow:hidden}
 .scan-overlay{position:absolute;inset:0;pointer-events:none;z-index:5}
-.scan-corner{position:absolute;width:28px;height:28px;border-color:var(--orange);border-style:solid}
-.scan-corner.tl{top:10px;left:10px;border-width:3px 0 0 3px;border-radius:6px 0 0 0}
-.scan-corner.tr{top:10px;right:10px;border-width:3px 3px 0 0;border-radius:0 6px 0 0}
-.scan-corner.bl{bottom:10px;left:10px;border-width:0 0 3px 3px;border-radius:0 0 0 6px}
-.scan-corner.br{bottom:10px;right:10px;border-width:0 3px 3px 0;border-radius:0 0 6px 0}
+.scan-corner{position:absolute;width:30px;height:30px;border-color:var(--orange);border-style:solid}
+.scan-corner.tl{top:12px;left:12px;border-width:3px 0 0 3px;border-radius:8px 0 0 0}
+.scan-corner.tr{top:12px;right:12px;border-width:3px 3px 0 0;border-radius:0 8px 0 0}
+.scan-corner.bl{bottom:12px;left:12px;border-width:0 0 3px 3px;border-radius:0 0 0 8px}
+.scan-corner.br{bottom:12px;right:12px;border-width:0 3px 3px 0;border-radius:0 0 8px 0}
 .scan-line{position:absolute;left:15px;right:15px;height:2px;background:linear-gradient(90deg,transparent,var(--orange),transparent);animation:scanline 2s ease-in-out infinite alternate;z-index:5}
 
-.progress-track{height:6px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden}
-.progress-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--orange),#ea580c);transition:width .8s ease}
+.progress-track{height:5px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden}
+.progress-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--orange),var(--orange2));transition:width .9s cubic-bezier(.4,0,.2,1)}
 
-.wave-bg{position:fixed;bottom:0;left:0;width:100%;height:30vh;opacity:.1;pointer-events:none;z-index:0}
+.wave-bg{position:fixed;bottom:0;left:0;width:100%;height:32vh;opacity:.08;pointer-events:none;z-index:0}
 
 .page{min-height:100vh;min-height:100dvh;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
 .page-content{position:relative;z-index:2;flex:1;display:flex;flex-direction:column}
+
+.ring-pulse{position:absolute;border-radius:50%;border:2px solid currentColor;animation:ringPulse 1.2s ease-out infinite}
+.timer-glow{animation:greenGlow 2s ease-in-out infinite}
+.streak-fire{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(251,146,60,.15),rgba(239,68,68,.1));border:1px solid rgba(251,146,60,.25);border-radius:20px;padding:4px 10px;font-size:11px;font-weight:800;color:#fb923c}
+.monthly-strip{display:flex;gap:6px;margin-bottom:10px}
+.monthly-pill{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:10px 8px;text-align:center}
+.shimmer-text{background:linear-gradient(90deg,var(--text3) 0%,rgba(255,255,255,.6) 50%,var(--text3) 100%);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 2.5s linear infinite}
+.online-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green2);animation:pulse 2s infinite}
 </style>`;
 
 const WAVE = `<svg class="wave-bg" viewBox="0 0 1440 400" preserveAspectRatio="none">
@@ -191,21 +220,29 @@ const WAVE = `<svg class="wave-bg" viewBox="0 0 1440 400" preserveAspectRatio="n
 function showSplash(): Promise<void> {
   const app = document.getElementById('app')!;
   app.innerHTML = `${CSS}
-    <div class="splash" id="splash-screen">
-      <div class="splash-logo" style="width:80px;height:80px;background:linear-gradient(135deg,var(--orange),#ea580c);border-radius:24px;display:flex;align-items:center;justify-content:center;color:#fff">
-        ${I.flame}
-      </div>
-      <div style="text-align:center">
-        <div style="display:flex;align-items:center;justify-content:center;gap:4px">
-          <span style="font-weight:800;font-size:18px;letter-spacing:-.3px;color:#fff">adrenalin</span>
-          <span style="color:var(--orange);font-size:10px;font-weight:700;vertical-align:super">\u00ae</span>
+    <div class="splash" id="splash-screen" style="background:radial-gradient(ellipse at 50% 40%,rgba(249,115,22,.06) 0%,var(--bg) 65%)">
+      <div style="position:relative;display:flex;align-items:center;justify-content:center">
+        <div style="position:absolute;width:120px;height:120px;border-radius:50%;border:1px solid rgba(249,115,22,.15);animation:ringPulse 2s ease-out infinite"></div>
+        <div style="position:absolute;width:100px;height:100px;border-radius:50%;border:1px solid rgba(249,115,22,.1);animation:ringPulse 2s ease-out .4s infinite"></div>
+        <div class="splash-logo" style="width:88px;height:88px;background:linear-gradient(135deg,#f97316,#c2410c);border-radius:28px;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 8px 32px rgba(249,115,22,.4),0 0 0 1px rgba(255,255,255,.1) inset">
+          ${I.flame}
         </div>
-        <p style="color:var(--text3);font-size:11px;margin-top:4px">Puantaj Sistemi</p>
       </div>
-      <div style="margin-top:12px;width:28px;height:28px;border:2px solid rgba(249,115,22,.2);border-top-color:var(--orange);border-radius:50%;animation:spin .8s linear infinite"></div>
-      <p style="color:var(--text3);font-size:8px;position:absolute;bottom:max(20px,var(--safe-bottom));left:50%;transform:translateX(-50%)">${PWA_VERSION}</p>
+      <div style="text-align:center;margin-top:8px">
+        <div style="display:flex;align-items:center;justify-content:center;gap:3px">
+          <span style="font-weight:900;font-size:22px;letter-spacing:-.5px;color:#fff">adrenalin</span>
+          <span style="color:var(--orange);font-size:11px;font-weight:700;vertical-align:super">\u00ae</span>
+        </div>
+        <p style="color:var(--text3);font-size:11px;margin-top:5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600">Personel Puantaj</p>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+        <div style="width:6px;height:6px;border-radius:50%;background:var(--orange);animation:pulse .8s .0s infinite"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:var(--orange);animation:pulse .8s .2s infinite"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:var(--orange);animation:pulse .8s .4s infinite"></div>
+      </div>
+      <p style="color:rgba(255,255,255,.1);font-size:8px;position:absolute;bottom:max(20px,var(--safe-bottom));left:50%;transform:translateX(-50%);letter-spacing:.05em">${PWA_VERSION}</p>
     </div>`;
-  return new Promise(r => setTimeout(r, 1200));
+  return new Promise(r => setTimeout(r, 1400));
 }
 
 // ════════════════════════════════════════
@@ -354,33 +391,42 @@ function showProcessing(msg: string) {
 }
 
 function showSuccess(title: string, name: string, time: string, isCheckin: boolean) {
-  const clr = isCheckin ? 'var(--green)' : 'var(--orange)';
   const clrRaw = isCheckin ? '#22c55e' : '#f97316';
+  const bgGlow = isCheckin
+    ? 'radial-gradient(ellipse at 50% 35%,rgba(34,197,94,.1) 0%,var(--bg) 65%)'
+    : 'radial-gradient(ellipse at 50% 35%,rgba(249,115,22,.1) 0%,var(--bg) 65%)';
   const dateStr = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const dayStr  = new Date().toLocaleDateString('tr-TR', { weekday: 'long' });
   document.getElementById('app')!.innerHTML = `${CSS}
-    <div class="page" style="align-items:center;justify-content:center">
-      ${WAVE}
-      <div style="position:relative;z-index:2;text-align:center;padding:24px;max-width:340px;width:100%" class="scale-in">
-        <div style="width:80px;height:80px;margin:0 auto 20px;background:${clrRaw}12;border:3px solid ${clrRaw}35;border-radius:50%;display:flex;align-items:center;justify-content:center;color:${clr};box-shadow:0 0 40px ${clrRaw}15">
-          ${isCheckin ? I.ok : I.out}
-        </div>
-        <h1 style="font-size:26px;font-weight:800;letter-spacing:-.3px;margin:0 0 4px">${esc(title)}</h1>
-        <p style="color:${clr};font-size:20px;font-weight:700;margin:0 0 20px">${esc(name)}</p>
-        <div class="card" style="padding:16px;margin-bottom:20px">
-          <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:4px">
-            <div style="color:${clr}">${I.clk}</div>
-            <span style="font-size:24px;font-weight:700">${esc(time)}</span>
+    <div class="page" style="align-items:center;justify-content:center;background:${bgGlow}">
+      <div style="position:relative;z-index:2;text-align:center;padding:28px 24px;max-width:340px;width:100%" class="scale-in">
+
+        <!-- Animated rings + icon -->
+        <div style="position:relative;width:100px;height:100px;margin:0 auto 24px">
+          <div style="position:absolute;inset:-16px;border-radius:50%;border:2px solid ${clrRaw}30;animation:ringPulse 1.4s ease-out infinite"></div>
+          <div style="position:absolute;inset:-6px;border-radius:50%;border:2px solid ${clrRaw}20;animation:ringPulse 1.4s ease-out .3s infinite"></div>
+          <div style="width:100px;height:100px;background:${clrRaw}15;border:2px solid ${clrRaw}40;border-radius:50%;display:flex;align-items:center;justify-content:center;color:${clrRaw};box-shadow:0 0 40px ${clrRaw}25,0 0 80px ${clrRaw}08">
+            ${isCheckin ? `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>` : `<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`}
           </div>
-          <p style="color:var(--text3);font-size:11px">${esc(dateStr)}</p>
         </div>
-        <div style="display:flex;align-items:center;justify-content:center;gap:4px">
-          <span style="font-weight:800;font-size:10px;color:var(--text3)">adrenalin</span>
-          <span style="color:var(--orange);font-size:7px;font-weight:700">\u00ae</span>
+
+        <h1 style="font-size:30px;font-weight:900;letter-spacing:-.5px;margin:0 0 6px;line-height:1">${esc(title)}</h1>
+        <p style="color:${clrRaw};font-size:18px;font-weight:700;margin:0 0 24px">${esc(name)}</p>
+
+        <!-- Time card -->
+        <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:18px;margin-bottom:20px;backdrop-filter:blur(12px)">
+          <div style="font-size:42px;font-weight:900;letter-spacing:-1px;color:#fff;font-variant-numeric:tabular-nums;line-height:1">${esc(time)}</div>
+          <div style="margin-top:6px;color:var(--text3);font-size:12px">${esc(dayStr)}, ${esc(dateStr)}</div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:center;gap:3px;opacity:.4">
+          <span style="font-weight:900;font-size:11px">adrenalin</span>
+          <span style="color:var(--orange);font-size:8px;font-weight:700">\u00ae</span>
         </div>
       </div>
     </div>`;
-  if (navigator.vibrate) navigator.vibrate(isCheckin ? [100, 50, 100] : [150]);
-  setTimeout(() => renderApp(), 2500);
+  if (navigator.vibrate) navigator.vibrate(isCheckin ? [80, 40, 120] : [120]);
+  setTimeout(() => renderApp(), 2800);
 }
 
 function showError(msg: string) {
@@ -467,49 +513,51 @@ function renderDash() {
   const todayStr = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', weekday: 'short' });
 
   app.innerHTML = `${CSS}
-    <div class="page">
-      ${WAVE}
+    <div class="page" style="background:radial-gradient(ellipse at 50% -10%,rgba(249,115,22,.07) 0%,var(--bg) 55%)">
       <div class="page-content">
-        <div style="position:relative;z-index:2;padding:max(16px,var(--safe-top)) 16px 0;flex-shrink:0" class="fade-in">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="position:relative;z-index:2;padding:max(14px,var(--safe-top)) 16px 0;flex-shrink:0" class="fade-in">
+
+          <!-- Header -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
             <div style="min-width:0">
-              <div style="display:flex;align-items:center;gap:3px;margin-bottom:2px">
-                <span style="font-weight:800;font-size:10px;color:var(--text3);letter-spacing:.5px;text-transform:uppercase">adrenalin</span>
-                <span style="color:var(--orange);font-size:7px;font-weight:700">\u00ae</span>
+              <div style="display:flex;align-items:center;gap:3px;margin-bottom:3px">
+                <span style="font-weight:900;font-size:9px;color:rgba(255,255,255,.18);letter-spacing:.8px;text-transform:uppercase">adrenalin</span>
+                <span style="color:var(--orange);font-size:6px;font-weight:700">\u00ae</span>
               </div>
-              <h1 style="font-size:20px;font-weight:800;letter-spacing:-.3px;margin:0">Merhaba, ${fn}!</h1>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
-                <span style="color:var(--orange);font-size:11px;font-weight:600">${esc(KASA_NAMES[currentUser.kasaId] || currentUser.kasaId)}</span>
-                <span style="color:var(--text3);font-size:10px">${esc(todayStr)}</span>
+              <h1 style="font-size:22px;font-weight:900;letter-spacing:-.4px;margin:0;line-height:1.15">Merhaba, ${fn}! \ud83d\udc4b</h1>
+              <div style="display:flex;align-items:center;gap:5px;margin-top:4px">
+                <div class="online-dot"></div>
+                <span style="color:var(--orange);font-size:11px;font-weight:700">${esc(KASA_NAMES[currentUser.kasaId] || currentUser.kasaId)}</span>
+                <span style="color:var(--text3);font-size:10px">\u00b7 ${esc(todayStr)}</span>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <span id="live-clock" style="color:var(--text3);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums">${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-              <div style="width:42px;height:42px;background:linear-gradient(135deg,var(--orange),#ea580c);border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;border:2px solid rgba(249,115,22,.3);flex-shrink:0">${esc(ini)}</div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+              <span id="live-clock" style="color:var(--text3);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em">${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+              <div style="width:46px;height:46px;background:linear-gradient(135deg,#f97316,#c2410c);border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;box-shadow:0 4px 16px rgba(249,115,22,.4),0 0 0 2px rgba(249,115,22,.2);flex-shrink:0">${esc(ini)}</div>
             </div>
           </div>
 
-          <div class="card ${isPending ? 'card-glow-amber' : 'card-glow-green'}" style="margin-bottom:8px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-              <div style="display:flex;align-items:center;gap:6px">
-                <div style="color:var(--green)">${I.clk}</div>
-                <span style="color:var(--text2);font-size:11px;font-weight:600">Bug\u00fcnk\u00fc Mesai</span>
-              </div>
-              <div class="badge" style="background:${isPending ? 'rgba(245,158,11,.1)' : 'rgba(34,197,94,.1)'};color:${isPending ? 'var(--amber)' : 'var(--green)'};border:1px solid ${isPending ? 'rgba(245,158,11,.2)' : 'rgba(34,197,94,.2)'}">
-                ${isPending ? `${I.clk} \u00c7\u0131k\u0131\u015f Bekl.` : `<span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 1.5s infinite"></span> Aktif`}
+          <!-- Timer card \u2014 premium glassmorphism -->
+          <div class="card-glass ${isPending ? 'card-glow-amber' : 'card-glow-green'}" style="margin-bottom:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <span style="color:var(--text2);font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase">Bug\u00fcnk\u00fc Mesai</span>
+              <div class="badge" style="background:${isPending ? 'rgba(245,158,11,.12)' : 'rgba(34,197,94,.12)'};color:${isPending ? 'var(--amber)' : 'var(--green2)'};border:1px solid ${isPending ? 'rgba(245,158,11,.3)' : 'rgba(34,197,94,.3)'}">
+                ${isPending
+                  ? `<span style="width:6px;height:6px;border-radius:50%;background:var(--amber);animation:pulse 1.2s infinite"></span> \u00c7\u0131k\u0131\u015f Bekleniyor`
+                  : `<span style="width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green2);animation:pulse 2s infinite"></span> Aktif`}
               </div>
             </div>
-            <div style="text-align:center;margin-bottom:10px">
-              <div id="live-timer" style="font-size:36px;font-weight:800;letter-spacing:1px;color:#fff;font-variant-numeric:tabular-nums">00:00:00</div>
+            <div style="text-align:center;margin-bottom:14px">
+              <div id="live-timer" class="${isPending ? '' : 'timer-glow'}" style="font-size:48px;font-weight:900;letter-spacing:2px;color:#fff;font-variant-numeric:tabular-nums;line-height:1;text-shadow:${isPending ? 'none' : '0 0 30px rgba(34,197,94,.4)'}">00:00:00</div>
             </div>
-            <div style="display:flex;gap:8px">
-              <div class="stat" style="flex:1">
-                <p style="color:var(--text3);font-size:9px;margin:0 0 2px;text-transform:uppercase;letter-spacing:.5px">Giri\u015f</p>
-                <p style="color:var(--orange);font-size:18px;font-weight:800;margin:0;letter-spacing:-.5px">${ci}</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:10px 12px">
+                <p style="color:var(--text3);font-size:9px;margin:0 0 3px;text-transform:uppercase;letter-spacing:.6px;font-weight:700">Giri\u015f</p>
+                <p style="color:var(--orange2);font-size:20px;font-weight:900;margin:0;letter-spacing:-.3px;font-variant-numeric:tabular-nums">${ci}</p>
               </div>
-              <div class="stat" style="flex:1">
-                <p style="color:var(--text3);font-size:9px;margin:0 0 2px;text-transform:uppercase;letter-spacing:.5px">S\u00fcre</p>
-                <p id="live-duration" style="color:var(--green);font-size:18px;font-weight:800;margin:0">--</p>
+              <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:10px 12px">
+                <p style="color:var(--text3);font-size:9px;margin:0 0 3px;text-transform:uppercase;letter-spacing:.6px;font-weight:700">S\u00fcre</p>
+                <p id="live-duration" style="color:var(--green2);font-size:20px;font-weight:900;margin:0;letter-spacing:-.3px">--</p>
               </div>
             </div>
           </div>
@@ -549,22 +597,75 @@ function renderTabContent() {
   else renderSchedule(tc);
 }
 
+// ── Monthly Stats Loader ──
+async function loadMonthlyStats(): Promise<{ workDays: number; totalHours: number; streak: number; tomorrowShift: string | null }> {
+  if (!currentUser) return { workDays: 0, totalHours: 0, streak: 0, tomorrowShift: null };
+  const today = new Date();
+  const monthStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+  const todayStr = today.toISOString().slice(0, 10);
+  try {
+    const [attRes, shiftRes] = await Promise.all([
+      supabase.from('attendance').select('date, check_in, check_out, status').eq('personnel_id', currentUser.id).gte('date', monthStart).lte('date', todayStr).order('date', { ascending: false }),
+      supabase.from('shifts').select('week_schedule').eq('personnel_id', currentUser.id).limit(1),
+    ]);
+    const records = attRes.data || [];
+    const done = records.filter((r: any) => r.check_in && r.check_out);
+    const workDays = done.length;
+    const totalMins = done.reduce((acc: number, r: any) => acc + Math.round((new Date(r.check_out).getTime() - new Date(r.check_in).getTime()) / 60000), 0);
+    const totalHours = Math.floor(totalMins / 60);
+    // Streak: arka arkaya çalışılan gün sayısı
+    let streak = 0;
+    const sorted = [...records].sort((a: any, b: any) => b.date.localeCompare(a.date));
+    for (let i = 0; i < sorted.length; i++) {
+      const r: any = sorted[i];
+      if (r.status === 'checked_out' || r.status === 'checked_in') {
+        if (i === 0) { streak = 1; continue; }
+        const prev: any = sorted[i - 1];
+        const d1 = new Date(prev.date + 'T12:00:00'), d2 = new Date(r.date + 'T12:00:00');
+        if (Math.round((d1.getTime() - d2.getTime()) / 86400000) <= 1) streak++; else break;
+      } else break;
+    }
+    // Yarınki vardiya
+    let tomorrowShift: string | null = null;
+    const ws0 = shiftRes.data?.[0]?.week_schedule;
+    if (ws0) {
+      try {
+        const ws = typeof ws0 === 'string' ? JSON.parse(ws0) : ws0;
+        const tmw = new Date(today); tmw.setDate(tmw.getDate() + 1);
+        const tmwKey = DAY_KEYS[tmw.getDay()];
+        const t = ws[tmwKey];
+        if (t?.isOff) tomorrowShift = t.leaveType || 'İzin';
+        else if (t?.startTime && t?.endTime) tomorrowShift = `${t.startTime} – ${t.endTime}`;
+      } catch {}
+    }
+    return { workDays, totalHours, streak, tomorrowShift };
+  } catch { return { workDays: 0, totalHours: 0, streak: 0, tomorrowShift: null }; }
+}
+
 // ── Home Tab ──
 async function renderHome(c: HTMLElement) {
   if (!currentUser || !currentAttendance) return;
   const isPending = currentAttendance.status === 'checkout_pending';
 
+  // Yükleniyor skeleton
+  c.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;padding-top:2px">
+    ${[1,2,3].map(() => `<div style="height:64px;border-radius:16px;background:rgba(255,255,255,.03);animation:pulse 1.5s infinite"></div>`).join('')}
+  </div>`;
+
   const today = new Date();
   const todayDate = today.toISOString().slice(0, 10);
   let shiftData: any[] | null = null;
   let teamAtt: any[] | null = null;
+  let monthStats = { workDays: 0, totalHours: 0, streak: 0, tomorrowShift: null as string | null };
   try {
-    const [shiftRes, teamRes] = await Promise.all([
+    const [shiftRes, teamRes, mStats] = await Promise.all([
       supabase.from('shifts').select('*').eq('personnel_id', currentUser.id).limit(1),
-      supabase.from('attendance').select('personnel_id, status').eq('kasa_id', currentUser.kasaId).eq('date', todayDate)
+      supabase.from('attendance').select('personnel_id, status').eq('kasa_id', currentUser.kasaId).eq('date', todayDate),
+      loadMonthlyStats(),
     ]);
     shiftData = shiftRes.data;
     teamAtt = teamRes.data;
+    monthStats = mStats;
   } catch {}
 
   let todayShift: WeekDay | null = null;
@@ -587,61 +688,94 @@ async function renderHome(c: HTMLElement) {
 
   const teamRecs = teamAtt || [];
   const activeCount = teamRecs.filter((r: any) => r.status === 'checked_in' || r.status === 'checkout_pending').length;
-  const doneCount = teamRecs.filter((r: any) => r.status === 'checked_out').length;
-  const shiftIsOff = todayShift?.isOff;
-  const leaveType = todayShift?.leaveType;
+  const doneCount   = teamRecs.filter((r: any) => r.status === 'checked_out').length;
+  const shiftIsOff  = todayShift?.isOff;
+  const leaveType   = todayShift?.leaveType;
   const lc = LEAVE_COLORS[leaveType || ''] || '#ea580c';
+  const monthName = new Date().toLocaleDateString('tr-TR', { month: 'long' });
 
-  c.innerHTML = `<div class="slide-up">
+  c.innerHTML = `<div class="slide-up" style="display:flex;flex-direction:column;gap:8px;padding-top:2px">
+
+    <!-- Ayl\u0131k \u00f6zet \u015ferit -->
+    <div class="monthly-strip">
+      <div class="monthly-pill">
+        <p style="color:var(--text3);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">${esc(monthName)}</p>
+        <p style="color:#fff;font-size:18px;font-weight:900;margin:0;line-height:1">${monthStats.workDays}<span style="font-size:10px;color:var(--text3);font-weight:600;margin-left:2px">g\u00fcn</span></p>
+      </div>
+      <div class="monthly-pill">
+        <p style="color:var(--text3);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Toplam</p>
+        <p style="color:var(--orange2);font-size:18px;font-weight:900;margin:0;line-height:1">${monthStats.totalHours}<span style="font-size:10px;color:var(--text3);font-weight:600;margin-left:2px">saat</span></p>
+      </div>
+      <div class="monthly-pill" style="${monthStats.streak >= 5 ? 'background:rgba(251,146,60,.08);border-color:rgba(251,146,60,.2)' : ''}">
+        <p style="color:var(--text3);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Seri \ud83d\udd25</p>
+        <p style="color:${monthStats.streak >= 5 ? '#fb923c' : 'var(--text2)'};font-size:18px;font-weight:900;margin:0;line-height:1">${monthStats.streak}<span style="font-size:10px;color:var(--text3);font-weight:600;margin-left:2px">g\u00fcn</span></p>
+      </div>
+    </div>
+
+    <!-- Vardiya kart\u0131 -->
     ${todayShift ? `
-    <div class="card" style="margin-bottom:8px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${!shiftIsOff && shiftTotalMins > 0 ? '8px' : '0'}">
-        <div style="display:flex;align-items:center;gap:6px">
-          <div style="color:var(--orange)">${I.cal}</div>
-          <span style="color:var(--text2);font-size:11px;font-weight:600">Vardiya</span>
+    <div class="card-glass card-glow-orange" style="padding:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:34px;height:34px;border-radius:10px;background:rgba(249,115,22,.12);display:flex;align-items:center;justify-content:center;color:var(--orange)">${I.cal}</div>
+          <div>
+            <p style="color:var(--text3);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 2px">Bug\u00fcnk\u00fc Vardiya</p>
+            ${shiftIsOff
+              ? `<div class="badge" style="background:${lc}15;color:${lc};border:1px solid ${lc}25">${esc(leaveType || '\u0130zin')}</div>`
+              : `<span style="color:#fff;font-size:16px;font-weight:900;letter-spacing:-.2px">${esc(todayShift.start || '')} \u2013 ${esc(todayShift.end || '')}</span>`}
+          </div>
         </div>
-        ${shiftIsOff
-          ? `<div class="badge" style="background:${lc}15;color:${lc};border:1px solid ${lc}25">${esc(leaveType || '\u0130zin')}</div>`
-          : `<span style="color:var(--orange);font-size:14px;font-weight:700">${esc(todayShift.start || '')} \u2013 ${esc(todayShift.end || '')}</span>`}
+        ${!shiftIsOff && shiftTotalMins > 0 ? `<span id="progress-pct" style="color:var(--orange2);font-size:14px;font-weight:900">%0</span>` : ''}
       </div>
       ${!shiftIsOff && shiftTotalMins > 0 ? `
-      <div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-          <span style="color:var(--text3);font-size:10px">\u0130lerleme</span>
-          <span id="progress-pct" style="color:var(--text3);font-size:10px">%0</span>
-        </div>
-        <div class="progress-track">
+      <div style="margin-top:10px">
+        <div class="progress-track" style="height:6px">
           <div class="progress-fill" id="progress-fill" data-total="${shiftTotalMins}" style="width:0%"></div>
         </div>
       </div>` : ''}
     </div>` : ''}
 
-    <div style="display:flex;gap:8px;margin-bottom:8px">
-      <div class="stat" style="flex:1;border-color:rgba(34,197,94,.12)">
-        <p style="color:var(--text3);font-size:9px;margin:0 0 2px;text-transform:uppercase">Aktif</p>
-        <p style="color:var(--green);font-size:22px;font-weight:800;margin:0">${activeCount}</p>
+    <!-- Yar\u0131nki vardiya -->
+    ${monthStats.tomorrowShift ? `
+    <div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:11px 14px">
+      <span style="font-size:16px">\ud83c\udf05</span>
+      <div>
+        <p style="color:var(--text3);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 2px">Yar\u0131n</p>
+        <p style="color:var(--text2);font-size:13px;font-weight:700;margin:0">${esc(monthStats.tomorrowShift)}</p>
       </div>
-      <div class="stat" style="flex:1;border-color:rgba(249,115,22,.12)">
-        <p style="color:var(--text3);font-size:9px;margin:0 0 2px;text-transform:uppercase">\u00c7\u0131k\u0131\u015f</p>
-        <p style="color:var(--orange);font-size:22px;font-weight:800;margin:0">${doneCount}</p>
+    </div>` : ''}
+
+    <!-- Ekip durumu -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+      <div style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:14px;padding:10px;text-align:center">
+        <div style="display:flex;align-items:center;justify-content:center;gap:3px;margin-bottom:3px">
+          <div class="online-dot" style="width:5px;height:5px"></div>
+          <p style="color:rgba(34,197,94,.7);font-size:8px;font-weight:700;text-transform:uppercase;margin:0;letter-spacing:.4px">Aktif</p>
+        </div>
+        <p style="color:var(--green2);font-size:24px;font-weight:900;margin:0;line-height:1">${activeCount}</p>
       </div>
-      <div class="stat" style="flex:1">
-        <p style="color:var(--text3);font-size:9px;margin:0 0 2px;text-transform:uppercase">Toplam</p>
-        <p style="color:var(--text2);font-size:22px;font-weight:800;margin:0">${teamRecs.length}</p>
+      <div style="background:rgba(249,115,22,.05);border:1px solid rgba(249,115,22,.12);border-radius:14px;padding:10px;text-align:center">
+        <p style="color:rgba(249,115,22,.6);font-size:8px;font-weight:700;text-transform:uppercase;margin:0 0 3px;letter-spacing:.4px">\u00c7\u0131k\u0131\u015f</p>
+        <p style="color:var(--orange2);font-size:24px;font-weight:900;margin:0;line-height:1">${doneCount}</p>
+      </div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:10px;text-align:center">
+        <p style="color:var(--text3);font-size:8px;font-weight:700;text-transform:uppercase;margin:0 0 3px;letter-spacing:.4px">Toplam</p>
+        <p style="color:var(--text2);font-size:24px;font-weight:900;margin:0;line-height:1">${teamRecs.length}</p>
       </div>
     </div>
 
+    <!-- \u00c7\u0131k\u0131\u015f butonu -->
     ${isPending ? `
-    <div class="card card-glow-amber" style="margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <div style="width:8px;height:8px;border-radius:50%;background:var(--amber);animation:pulse 1.5s infinite;flex-shrink:0"></div>
-        <span style="color:var(--amber);font-size:13px;font-weight:600">\u00c7\u0131k\u0131\u015f Onay\u0131 Bekleniyor</span>
+    <div class="card-glass card-glow-amber" style="padding:14px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber);animation:pulse 1.2s infinite;flex-shrink:0"></div>
+        <span style="color:var(--amber);font-size:13px;font-weight:700">\u00c7\u0131k\u0131\u015f Onay\u0131 Bekleniyor</span>
       </div>
-      <p style="color:var(--text2);font-size:11px;margin:0 0 12px;line-height:1.5">PC'de \u00e7\u0131k\u0131\u015f QR kodu g\u00f6sterildi. Okutmak i\u00e7in a\u015fa\u011f\u0131daki butona bas\u0131n.</p>
-      <button id="scan-co" class="btn btn-danger" style="margin-bottom:6px">${I.cam} \u00c7\u0131k\u0131\u015f QR Okut</button>
+      <p style="color:var(--text2);font-size:11px;margin:0 0 12px;line-height:1.6">PC'de \u00e7\u0131k\u0131\u015f QR kodu g\u00f6sterildi. Okutmak i\u00e7in a\u015fa\u011f\u0131daki butona bas\u0131n.</p>
+      <button id="scan-co" class="btn btn-danger" style="margin-bottom:8px">${I.cam} \u00c7\u0131k\u0131\u015f QR Okut</button>
       <button id="cancel-co2" class="btn btn-ghost" style="font-size:13px">\u0130ptal Et</button>
     </div>` : `
-    <button id="co-btn" class="btn btn-danger" style="margin-bottom:8px">${I.out} \u0130\u015ften \u00c7\u0131k\u0131\u015f Yap</button>`}
+    <button id="co-btn" class="btn btn-danger">${I.out} \u0130\u015ften \u00c7\u0131k\u0131\u015f Yap</button>`}
   </div>`;
 
   updateLiveTimer();
