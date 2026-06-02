@@ -298,7 +298,8 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
         const coMin = new Date(att.check_out).getHours() * 60 + new Date(att.check_out).getMinutes();
         const schEndMin = eH * 60 + eM;
         if (coMin < schEndMin - 5) row.earlyMin = schEndMin - coMin;
-        if (row.workedMin > scheduledMin + 15) row.overtimeMin = row.workedMin - scheduledMin;
+        const netSchedMin = Math.max(0, scheduledMin - calcBreakMin(scheduledMin));
+        if (row.workedMin > netSchedMin + 15) row.overtimeMin = row.workedMin - netSchedMin;
         row.status = row.lateMin > 0 ? 'late' : 'normal';
       } else if (att?.check_in && !att?.check_out) {
         const gross = Math.round((Date.now() - new Date(att.check_in).getTime()) / 60000);
@@ -331,11 +332,11 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
     const avgDailyMin = workDays > 0 ? Math.round(totalWorkedMin / workDays) : 0;
     const suspiciousCount = puantajRows.filter(r => r.suspicious).length;
 
-    // Haftalık hedef karşılaştırma
+    // Haftalık hedef karşılaştırma — net çalışılan / net planlanan
     const weeklyTarget = person.weeklyTargetHours ?? 45;
-    const totalDays = puantajRows.length;
-    const weeks = Math.max(1, totalDays / 7);
-    const expectedTotalMin = weeklyTarget * 60 * weeks;
+    const totalNetScheduledMin = puantajRows.reduce((a, r) => a + Math.max(0, r.scheduledMin - calcBreakMin(r.scheduledMin)), 0);
+    const weeks = Math.max(1, puantajRows.length / 7);
+    const expectedTotalMin = totalNetScheduledMin > 0 ? totalNetScheduledMin : weeklyTarget * 60 * weeks;
     const targetPct = expectedTotalMin > 0 ? Math.round((totalWorkedMin / expectedTotalMin) * 100) : 0;
 
     const totalRevenue = sales.reduce((a, s) => a + toTL(s, rates.usd, rates.eur), 0);
