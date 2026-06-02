@@ -89,13 +89,11 @@ interface FormState {
   phone: string;
   weeklyTargetHours: number;
   isActive: boolean;
+  profileImage: string;
   role: 'personel' | 'genel_mudur';
 }
 
 const emptyForm: FormState = {
-  fullName: '', username: '', password: '', phone: '',
-  weeklyTargetHours: 45, isActive: true, profileImage: '',
-  role: 'personel
   fullName: '', username: '', password: '', phone: '',
   weeklyTargetHours: 45, isActive: true, profileImage: '',
   role: 'personel',
