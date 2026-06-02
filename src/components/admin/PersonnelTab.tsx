@@ -908,6 +908,9 @@ export default function PersonnelTab() {
     if (!form.fullName.trim() || !form.username.trim() || !form.password.trim()) {
       setFormError('Ad soyad, kullanıcı adı ve şifre zorunludur.');
       return;
+    }
+    setSavingForm(true);
+    let success = false;
     const targetKasa = form.role === 'genel_mudur' ? 'genel' : selectedKasa;
     if (editTarget) {
       success = await updatePersonnelInFirebase(editTarget.id, {
@@ -920,13 +923,6 @@ export default function PersonnelTab() {
         isActive: form.isActive,
         role: form.role,
         kasaId: targetKasa,
-        updatedAt: new Date().toISOString(),
-      });
-    } else {
-      const newP: Personnel = {
-        id: `${targetKasa}_${Date.now()}`,
-        kasaId: targetKasa,
-        role: form.rolesa,
         updatedAt: new Date().toISOString(),
       });
     } else {
