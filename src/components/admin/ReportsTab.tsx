@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/config/supabase';
 import type { DatedSale } from '@/utils/performanceDB';
+import { loadExchangeRatesFromSupabase } from '@/utils/dailyData';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type KasaId = 'wildpark' | 'sinema' | 'face2face';
@@ -812,13 +813,9 @@ function KasaView({ kasaId, period, usdRate, eurRate }: KasaViewProps) {
 export default function ReportsTab() {
   const [selectedKasa, setSelectedKasa]   = useState<KasaId | null>(null);
   const [period, setPeriod]               = useState<FilterPeriod>('month');
+  const [rates, setRates]                 = useState({ usd: 30, eur: 50.4877 });
 
-  const rates = useMemo(() => {
-    try {
-      const r = JSON.parse(localStorage.getItem('exchange_rates') || '{}');
-      return { usd: Number(r.usd) || 35, eur: Number(r.eur) || 38 };
-    } catch { return { usd: 35, eur: 38 }; }
-  }, []);
+  useEffect(() => { loadExchangeRatesFromSupabase().then(setRates); }, []);
 
   // Kasa selection screen
   if (!selectedKasa) {

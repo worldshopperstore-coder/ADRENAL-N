@@ -11,6 +11,7 @@ import {
   type DatedSale,
 } from '@/utils/performanceDB';
 import { getAllPersonnelFromFirebase } from '@/utils/personnelSupabaseDB';
+import { loadExchangeRatesFromSupabase } from '@/utils/dailyData';
 import { INITIAL_PACKAGES } from '@/data/packages';
 import type { Personnel } from '@/types/personnel';
 
@@ -668,12 +669,10 @@ export default function PerformanceTab() {
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
   const [shifts, setShifts]       = useState<Record<string, any>>({});
   const [loading, setLoading]     = useState(true);
+  const [rates, setRates]         = useState({ usd: 30, eur: 50.4877 });
 
-  const rates = useMemo(() => {
-    try {
-      const r = JSON.parse(localStorage.getItem('exchange_rates') || '{}');
-      return { usd: Number(r.usd) || 35, eur: Number(r.eur) || 38 };
-    } catch { return { usd: 35, eur: 38 }; }
+  useEffect(() => {
+    loadExchangeRatesFromSupabase().then(setRates);
   }, []);
 
   useEffect(() => {

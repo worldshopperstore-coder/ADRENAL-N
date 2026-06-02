@@ -17,6 +17,7 @@ import {
   type WeekSchedule,
 } from '@/utils/personnelSupabaseDB';
 import { getPersonnelAttendance, getTodayAttendance, type AttendanceRecord } from '@/utils/attendanceDB';
+import { loadExchangeRatesFromSupabase } from '@/utils/dailyData';
 import {
   getAllSalesForDateRange,
   getAllCrossSalesForDateRange,
@@ -189,12 +190,8 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
   const [lf, setLf] = useState({ start: fmtDate(today), end: fmtDate(today), type: 'yillik' as LeaveType, note: '' });
   const [leaveSaving, setLeaveSaving] = useState(false);
 
-  const rates = useMemo(() => {
-    try {
-      const r = JSON.parse(localStorage.getItem('exchange_rates') || '{}');
-      return { usd: Number(r.usd) || 35, eur: Number(r.eur) || 38 };
-    } catch { return { usd: 35, eur: 38 }; }
-  }, []);
+  const [rates, setRates] = useState({ usd: 30, eur: 50.4877 });
+  useEffect(() => { loadExchangeRatesFromSupabase().then(setRates); }, []);
 
   const loadData = useCallback(() => {
     setLoading(true);
