@@ -78,12 +78,14 @@ export default function CrossSalesAccountingTab() {
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [allPackages, setAllPackages] = useState<PackageItem[]>([]);
   const [salesData, setSalesData] = useState<{ date: string; kasaId: KasaId; sales: SaleItem[] }[]>([]);
-  // Günlük kur geçmişi: key = date (YYYY-MM-DD)
   const [dailyRates, setDailyRates] = useState<Map<string, { usd: number; eur: number }>>(new Map());
+  // Hangi günler önceki günün kuruyla hesaplandı
+  const [carriedRateDates, setCarriedRateDates] = useState<Set<string>>(new Set());
+  const [noRateAtAll, setNoRateAtAll] = useState(false);
 
-  // Helper: o günün kurunu getir
-  const getRates = (date: string): { usd: number; eur: number } => {
-    return dailyRates.get(date) || { usd: 30, eur: 50.4877 };
+  // O günün kurunu getir — sadece gerçek/devralınan kurdan (hardcoded fallback YOK)
+  const getRates = (date: string): { usd: number; eur: number } | null => {
+    return dailyRates.get(date) ?? null;
   };
 
   // Fetch data
@@ -122,8 +124,10 @@ export default function CrossSalesAccountingTab() {
         }
       }
 
-      // Günlük kur geçmişini yükle (tüm kasalar için ortak)
+      // Günlük kur geçmişini yükle
       const ratesMap = new Map<string, { usd: number; eur: number }>();
+
+      // Bu ayın kurlarını yükle
       const { data: ratesData } = await supabase
         .from('daily_rates')
         .select('date, usd, eur')
@@ -131,9 +135,39 @@ export default function CrossSalesAccountingTab() {
         .lte('date', endDate);
       if (ratesData) {
         for (const r of ratesData) {
-          ratesMap.set(r.date, { usd: Number(r.usd) || 30, eur: Number(r.eur) || 33 });
+          ratesMap.set(r.date, { usd: Number(r.usd), eur: Number(r.eur) });
         }
       }
+
+      // Bu aydan önceki en son girilen kuru bul (carry-forward başlangıç noktası)
+      const { data: prevRateData } = await supabase
+        .from('daily_rates')
+        .select('date, usd, eur')
+        .lt('date', startDate)
+        .order('date', { ascending: false })
+        .limit(1);
+
+      let lastKnownRate: { usd: number; eur: number } | null =
+        prevRateData?.[0]
+          ? { usd: Number(prevRateData[0].usd), eur: Number(prevRateData[0].eur) }
+          : null;
+
+      // Ay içindeki eksik günleri carry-forward ile doldur
+      const carried = new Set<string>();
+      for (let d = 1; d <= lastDay; d++) {
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        if (ratesMap.has(dateStr)) {
+          lastKnownRate = ratesMap.get(dateStr)!;
+        } else if (lastKnownRate) {
+          ratesMap.set(dateStr, lastKnownRate);
+          carried.add(dateStr);
+        }
+        // lastKnownRate hâlâ null ise: o gün için kur yok, hesaplanamaz
+      }
+
+      const hasAnyRate = ratesMap.size > 0;
+      setNoRateAtAll(!hasAnyRate);
+      setCarriedRateDates(carried);
       setDailyRates(ratesMap);
 
       setSalesData(salesResults);
@@ -157,6 +191,7 @@ export default function CrossSalesAccountingTab() {
   const calcPruvaShareTL = (sale: SaleItem, kasaId: KasaId, date: string): number => {
     const isCross = sale.isCrossSale || sale.category?.startsWith('Çapraz');
     const rates = getRates(date);
+    if (!rates) return 0; // O gün için kur girilmemiş, hesaplanamaz
     const saleTotalTL = sale.kkTl + sale.cashTl + (sale.cashUsd * rates.usd) + (sale.cashEur * rates.eur);
 
     if (!isCross) {
@@ -248,9 +283,10 @@ export default function CrossSalesAccountingTab() {
           const sales = kasaSalesMap.get(`${kasaId}|${date}`) || [];
           for (const sale of sales) {
             const isCross = !!(sale.isCrossSale || sale.category?.startsWith('Çapraz'));
-            if (!isCross) continue; // Only cross-sales matter for mutabakat
+            if (!isCross) continue;
 
             const rates = getRates(date);
+            if (!rates) continue; // Kur girilmemiş gün — hesaplamaya dahil etme
             const saleTotalTL = sale.kkTl + sale.cashTl + (sale.cashUsd * rates.usd) + (sale.cashEur * rates.eur);
             const pruvaShare = calcPruvaShareTL(sale, kasaId, date);
             const adrShare = saleTotalTL - pruvaShare;
@@ -477,6 +513,9 @@ ${hakEdisSection}
                         <span className="flex items-center gap-1.5">
                           <ChevronDown className={`w-3 h-3 text-gray-600 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
                           {fmtTR(r.date)}
+                          {carriedRateDates.has(r.date) && (
+                            <span className="text-amber-400 text-[9px] font-bold" title="Önceki günün kuru kullanıldı">↩ devr.</span>
+                          )}
                         </span>
                       </td>
                       <td className="px-3 py-2 text-right text-emerald-400 font-semibold">{fmtNum(r.pruvaPayi)}</td>
@@ -596,6 +635,26 @@ ${hakEdisSection}
           </div>
         </div>
       </div>
+
+      {/* Kur uyarıları */}
+      {!loading && noRateAtAll && (
+        <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
+          <span className="text-red-400 text-lg leading-none mt-0.5">⚠</span>
+          <div>
+            <p className="text-red-400 font-semibold text-sm">Kur Verisi Bulunamadı</p>
+            <p className="text-red-400/70 text-xs mt-0.5">Bu dönem için hiç döviz kuru girilmemiş. Sidebar'dan kur girerek hesaplamayı başlatın.</p>
+          </div>
+        </div>
+      )}
+      {!loading && !noRateAtAll && carriedRateDates.size > 0 && (
+        <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+          <span className="text-amber-400 text-lg leading-none mt-0.5">⚠</span>
+          <div>
+            <p className="text-amber-400 font-semibold text-sm">{carriedRateDates.size} gün için kur girilmemiş</p>
+            <p className="text-amber-400/70 text-xs mt-0.5">Bu günlerde önceki günün kuru kullanıldı. Tabloda <span className="font-bold">↩</span> işareti olan satırlar bunlar.</p>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-20 text-gray-500 text-sm">Veriler yükleniyor...</div>
