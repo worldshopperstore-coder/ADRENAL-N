@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import path from 'path';
 import { registerPosIpcHandlers, cleanupBridge, startBridgeExe } from './posIpc';
+import { autoUpdater } from 'electron-updater';
 
 // GPU sorunlarını önle (RDP / VM ortamları için)
 app.disableHardwareAcceleration();
@@ -57,6 +58,49 @@ app.on('ready', () => {
   ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized() ?? false);
 
   createWindow();
+    // ── Otomatik Güncelleme ─────────────────────────────────
+    try {
+      autoUpdater.autoDownload = false;
+      autoUpdater.autoInstallOnAppQuit = true;
+
+      autoUpdater.on('update-available', (info) => {
+        console.log('[UPDATER] Güncelleme mevcut:', info.version);
+        mainWindow?.webContents.send('updater:update-available', { version: info.version });
+      });
+
+      autoUpdater.on('download-progress', (progress) => {
+        mainWindow?.webContents.send('updater:download-progress', { percent: Math.round(progress.percent) });
+      });
+
+      autoUpdater.on('update-downloaded', () => {
+        console.log('[UPDATER] Güncelleme indirildi, yeniden başlatılacak');
+        mainWindow?.webContents.send('updater:update-downloaded');
+      });
+
+      autoUpdater.on('error', (err) => {
+        console.error('[UPDATER] Hata:', err?.message || err);
+      });
+
+      ipcMain.handle('updater:check', async () => {
+        try {
+          const result = await autoUpdater.checkForUpdates();
+          return { available: !!result?.updateInfo, version: result?.updateInfo?.version };
+        } catch { return { available: false }; }
+      });
+
+      ipcMain.handle('updater:download', async () => {
+        try { await autoUpdater.downloadUpdate(); return { success: true }; }
+        catch (e: any) { return { success: false, error: e.message }; }
+      });
+
+      ipcMain.handle('updater:install', () => {
+        autoUpdater.quitAndInstall();
+      });
+
+      setTimeout(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 5000);
+    } catch (e) {
+      console.warn('[UPDATER] Başlatılamadı:', e);
+    }
 
   // pos_bridge EXE otomatik başlat
   const isDevEnv = !!process.env.VITE_DEV_SERVER_URL;
