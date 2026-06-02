@@ -187,7 +187,34 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
 
   // ── Puantaj Analysis ──────────────────────────────────────────────────
   const puantajRows = useMemo<PuantajRow[]>(() => {
-    if (!schedule) return [];
+    if (!schedule) {
+      // Vardiya tanımsız (YD gibi) — sadece yoklama kayıtlarından satır oluştur
+      return attendance
+        .map(att => {
+          const workedMin = att.check_in && att.check_out
+            ? Math.round((new Date(att.check_out).getTime() - new Date(att.check_in).getTime()) / 60000)
+            : att.check_in && att.status !== 'checked_out'
+            ? Math.round((Date.now() - new Date(att.check_in).getTime()) / 60000)
+            : 0;
+          return {
+            date: att.date,
+            dayKey: dateToWeekDay(att.date),
+            scheduledStart: null,
+            scheduledEnd: null,
+            scheduledMin: 0,
+            actualStart: att.check_in ? new Date(att.check_in).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null,
+            actualEnd: att.check_out ? new Date(att.check_out).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null,
+            workedMin,
+            lateMin: 0,
+            earlyMin: 0,
+            overtimeMin: 0,
+            status: att.check_in ? 'normal' as const : 'no_record' as const,
+            leaveRecord: null,
+            attendance: att,
+          };
+        })
+        .sort((a, b) => b.date.localeCompare(a.date));
+    }
     const rows: PuantajRow[] = [];
     const d = new Date(startDate + 'T00:00:00');
     const end = new Date(endDate + 'T00:00:00');
@@ -344,10 +371,11 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
   };
 
   const kasa = KASAS.find(k => k.id === person.kasaId);
+  const isYD = person.kasaId === 'yasam_destek';
   const TABS = [
     { id: 'overview' as const, label: 'Genel Bakış', icon: BarChart2 },
     { id: 'puantaj' as const, label: 'Puantaj', icon: Clock },
-    { id: 'sales' as const, label: 'Satış Detay', icon: TrendingUp },
+    ...(!isYD ? [{ id: 'sales' as const, label: 'Satış Detay', icon: TrendingUp }] : []),
     { id: 'leaves' as const, label: 'İzinler', icon: Umbrella },
   ];
 
@@ -496,35 +524,37 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
                     </div>
                   </div>
 
-                  {/* Sales Summary */}
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: 'Toplam Ciro', value: `₺${fmtNum(summary.totalRevenue)}`, icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-                      { label: 'Kişi Sayısı', value: fmtNum(summary.totalPersons), icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-                      { label: 'Çapraz Satış', value: String(summary.crossCount), icon: ArrowLeftRight, color: 'text-orange-400', bg: 'bg-orange-500/10' },
-                    ].map(m => (
-                      <div key={m.label} className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-3 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-7 h-7 rounded-lg ${m.bg} flex items-center justify-center`}>
-                            <m.icon className={`w-3.5 h-3.5 ${m.color}`} />
+                  {/* Sales Summary — YD'de gösterilmez */}
+                  {!isYD && (
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { label: 'Toplam Ciro', value: `₺${fmtNum(summary.totalRevenue)}`, icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+                        { label: 'Kişi Sayısı', value: fmtNum(summary.totalPersons), icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+                        { label: 'Çapraz Satış', value: String(summary.crossCount), icon: ArrowLeftRight, color: 'text-orange-400', bg: 'bg-orange-500/10' },
+                      ].map(m => (
+                        <div key={m.label} className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-3 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-7 h-7 rounded-lg ${m.bg} flex items-center justify-center`}>
+                              <m.icon className={`w-3.5 h-3.5 ${m.color}`} />
+                            </div>
+                            <span className="text-xs text-gray-500">{m.label}</span>
                           </div>
-                          <span className="text-xs text-gray-500">{m.label}</span>
+                          <p className={`text-xl font-bold ${m.color}`}>{m.value}</p>
                         </div>
-                        <p className={`text-xl font-bold ${m.color}`}>{m.value}</p>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
 
               {/* ═══ PUANTAJ TAB ═══ */}
               {activeTab === 'puantaj' && (
                 <>
-                  {!schedule ? (
+                  {puantajRows.length === 0 ? (
                     <div className="text-center py-10 text-gray-600">
                       <Clock className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                      <p className="text-sm">Bu personel için vardiya planı tanımlanmamış.</p>
-                      <p className="text-xs text-gray-700 mt-1">Vardiya planı tanımlayarak geç gelme, erken çıkma ve devamsızlık takibi yapabilirsiniz.</p>
+                      <p className="text-sm">Bu dönem için yoklama kaydı bulunamadı.</p>
+                      {!schedule && <p className="text-xs text-gray-700 mt-1">Vardiya planı tanımlayarak geç gelme, erken çıkma ve devamsızlık takibi yapabilirsiniz.</p>}
                     </div>
                   ) : (
                     <>
