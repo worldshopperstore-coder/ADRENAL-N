@@ -83,7 +83,7 @@ export default function CrossSalesAccountingTab() {
 
   // Helper: o günün kurunu getir
   const getRates = (date: string): { usd: number; eur: number } => {
-    return dailyRates.get(date) || { usd: 30, eur: 33 };
+    return dailyRates.get(date) || { usd: 30, eur: 50.4877 };
   };
 
   // Fetch data
