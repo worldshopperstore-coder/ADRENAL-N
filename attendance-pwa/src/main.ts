@@ -95,7 +95,7 @@ async function tryRecoverSession(): Promise<boolean> {
 }
 
 // ── Constants ──
-const KASA_NAMES: Record<string, string> = { wildpark: 'WildPark', sinema: 'XD Sinema', face2face: 'Face2Face', genel: 'Genel Yönetim' };
+const KASA_NAMES: Record<string, string> = { wildpark: 'WildPark', sinema: 'XD Sinema', face2face: 'Face2Face', genel: 'Genel Yönetim', yasam_destek: 'Yaşam Destek' };
 const LEAVE_COLORS: Record<string, string> = { 'Yıllık İzin': '#3b82f6', 'Hastalık İzni': '#ef4444', 'Mazeret İzni': '#f59e0b', 'İzin': '#ea580c' };
 const DAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -286,9 +286,11 @@ async function startScanner(mode: 'checkin' | 'checkout') {
         let token = '';
         try { const url = new URL(decoded); token = url.searchParams.get('token') || ''; } catch { token = decoded; }
         if (mode === 'checkin') {
+          if (token.startsWith('YD-')) { await handleYDCheckin(); return; }
           if (!token.startsWith('ATT-')) { showError('Ge\u00e7ersiz QR kod.'); return; }
           showProcessing('Yoklama onaylan\u0131yor...'); await handleCheckin(token);
         } else {
+          if (token.startsWith('YD-')) { showProcessing('\u00c7\u0131k\u0131\u015f onaylan\u0131yor...'); await handleYDCheckout(); return; }
           if (!token.startsWith('OUT-')) { showError('Ge\u00e7ersiz \u00e7\u0131k\u0131\u015f QR kodu.'); return; }
           showProcessing('\u00c7\u0131k\u0131\u015f onaylan\u0131yor...'); await handleCheckoutScan(token);
         }
@@ -656,6 +658,7 @@ async function renderHome(c: HTMLElement) {
   } else {
     document.getElementById('co-btn')?.addEventListener('click', async () => {
       if (!currentUser || !currentAttendance) return;
+      if (currentUser.kasaId === 'yasam_destek') { showScanner('checkout'); return; }
       const tk = `OUT-${currentUser.id}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
       showScanner('checkout');
       try {
@@ -855,6 +858,197 @@ async function renderSchedule(c: HTMLElement) {
       </div>`;
     }).join('') : '<p style="color:var(--text3);font-size:11px;text-align:center;padding:16px">Kay\u0131t yok</p>'}
   </div>`;
+}
+
+// ════════════════════════════════════════
+// YAŞAM DESTEK (YD) MODE
+// ════════════════════════════════════════
+
+function saveYDUser(user: PersonnelInfo) {
+  localStorage.setItem('yd_user', JSON.stringify(user));
+}
+
+function loadYDUser(): PersonnelInfo | null {
+  try {
+    const u = localStorage.getItem('yd_user');
+    return u ? JSON.parse(u) : null;
+  } catch { return null; }
+}
+
+async function handleYDCheckin() {
+  const saved = loadYDUser();
+  if (!saved) { showYDLoginForm(); return; }
+  await doYDCheckin(saved);
+}
+
+async function handleYDCheckout() {
+  if (!currentUser || !currentAttendance) { showError('Oturum bulunamadı. Lütfen tekrar QR okutun.'); return; }
+  try {
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('attendance')
+      .update({ status: 'checked_out', check_out: now, checkout_token: null })
+      .eq('id', currentAttendance.id)
+      .in('status', ['checked_in', 'checkout_pending']);
+    if (error) { showError('Çıkış kaydedilemedi'); return; }
+    clearSession(false);
+    showSuccess('Güle Güle!', currentUser.fullName,
+      new Date(now).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), false);
+  } catch {
+    showError('Çıkış kaydedilemedi. İnternet bağlantınızı kontrol edin.');
+  }
+}
+
+async function doYDCheckin(user: PersonnelInfo) {
+  showProcessing('Giriş kaydediliyor...');
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const rowId = `${user.id}_${today}`;
+    const { data: existing } = await supabase.from('attendance').select('*').eq('id', rowId).single();
+
+    if (existing?.status === 'checked_out') {
+      showYDDoneToday(user, existing as AttendanceRecord);
+      return;
+    }
+    if (existing?.status === 'checked_in' || existing?.status === 'checkout_pending') {
+      currentUser = user;
+      currentAttendance = existing as AttendanceRecord;
+      saveSession(user, existing as AttendanceRecord);
+      showDashboard();
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const sessionToken = `ATT-${user.id}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    const { error } = await supabase.from('attendance').upsert([{
+      id: rowId,
+      personnel_id: user.id,
+      personnel_name: user.fullName,
+      kasa_id: user.kasaId,
+      date: today,
+      status: 'checked_in',
+      check_in: now,
+      check_out: null,
+      session_token: sessionToken,
+    }], { onConflict: 'id' });
+
+    if (error) { showError('Giriş kaydedilemedi'); return; }
+
+    const att: AttendanceRecord = {
+      id: rowId, personnel_id: user.id, personnel_name: user.fullName,
+      kasa_id: user.kasaId, date: today, check_in: now, check_out: null,
+      status: 'checked_in', session_token: sessionToken,
+    };
+    currentUser = user;
+    currentAttendance = att;
+    saveSession(user, att);
+    showSuccess('Hoş Geldiniz!', user.fullName,
+      new Date(now).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), true);
+  } catch (e: any) {
+    if (e?.message?.includes('Failed to fetch') || e?.message?.includes('NetworkError')) {
+      showError('İnternet bağlantısı kurulamadı. WiFi veya mobil verinizi kontrol edin.');
+    } else {
+      showError('Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.');
+    }
+  }
+}
+
+function showYDLoginForm() {
+  stopLiveTimer();
+  document.getElementById('app')!.innerHTML = `${CSS}
+    <div class="page">
+      ${WAVE}
+      <div class="page-content" style="align-items:center;justify-content:center;padding:0 20px">
+        <div style="width:100%;max-width:340px" class="fade-in">
+          <div style="text-align:center;margin-bottom:28px">
+            <div style="width:60px;height:60px;margin:0 auto 12px;background:linear-gradient(135deg,var(--orange),#ea580c);border-radius:18px;display:flex;align-items:center;justify-content:center;color:#fff">
+              ${I.flame}
+            </div>
+            <h1 style="font-size:20px;font-weight:800;letter-spacing:-.3px">Yaşam Destek</h1>
+            <p style="color:var(--text2);font-size:12px;margin-top:4px">İlk giriş — kimliğinizi doğrulayın</p>
+          </div>
+          <div id="yd-error" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:12px;padding:10px 14px;color:var(--red);font-size:12px;text-align:center;margin-bottom:12px"></div>
+          <div style="margin-bottom:10px">
+            <input id="yd-user" type="text" placeholder="Kullanıcı Adı" autocomplete="username"
+              style="width:100%;padding:14px 16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:14px;color:#fff;font-size:14px;outline:none;-webkit-appearance:none" />
+          </div>
+          <div style="margin-bottom:20px">
+            <input id="yd-pass" type="password" placeholder="Şifre" autocomplete="current-password"
+              style="width:100%;padding:14px 16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:14px;color:#fff;font-size:14px;outline:none;-webkit-appearance:none" />
+          </div>
+          <button id="yd-submit" class="btn btn-primary">${I.ok} Giriş Yap</button>
+        </div>
+      </div>
+    </div>`;
+
+  const userEl = document.getElementById('yd-user') as HTMLInputElement;
+  const passEl = document.getElementById('yd-pass') as HTMLInputElement;
+  const errEl  = document.getElementById('yd-error') as HTMLElement;
+  const btnEl  = document.getElementById('yd-submit') as HTMLButtonElement;
+
+  const attempt = async () => {
+    const username = userEl.value.trim();
+    const password = passEl.value.trim();
+    if (!username || !password) {
+      errEl.style.display = 'block'; errEl.textContent = 'Kullanıcı adı ve şifre giriniz'; return;
+    }
+    btnEl.disabled = true;
+    btnEl.innerHTML = `<div style="width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite"></div>`;
+    try {
+      const { data, error } = await supabase
+        .from('personnel')
+        .select('id, fullName, kasaId, role')
+        .ilike('username', username)
+        .eq('password', password)
+        .eq('kasaId', 'yasam_destek')
+        .eq('isActive', true)
+        .single();
+      if (error || !data) {
+        errEl.style.display = 'block'; errEl.textContent = 'Kullanıcı adı veya şifre hatalı!';
+        btnEl.disabled = false; btnEl.innerHTML = `${I.ok} Giriş Yap`; passEl.value = ''; return;
+      }
+      const user: PersonnelInfo = { id: data.id, fullName: data.fullName, kasaId: data.kasaId, role: data.role };
+      saveYDUser(user);
+      await doYDCheckin(user);
+    } catch {
+      errEl.style.display = 'block'; errEl.textContent = 'Bağlantı hatası. İnternet bağlantınızı kontrol edin.';
+      btnEl.disabled = false; btnEl.innerHTML = `${I.ok} Giriş Yap`;
+    }
+  };
+
+  btnEl.addEventListener('click', attempt);
+  passEl.addEventListener('keydown', e => { if (e.key === 'Enter') attempt(); });
+  userEl.addEventListener('keydown', e => { if (e.key === 'Enter') passEl.focus(); });
+}
+
+function showYDDoneToday(user: PersonnelInfo, att: AttendanceRecord) {
+  stopLiveTimer();
+  const ci = att.check_in  ? new Date(att.check_in).toLocaleTimeString('tr-TR',  { hour: '2-digit', minute: '2-digit' }) : '--:--';
+  const co = att.check_out ? new Date(att.check_out).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+  document.getElementById('app')!.innerHTML = `${CSS}
+    <div class="page" style="align-items:center;justify-content:center">
+      ${WAVE}
+      <div style="position:relative;z-index:2;text-align:center;padding:24px;max-width:340px;width:100%" class="scale-in">
+        <div style="width:80px;height:80px;margin:0 auto 20px;background:rgba(249,115,22,.1);border:3px solid rgba(249,115,22,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--orange)">
+          ${I.ok}
+        </div>
+        <h1 style="font-size:22px;font-weight:800;margin:0 0 4px">Bugün Tamamlandı</h1>
+        <p style="color:var(--orange);font-size:16px;font-weight:600;margin:0 0 20px">${esc(user.fullName)}</p>
+        <div class="card" style="padding:16px;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-around;align-items:center">
+            <div style="text-align:center">
+              <p style="color:var(--text3);font-size:9px;margin:0 0 4px;text-transform:uppercase;letter-spacing:.5px">Giriş</p>
+              <p style="color:var(--green);font-size:22px;font-weight:800;margin:0">${ci}</p>
+            </div>
+            <div style="color:var(--text3);font-size:18px">→</div>
+            <div style="text-align:center">
+              <p style="color:var(--text3);font-size:9px;margin:0 0 4px;text-transform:uppercase;letter-spacing:.5px">Çıkış</p>
+              <p style="color:var(--red);font-size:22px;font-weight:800;margin:0">${co}</p>
+            </div>
+          </div>
+        </div>
+        <p style="color:var(--text3);font-size:11px;line-height:1.6">Bugün için çıkış yapıldı.<br>İyi akşamlar, ${esc(user.fullName.split(' ')[0])}!</p>
+      </div>
+    </div>`;
 }
 
 // ── Init ──
