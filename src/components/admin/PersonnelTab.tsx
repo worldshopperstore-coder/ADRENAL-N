@@ -37,7 +37,6 @@ const KASAS = [
   { id: 'sinema' as KasaId,   name: 'Sinema',   Icon: Monitor,   accent: 'violet',  text: 'text-violet-400',  bg: 'bg-violet-500/10',  borderAccent: 'border-violet-500/20'  },
   { id: 'face2face' as KasaId,name: 'Face2Face', Icon: Users2,    accent: 'sky',     text: 'text-sky-400',     bg: 'bg-sky-500/10',     borderAccent: 'border-sky-500/20'     },
   { id: 'genel' as KasaId,    name: 'Genel Müdür', Icon: User,     accent: 'amber',   text: 'text-amber-400',   bg: 'bg-amber-500/10',   borderAccent: 'border-amber-500/20'   },
-  { id: 'genel' as KasaId,    name: 'Genel Müdür', Icon: User,     accent: 'amber',   text: 'text-amber-400',   bg: 'bg-amber-500/10',   borderAccent: 'border-amber-500/20'   },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -878,7 +877,6 @@ export default function PersonnelTab() {
       username: p.username,
       password: p.password,
       phone: p.phone || '',
-      role: p.role,
       weeklyTargetHours: p.weeklyTargetHours ?? 45,
       isActive: p.isActive,
       profileImage: p.profileImage || '',
