@@ -7,7 +7,6 @@ import {
 import {
   getAllSalesForDateRange,
   getAllCrossSalesForDateRange,
-  getShiftsAll,
   type DatedSale,
 } from '@/utils/performanceDB';
 import { getAllPersonnelFromFirebase } from '@/utils/personnelSupabaseDB';
@@ -667,7 +666,6 @@ export default function PerformanceTab() {
   const [sales, setSales]         = useState<DatedSale[]>([]);
   const [crossSales, setCross]    = useState<DatedSale[]>([]);
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
-  const [shifts, setShifts]       = useState<Record<string, any>>({});
   const [loading, setLoading]     = useState(true);
   const [rates, setRates]         = useState({ usd: 30, eur: 50.4877 });
 
@@ -682,12 +680,10 @@ export default function PerformanceTab() {
       getAllSalesForDateRange(start, end),
       getAllCrossSalesForDateRange(start, end),
       getAllPersonnelFromFirebase(),
-      getShiftsAll(),
-    ]).then(([s, cs, p, sh]) => {
+    ]).then(([s, cs, p]) => {
       setSales(s);
       setCross(cs);
       setPersonnel(p);
-      setShifts(sh);
       setLoading(false);
     }).catch(err => {
       console.error('Performans verileri yüklenirken hata:', err);
