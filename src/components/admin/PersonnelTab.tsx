@@ -3,7 +3,7 @@ import {
   Users, Plus, Edit2, Trash2, ArrowLeft, Search, CheckCircle, XCircle,
   TreePine, Monitor, Users2, Camera, X, Calendar, TrendingUp, Package,
   ArrowLeftRight, Star, BarChart2, Clock, Phone, User, Lock, Eye, EyeOff, MapPin,
-  AlertTriangle, Timer, Coffee, Umbrella, PlusCircle, Minus,
+  AlertTriangle, Timer, Coffee, Umbrella, PlusCircle, Minus, Download, ChevronDown,
 } from 'lucide-react';
 import type { Personnel } from '@/types/personnel';
 import {
@@ -132,13 +132,44 @@ interface PuantajRow {
   scheduledMin: number;
   actualStart: string | null;
   actualEnd: string | null;
-  workedMin: number;
-  lateMin: number;      // geç gelme
-  earlyMin: number;     // erken çıkma
-  overtimeMin: number;  // fazla mesai
+  grossWorkedMin: number; // moladan önce
+  breakMin: number;       // yasal mola düşümü
+  workedMin: number;      // net (mola düşüldü)
+  lateMin: number;
+  earlyMin: number;
+  overtimeMin: number;
+  suspicious: boolean;    // 16s+ = eksik çıkış şüphesi
   status: 'normal' | 'late' | 'absent' | 'leave' | 'off' | 'no_record';
   leaveRecord: LeaveRecord | null;
   attendance: AttendanceRecord | null;
+}
+
+function calcBreakMin(workedMin: number): number {
+  if (workedMin >= 7.5 * 60) return 60;
+  if (workedMin >= 4 * 60) return 30;
+  return 0;
+}
+
+function getISOWeek(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay() || 7;
+  d.setDate(d.getDate() + 4 - day);
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+function calendarCellColor(row: PuantajRow | undefined): string {
+  if (!row) return 'bg-gray-800/20 text-gray-700';
+  if (row.suspicious) return 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
+  switch (row.status) {
+    case 'normal':  return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/20';
+    case 'late':    return 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/20';
+    case 'absent':  return 'bg-red-500/20 text-red-400 border border-red-500/20';
+    case 'leave':   return 'bg-blue-500/20 text-blue-300 border border-blue-500/20';
+    case 'off':     return row.grossWorkedMin > 0 ? 'bg-orange-500/20 text-orange-300 border border-orange-500/20' : 'bg-gray-700/20 text-gray-600';
+    default:        return 'bg-gray-800/20 text-gray-600';
+  }
 }
 
 function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose: () => void }) {
@@ -152,7 +183,7 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
   const [schedule, setSchedule] = useState<WeekSchedule | null>(null);
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'puantaj' | 'sales' | 'leaves'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'puantaj' | 'sales' | 'leaves' | 'takvim'>('overview');
   // leave form
   const [leaveForm, setLeaveForm] = useState(false);
   const [lf, setLf] = useState({ start: fmtDate(today), end: fmtDate(today), type: 'yillik' as LeaveType, note: '' });
@@ -188,26 +219,25 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
   // ── Puantaj Analysis ──────────────────────────────────────────────────
   const puantajRows = useMemo<PuantajRow[]>(() => {
     if (!schedule) {
-      // Vardiya tanımsız (YD gibi) — sadece yoklama kayıtlarından satır oluştur
       return attendance
         .map(att => {
-          const workedMin = att.check_in && att.check_out
+          const gross = att.check_in && att.check_out
             ? Math.round((new Date(att.check_out).getTime() - new Date(att.check_in).getTime()) / 60000)
             : att.check_in && att.status !== 'checked_out'
             ? Math.round((Date.now() - new Date(att.check_in).getTime()) / 60000)
             : 0;
+          const brk = calcBreakMin(gross);
           return {
             date: att.date,
             dayKey: dateToWeekDay(att.date),
-            scheduledStart: null,
-            scheduledEnd: null,
-            scheduledMin: 0,
+            scheduledStart: null, scheduledEnd: null, scheduledMin: 0,
             actualStart: att.check_in ? new Date(att.check_in).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null,
             actualEnd: att.check_out ? new Date(att.check_out).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null,
-            workedMin,
-            lateMin: 0,
-            earlyMin: 0,
-            overtimeMin: 0,
+            grossWorkedMin: gross,
+            breakMin: brk,
+            workedMin: Math.max(0, gross - brk),
+            lateMin: 0, earlyMin: 0, overtimeMin: 0,
+            suspicious: gross > 16 * 60,
             status: att.check_in ? 'normal' as const : 'no_record' as const,
             leaveRecord: null,
             attendance: att,
@@ -234,10 +264,9 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
         scheduledMin,
         actualStart: att?.check_in ? new Date(att.check_in).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null,
         actualEnd: att?.check_out ? new Date(att.check_out).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null,
-        workedMin: 0,
-        lateMin: 0,
-        earlyMin: 0,
-        overtimeMin: 0,
+        grossWorkedMin: 0, breakMin: 0, workedMin: 0,
+        lateMin: 0, earlyMin: 0, overtimeMin: 0,
+        suspicious: false,
         status: 'no_record',
         leaveRecord: leave,
         attendance: att || null,
@@ -247,40 +276,36 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
         row.status = 'leave';
       } else if (daySchedule.isOff) {
         row.status = 'off';
-        // Off günde çalıştıysa -> fazla mesai
         if (att?.check_in && att?.check_out) {
-          row.workedMin = Math.round((new Date(att.check_out).getTime() - new Date(att.check_in).getTime()) / 60000);
+          const gross = Math.round((new Date(att.check_out).getTime() - new Date(att.check_in).getTime()) / 60000);
+          const brk = calcBreakMin(gross);
+          row.grossWorkedMin = gross; row.breakMin = brk;
+          row.workedMin = Math.max(0, gross - brk);
           row.overtimeMin = row.workedMin;
+          row.suspicious = gross > 16 * 60;
         }
       } else if (att?.check_in && att?.check_out) {
-        row.workedMin = Math.round((new Date(att.check_out).getTime() - new Date(att.check_in).getTime()) / 60000);
-        // Geç gelme: actual check_in vs scheduled start
+        const gross = Math.round((new Date(att.check_out).getTime() - new Date(att.check_in).getTime()) / 60000);
+        const brk = calcBreakMin(gross);
+        row.grossWorkedMin = gross; row.breakMin = brk;
+        row.workedMin = Math.max(0, gross - brk);
+        row.suspicious = gross > 16 * 60;
         const [schH, schM] = daySchedule.startTime.split(':').map(Number);
-        const ciDate = new Date(att.check_in);
-        const ciMin = ciDate.getHours() * 60 + ciDate.getMinutes();
+        const ciMin = new Date(att.check_in).getHours() * 60 + new Date(att.check_in).getMinutes();
         const schStartMin = schH * 60 + schM;
-        if (ciMin > schStartMin + 5) { // 5dk tolerans
-          row.lateMin = ciMin - schStartMin;
-        }
-        // Erken çıkma: actual check_out vs scheduled end
+        if (ciMin > schStartMin + 5) row.lateMin = ciMin - schStartMin;
         const [eH, eM] = daySchedule.endTime.split(':').map(Number);
-        const coDate = new Date(att.check_out);
-        const coMin = coDate.getHours() * 60 + coDate.getMinutes();
+        const coMin = new Date(att.check_out).getHours() * 60 + new Date(att.check_out).getMinutes();
         const schEndMin = eH * 60 + eM;
-        if (coMin < schEndMin - 5) { // 5dk tolerans
-          row.earlyMin = schEndMin - coMin;
-        }
-        // Fazla mesai: scheduled'den fazla çalışma
-        if (row.workedMin > scheduledMin + 15) { // 15dk tolerans
-          row.overtimeMin = row.workedMin - scheduledMin;
-        }
+        if (coMin < schEndMin - 5) row.earlyMin = schEndMin - coMin;
+        if (row.workedMin > scheduledMin + 15) row.overtimeMin = row.workedMin - scheduledMin;
         row.status = row.lateMin > 0 ? 'late' : 'normal';
       } else if (att?.check_in && !att?.check_out) {
-        // Henüz çıkış yapmamış (hala çalışıyor)
-        row.workedMin = Math.round((Date.now() - new Date(att.check_in).getTime()) / 60000);
+        const gross = Math.round((Date.now() - new Date(att.check_in).getTime()) / 60000);
+        row.grossWorkedMin = gross; row.breakMin = 0; row.workedMin = gross;
+        row.suspicious = gross > 16 * 60;
         row.status = 'normal';
       } else if (scheduledMin > 0 && dateStr <= fmtDate(today)) {
-        // Vardiyası var ama hiç giriş yapmamış = devamsızlık
         row.status = 'absent';
       }
 
@@ -293,6 +318,7 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
   // ── Summary Stats ─────────────────────────────────────────────────────
   const summary = useMemo(() => {
     const totalWorkedMin = puantajRows.reduce((a, r) => a + r.workedMin, 0);
+    const totalBreakMin = puantajRows.reduce((a, r) => a + r.breakMin, 0);
     const totalScheduledMin = puantajRows.reduce((a, r) => a + r.scheduledMin, 0);
     const totalOvertimeMin = puantajRows.reduce((a, r) => a + r.overtimeMin, 0);
     const totalLateMin = puantajRows.reduce((a, r) => a + r.lateMin, 0);
@@ -303,6 +329,7 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
     const leaveDays = countLeaveDays(leaves, startDate, endDate);
     const offDays = puantajRows.filter(r => r.status === 'off' && r.workedMin === 0).length;
     const avgDailyMin = workDays > 0 ? Math.round(totalWorkedMin / workDays) : 0;
+    const suspiciousCount = puantajRows.filter(r => r.suspicious).length;
 
     // Haftalık hedef karşılaştırma
     const weeklyTarget = person.weeklyTargetHours ?? 45;
@@ -315,8 +342,8 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
     const totalPersons = sales.reduce((a, s) => a + (s.adultQty || 0) + (s.childQty || 0), 0);
 
     return {
-      totalWorkedMin, totalScheduledMin, totalOvertimeMin, totalLateMin, totalEarlyMin,
-      workDays, absentDays, lateDays, leaveDays, offDays, avgDailyMin,
+      totalWorkedMin, totalBreakMin, totalScheduledMin, totalOvertimeMin, totalLateMin, totalEarlyMin,
+      workDays, absentDays, lateDays, leaveDays, offDays, avgDailyMin, suspiciousCount,
       weeklyTarget, targetPct, expectedTotalMin,
       totalRevenue, totalPersons, crossCount: crossSales.length,
     };
@@ -375,9 +402,60 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
   const TABS = [
     { id: 'overview' as const, label: 'Genel Bakış', icon: BarChart2 },
     { id: 'puantaj' as const, label: 'Puantaj', icon: Clock },
+    { id: 'takvim' as const, label: 'Takvim', icon: Calendar },
     ...(!isYD ? [{ id: 'sales' as const, label: 'Satış Detay', icon: TrendingUp }] : []),
     { id: 'leaves' as const, label: 'İzinler', icon: Umbrella },
   ];
+
+  const exportCSV = () => {
+    const DAY_NAMES: Record<WeekDays, string> = {
+      monday: 'Pazartesi', tuesday: 'Salı', wednesday: 'Çarşamba',
+      thursday: 'Perşembe', friday: 'Cuma', saturday: 'Cumartesi', sunday: 'Pazar',
+    };
+    const statusLabels: Record<string, string> = {
+      normal: 'Normal', late: 'Geç', absent: 'Devamsız', leave: 'İzinli', off: 'Tatil', no_record: '-',
+    };
+    const headers = ['Tarih', 'Gün', 'Vardiya', 'Giriş', 'Çıkış', 'Brüt Mesai', 'Mola', 'Net Mesai', 'Geç (dk)', 'Erken Çıkış (dk)', 'Fazla Mesai', 'Durum'];
+    const dataRows = [...puantajRows].reverse().map(r => [
+      r.date,
+      DAY_NAMES[r.dayKey],
+      r.scheduledStart ? `${r.scheduledStart}-${r.scheduledEnd}` : '-',
+      r.actualStart || '-',
+      r.actualEnd || '-',
+      r.grossWorkedMin > 0 ? minutesToHM(r.grossWorkedMin) : '-',
+      r.breakMin > 0 ? `-${r.breakMin}dk` : '-',
+      r.workedMin > 0 ? minutesToHM(r.workedMin) : '-',
+      r.lateMin > 0 ? String(r.lateMin) : '-',
+      r.earlyMin > 0 ? String(r.earlyMin) : '-',
+      r.overtimeMin > 0 ? minutesToHM(r.overtimeMin) : '-',
+      statusLabels[r.status] || r.status,
+    ]);
+    const totalRow = ['TOPLAM', '', '', '', '',
+      minutesToHM(puantajRows.reduce((a, r) => a + r.grossWorkedMin, 0)),
+      puantajRows.reduce((a, r) => a + r.breakMin, 0) > 0 ? `-${puantajRows.reduce((a, r) => a + r.breakMin, 0)}dk` : '-',
+      minutesToHM(puantajRows.reduce((a, r) => a + r.workedMin, 0)),
+      '', '',
+      minutesToHM(puantajRows.reduce((a, r) => a + r.overtimeMin, 0)),
+      '',
+    ];
+    const rows = [
+      [`${person.fullName} — Puantaj Raporu`],
+      [`Dönem: ${startDate} / ${endDate}`],
+      [],
+      headers,
+      ...dataRows,
+      [],
+      totalRow,
+    ];
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${person.fullName}_puantaj_${startDate}_${endDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -566,18 +644,22 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
                         {summary.absentDays > 0 && <span className="text-red-400">✗ {summary.absentDays} devamsız</span>}
                         {summary.leaveDays > 0 && <span className="text-blue-400">☂ {summary.leaveDays} izin</span>}
                         {summary.totalOvertimeMin > 0 && <span className="text-orange-400">⏱ {minutesToHM(summary.totalOvertimeMin)} mesai</span>}
+                        {summary.suspiciousCount > 0 && <span className="text-amber-400 font-semibold">⚠ {summary.suspiciousCount} şüpheli kayıt</span>}
                       </div>
+                      <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-700 transition-colors ml-auto">
+                        <Download className="w-3.5 h-3.5" /> Excel İndir
+                      </button>
 
                       {/* Puantaj table */}
                       <div className="overflow-x-auto">
-                        <table className="w-full text-xs min-w-[800px]">
+                        <table className="w-full text-xs min-w-[860px]">
                           <thead>
                             <tr className="border-b border-gray-800">
                               <th className="text-left px-3 py-2 text-gray-500 font-medium">Tarih</th>
                               <th className="text-center px-3 py-2 text-gray-500 font-medium">Vardiya</th>
                               <th className="text-center px-3 py-2 text-gray-500 font-medium">Giriş</th>
                               <th className="text-center px-3 py-2 text-gray-500 font-medium">Çıkış</th>
-                              <th className="text-center px-3 py-2 text-gray-500 font-medium">Çalışma</th>
+                              <th className="text-center px-3 py-2 text-gray-500 font-medium">Net Mesai<span className="block text-[9px] text-gray-700">(mola düşüldü)</span></th>
                               <th className="text-center px-3 py-2 text-gray-500 font-medium">Geç</th>
                               <th className="text-center px-3 py-2 text-gray-500 font-medium">Erken Çıkış</th>
                               <th className="text-center px-3 py-2 text-gray-500 font-medium">Fazla Mesai</th>
@@ -585,49 +667,82 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
                             </tr>
                           </thead>
                           <tbody>
-                            {puantajRows.map(r => {
-                              const dateObj = new Date(r.date + 'T00:00:00');
+                            {(() => {
+                              const elements: React.ReactNode[] = [];
+                              let currentWeek = '';
+                              let wkWorked = 0, wkOvertime = 0, wkLate = 0, wkWorkDays = 0;
                               const statusCfg = {
-                                normal:    { label: 'Tamam',     cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
-                                late:      { label: 'Geç',       cls: 'bg-red-500/15 text-red-400 border-red-500/30' },
-                                absent:    { label: 'Devamsız',  cls: 'bg-red-500/15 text-red-400 border-red-500/30' },
-                                leave:     { label: r.leaveRecord ? LEAVE_LABELS[r.leaveRecord.leave_type as LeaveType] || 'İzin' : 'İzin', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
-                                off:       { label: 'Tatil',     cls: 'bg-gray-500/15 text-gray-500 border-gray-500/30' },
-                                no_record: { label: '—',         cls: 'bg-gray-500/15 text-gray-600 border-gray-500/30' },
+                                normal:    { label: 'Tamam',    cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+                                late:      { label: 'Geç',      cls: 'bg-red-500/15 text-red-400 border-red-500/30' },
+                                absent:    { label: 'Devamsız', cls: 'bg-red-500/15 text-red-400 border-red-500/30' },
+                                leave:     { label: '—',        cls: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
+                                off:       { label: 'Tatil',    cls: 'bg-gray-500/15 text-gray-500 border-gray-500/30' },
+                                no_record: { label: '—',        cls: 'bg-gray-500/15 text-gray-600 border-gray-500/30' },
                               };
-                              const st = statusCfg[r.status];
-                              return (
-                                <tr key={r.date} className={`border-b border-gray-800/50 ${r.status === 'absent' ? 'bg-red-500/5' : r.status === 'late' ? 'bg-yellow-500/5' : ''}`}>
-                                  <td className="px-3 py-2">
-                                    <span className="text-white font-medium">{dateObj.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}</span>
-                                    <span className="text-gray-600 ml-1.5">{DAY_TR[r.dayKey]}</span>
-                                  </td>
-                                  <td className="px-3 py-2 text-center text-gray-400 font-mono">
-                                    {r.scheduledStart ? `${r.scheduledStart}-${r.scheduledEnd}` : '—'}
-                                  </td>
-                                  <td className="px-3 py-2 text-center font-mono text-emerald-400">{r.actualStart || '—'}</td>
-                                  <td className="px-3 py-2 text-center font-mono text-blue-400">{r.actualEnd || '—'}</td>
-                                  <td className="px-3 py-2 text-center font-semibold text-white">{r.workedMin > 0 ? minutesToHM(r.workedMin) : '—'}</td>
-                                  <td className="px-3 py-2 text-center">
-                                    {r.lateMin > 0 ? <span className="text-red-400 font-semibold">{r.lateMin}dk</span> : <span className="text-gray-700">—</span>}
-                                  </td>
-                                  <td className="px-3 py-2 text-center">
-                                    {r.earlyMin > 0 ? <span className="text-amber-400 font-semibold">{r.earlyMin}dk</span> : <span className="text-gray-700">—</span>}
-                                  </td>
-                                  <td className="px-3 py-2 text-center">
-                                    {r.overtimeMin > 0 ? <span className="text-orange-400 font-semibold">{minutesToHM(r.overtimeMin)}</span> : <span className="text-gray-700">—</span>}
-                                  </td>
-                                  <td className="px-3 py-2 text-center">
-                                    <span className={`inline-block px-2 py-0.5 rounded-lg text-[10px] font-semibold border ${st.cls}`}>{st.label}</span>
-                                  </td>
-                                </tr>
-                              );
-                            })}
+                              const pushWeekRow = (wk: string) => {
+                                elements.push(
+                                  <tr key={`wk-${wk}`} className="border-y border-gray-700/60 bg-gray-800/40">
+                                    <td className="px-3 py-1.5 text-gray-400 text-[10px] font-bold" colSpan={4}>
+                                      ↑ Hafta Özeti · {wkWorkDays} iş günü
+                                    </td>
+                                    <td className="px-3 py-1.5 text-center text-emerald-300 text-[10px] font-bold">{wkWorked > 0 ? minutesToHM(wkWorked) : '—'}</td>
+                                    <td className="px-3 py-1.5 text-center text-red-400 text-[10px]">{wkLate > 0 ? `${wkLate}dk` : '—'}</td>
+                                    <td className="px-3 py-1.5" />
+                                    <td className="px-3 py-1.5 text-center text-orange-400 text-[10px]">{wkOvertime > 0 ? minutesToHM(wkOvertime) : '—'}</td>
+                                    <td className="px-3 py-1.5" />
+                                  </tr>
+                                );
+                                wkWorked = 0; wkOvertime = 0; wkLate = 0; wkWorkDays = 0;
+                              };
+                              puantajRows.forEach(r => {
+                                const wk = getISOWeek(r.date);
+                                if (currentWeek && wk !== currentWeek) pushWeekRow(currentWeek);
+                                currentWeek = wk;
+                                wkWorked += r.workedMin; wkOvertime += r.overtimeMin; wkLate += r.lateMin;
+                                if (r.status === 'normal' || r.status === 'late') wkWorkDays++;
+                                const dateObj = new Date(r.date + 'T00:00:00');
+                                const stCfg = { ...statusCfg[r.status] };
+                                if (r.status === 'leave' && r.leaveRecord) stCfg.label = LEAVE_LABELS[r.leaveRecord.leave_type as LeaveType] || 'İzin';
+                                elements.push(
+                                  <tr key={r.date} className={`border-b border-gray-800/50 ${r.suspicious ? 'bg-amber-500/5' : r.status === 'absent' ? 'bg-red-500/5' : r.status === 'late' ? 'bg-yellow-500/5' : ''}`}>
+                                    <td className="px-3 py-2">
+                                      <span className="text-white font-medium">{dateObj.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}</span>
+                                      <span className="text-gray-600 ml-1.5">{DAY_TR[r.dayKey]}</span>
+                                    </td>
+                                    <td className="px-3 py-2 text-center text-gray-400 font-mono">{r.scheduledStart ? `${r.scheduledStart}-${r.scheduledEnd}` : '—'}</td>
+                                    <td className="px-3 py-2 text-center font-mono text-emerald-400">{r.actualStart || '—'}</td>
+                                    <td className="px-3 py-2 text-center font-mono text-blue-400">{r.actualEnd || '—'}</td>
+                                    <td className="px-3 py-2 text-center">
+                                      {r.workedMin > 0 ? (
+                                        <div>
+                                          <span className="font-semibold text-white">{minutesToHM(r.workedMin)}</span>
+                                          {r.breakMin > 0 && <span className="block text-gray-600 text-[9px]">−{r.breakMin}dk mola</span>}
+                                        </div>
+                                      ) : <span className="text-gray-700">—</span>}
+                                    </td>
+                                    <td className="px-3 py-2 text-center">{r.lateMin > 0 ? <span className="text-red-400 font-semibold">{r.lateMin}dk</span> : <span className="text-gray-700">—</span>}</td>
+                                    <td className="px-3 py-2 text-center">{r.earlyMin > 0 ? <span className="text-amber-400 font-semibold">{r.earlyMin}dk</span> : <span className="text-gray-700">—</span>}</td>
+                                    <td className="px-3 py-2 text-center">{r.overtimeMin > 0 ? <span className="text-orange-400 font-semibold">{minutesToHM(r.overtimeMin)}</span> : <span className="text-gray-700">—</span>}</td>
+                                    <td className="px-3 py-2 text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <span className={`inline-block px-2 py-0.5 rounded-lg text-[10px] font-semibold border ${stCfg.cls}`}>{stCfg.label}</span>
+                                        {r.suspicious && <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" title="16 saatten uzun — eksik çıkış olabilir" />}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              });
+                              if (currentWeek) pushWeekRow(currentWeek);
+                              return elements;
+                            })()}
                           </tbody>
                           <tfoot>
-                            <tr className="border-t-2 border-gray-700 font-semibold">
-                              <td className="px-3 py-2 text-white" colSpan={4}>TOPLAM</td>
-                              <td className="px-3 py-2 text-center text-emerald-400">{minutesToHM(summary.totalWorkedMin)}</td>
+                            <tr className="border-t-2 border-gray-700 font-semibold bg-gray-800/30">
+                              <td className="px-3 py-2 text-white" colSpan={4}>GENEL TOPLAM</td>
+                              <td className="px-3 py-2 text-center">
+                                <span className="text-emerald-400">{minutesToHM(summary.totalWorkedMin)}</span>
+                                {summary.totalBreakMin > 0 && <span className="block text-gray-600 text-[9px]">−{summary.totalBreakMin}dk mola</span>}
+                              </td>
                               <td className="px-3 py-2 text-center text-red-400">{summary.totalLateMin > 0 ? minutesToHM(summary.totalLateMin) : '—'}</td>
                               <td className="px-3 py-2 text-center text-amber-400">{summary.totalEarlyMin > 0 ? minutesToHM(summary.totalEarlyMin) : '—'}</td>
                               <td className="px-3 py-2 text-center text-orange-400">{summary.totalOvertimeMin > 0 ? minutesToHM(summary.totalOvertimeMin) : '—'}</td>
@@ -639,6 +754,72 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
                     </>
                   )}
                 </>
+              )}
+
+              {/* ═══ TAKVİM TAB ═══ */}
+              {activeTab === 'takvim' && (
+                <div className="space-y-6">
+                  {/* Renk açıklamaları */}
+                  <div className="flex flex-wrap gap-2 text-[10px]">
+                    {[
+                      { color: 'bg-emerald-500/20 border-emerald-500/20', label: 'Normal' },
+                      { color: 'bg-yellow-500/20 border-yellow-500/20', label: 'Geç' },
+                      { color: 'bg-red-500/20 border-red-500/20', label: 'Devamsız' },
+                      { color: 'bg-blue-500/20 border-blue-500/20', label: 'İzin' },
+                      { color: 'bg-gray-700/20 border-gray-600/20', label: 'Tatil/Yok' },
+                      { color: 'bg-amber-500/20 border-amber-500/30', label: '⚠ Şüpheli' },
+                    ].map(l => (
+                      <span key={l.label} className={`flex items-center gap-1 px-2 py-1 rounded-lg border ${l.color} text-gray-300`}>
+                        <span className={`w-2 h-2 rounded-sm ${l.color.split(' ')[0]}`} />{l.label}
+                      </span>
+                    ))}
+                  </div>
+                  {(() => {
+                    // Seçilen aralıktaki ayları üret
+                    const months: { year: number; month: number; label: string }[] = [];
+                    const s = new Date(startDate + 'T00:00:00');
+                    const e = new Date(endDate + 'T00:00:00');
+                    let cur = new Date(s.getFullYear(), s.getMonth(), 1);
+                    while (cur <= e) {
+                      months.push({ year: cur.getFullYear(), month: cur.getMonth(), label: cur.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) });
+                      cur.setMonth(cur.getMonth() + 1);
+                    }
+                    const rowMap = new Map(puantajRows.map(r => [r.date, r]));
+                    return months.map(({ year, month, label }) => {
+                      const daysInMonth = new Date(year, month + 1, 0).getDate();
+                      const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // Mon=0
+                      const cells: React.ReactNode[] = [];
+                      // Boş hücreler
+                      for (let i = 0; i < firstWeekday; i++) cells.push(<div key={`e${i}`} />);
+                      for (let d = 1; d <= daysInMonth; d++) {
+                        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        const inRange = dateStr >= startDate && dateStr <= endDate;
+                        const row = rowMap.get(dateStr);
+                        const cc = inRange ? calendarCellColor(row) : 'bg-transparent text-gray-800';
+                        const isToday = dateStr === fmtDate(new Date());
+                        cells.push(
+                          <div key={dateStr} title={row ? `${row.actualStart || '?'} → ${row.actualEnd || '?'} · ${minutesToHM(row.workedMin)}` : dateStr}
+                            className={`rounded-lg flex flex-col items-center justify-center py-1.5 text-center cursor-default select-none ${cc} ${isToday ? 'ring-2 ring-orange-400' : ''}`}>
+                            <span className="text-[11px] font-bold leading-none">{d}</span>
+                            {row?.actualStart && <span className="text-[8px] leading-none mt-0.5 opacity-70">{row.actualStart}</span>}
+                            {row?.workedMin > 0 && <span className="text-[8px] leading-none opacity-60">{minutesToHM(row.workedMin)}</span>}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={`${year}-${month}`}>
+                          <h4 className="text-sm font-semibold text-white mb-2 capitalize">{label}</h4>
+                          <div className="grid grid-cols-7 gap-1 mb-1">
+                            {['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'].map(d => (
+                              <div key={d} className="text-center text-[9px] text-gray-600 font-semibold py-0.5">{d}</div>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-7 gap-1">{cells}</div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
               )}
 
               {/* ═══ SALES TAB ═══ */}
