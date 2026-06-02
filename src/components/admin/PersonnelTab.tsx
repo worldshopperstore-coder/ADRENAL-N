@@ -30,12 +30,13 @@ import { INITIAL_PACKAGES } from '@/data/packages';
 import ShiftBoardModal from './ShiftBoardModal';
 import AnnouncementsAdminTab from './AnnouncementsAdminTab';
 
-type KasaId = 'wildpark' | 'sinema' | 'face2face' | 'genel';
+type KasaId = 'wildpark' | 'sinema' | 'face2face' | 'yasam_destek' | 'genel';
 
 const KASAS = [
   { id: 'wildpark' as KasaId, name: 'WildPark', Icon: TreePine,  accent: 'emerald', text: 'text-emerald-400', bg: 'bg-emerald-500/10', borderAccent: 'border-emerald-500/20' },
   { id: 'sinema' as KasaId,   name: 'Sinema',   Icon: Monitor,   accent: 'violet',  text: 'text-violet-400',  bg: 'bg-violet-500/10',  borderAccent: 'border-violet-500/20'  },
   { id: 'face2face' as KasaId,name: 'Face2Face', Icon: Users2,    accent: 'sky',     text: 'text-sky-400',     bg: 'bg-sky-500/10',     borderAccent: 'border-sky-500/20'     },
+  { id: 'yasam_destek' as KasaId, name: 'Yaşam Destek', Icon: Coffee, accent: 'teal', text: 'text-teal-400', bg: 'bg-teal-500/10', borderAccent: 'border-teal-500/20' },
   { id: 'genel' as KasaId,    name: 'Genel Müdür', Icon: User,     accent: 'amber',   text: 'text-amber-400',   bg: 'bg-amber-500/10',   borderAccent: 'border-amber-500/20'   },
 ];
 
