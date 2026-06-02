@@ -60,7 +60,8 @@ app.on('ready', () => {
   createWindow();
     // ── Otomatik Güncelleme ─────────────────────────────────
     try {
-      autoUpdater.autoDownload = false;
+      // Otomatik indirme: çalışan uygulamaların elle müdahale olmadan güncellemeyi indirmesi için true
+      autoUpdater.autoDownload = true;
       autoUpdater.autoInstallOnAppQuit = true;
 
       autoUpdater.on('update-available', (info) => {
@@ -97,7 +98,10 @@ app.on('ready', () => {
         autoUpdater.quitAndInstall();
       });
 
+      // İlk kontrolü 5 saniye sonra yap
       setTimeout(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 5000);
+      // Sonrasında her 5 dakikada bir güncelleme kontrolü yap (çalışan uygulamalar için)
+      setInterval(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 5 * 60 * 1000);
     } catch (e) {
       console.warn('[UPDATER] Başlatılamadı:', e);
     }
