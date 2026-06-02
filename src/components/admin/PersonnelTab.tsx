@@ -1264,15 +1264,7 @@ export default function PersonnelTab() {
                   <span className="text-xs text-gray-400 flex items-center gap-1"><Phone className="w-3 h-3" /> Telefon</span>
                   <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="05xx xxx xx xx"
                     className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500" />
-                </label>User className="w-3 h-3" /> Rol</span>
-                  <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as 'personel' | 'genel_mudur' }))}
-                    className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500">
-                    <option value="personel">Personel</option>
-                    <option value="genel_mudur">Genel Müdür</option>
-                  </select>
                 </label>
-                <label className="block">
-                  <span className="text-xs text-gray-400 flex items-center gap-1"><
                 <label className="block">
                   <span className="text-xs text-gray-400 flex items-center gap-1"><User className="w-3 h-3" /> Kullanıcı Adı *</span>
                   <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
