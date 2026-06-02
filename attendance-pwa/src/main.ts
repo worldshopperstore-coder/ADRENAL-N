@@ -24,6 +24,7 @@ let currentAttendance: AttendanceRecord | null = null;
 let activeTab: 'home' | 'team' | 'schedule' = 'home';
 let liveTimerInterval: ReturnType<typeof setInterval> | null = null;
 let isOnline = navigator.onLine;
+let currentShiftEndTime: string | null = null;
 
 // ── Helpers ──
 const esc = (s: string) => {
@@ -468,14 +469,33 @@ function updateLiveTimer() {
   const s = totalSec % 60;
   const pad = (n: number) => n.toString().padStart(2, '0');
 
-  const durEl = document.getElementById('live-duration');
-  if (durEl) durEl.textContent = `${h}s ${pad(m)}dk`;
-
   const clockEl = document.getElementById('live-clock');
   if (clockEl) clockEl.textContent = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   const timerEl = document.getElementById('live-timer');
   if (timerEl) timerEl.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+
+  // Vardiya bitimine kalan süre
+  const remEl = document.getElementById('live-remaining');
+  if (remEl && currentShiftEndTime) {
+    const [endH, endM] = currentShiftEndTime.split(':').map(Number);
+    const now = new Date();
+    const shiftEndMin = endH * 60 + endM;
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const diffMin = shiftEndMin - nowMin;
+    if (diffMin > 0) {
+      const rh = Math.floor(diffMin / 60);
+      const rm = diffMin % 60;
+      remEl.textContent = rh > 0 ? `Bitime ${rh}s ${rm}dk kaldı` : `Bitime ${rm}dk kaldı`;
+    } else if (diffMin > -60) {
+      remEl.textContent = 'Vardiya tamamlandı';
+    } else {
+      const extra = Math.abs(diffMin);
+      const eh = Math.floor(extra / 60);
+      const em = extra % 60;
+      remEl.textContent = `${eh > 0 ? eh + 's ' : ''}${em}dk fazla mesai`;
+    }
+  }
 
   const progEl = document.getElementById('progress-fill') as HTMLElement;
   const progText = document.getElementById('progress-pct');
@@ -539,25 +559,44 @@ function renderDash() {
 
           <!-- Timer card \u2014 premium glassmorphism -->
           <div class="card-glass ${isPending ? 'card-glow-amber' : 'card-glow-green'}" style="margin-bottom:10px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
               <span style="color:var(--text2);font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase">Bug\u00fcnk\u00fc Mesai</span>
               <div class="badge" style="background:${isPending ? 'rgba(245,158,11,.12)' : 'rgba(34,197,94,.12)'};color:${isPending ? 'var(--amber)' : 'var(--green2)'};border:1px solid ${isPending ? 'rgba(245,158,11,.3)' : 'rgba(34,197,94,.3)'}">
                 ${isPending
                   ? `<span style="width:6px;height:6px;border-radius:50%;background:var(--amber);animation:pulse 1.2s infinite"></span> \u00c7\u0131k\u0131\u015f Bekleniyor`
-                  : `<span style="width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green2);animation:pulse 2s infinite"></span> Aktif`}
+                  : `<span style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite"></span> Aktif`}
               </div>
             </div>
-            <div style="text-align:center;margin-bottom:14px">
-              <div id="live-timer" class="${isPending ? '' : 'timer-glow'}" style="font-size:48px;font-weight:900;letter-spacing:2px;color:#fff;font-variant-numeric:tabular-nums;line-height:1;text-shadow:${isPending ? 'none' : '0 0 30px rgba(34,197,94,.4)'}">00:00:00</div>
+            <!-- B\u00fcy\u00fck saya\u00e7 -->
+            <div style="text-align:center;margin-bottom:12px">
+              <div id="live-timer" style="font-size:48px;font-weight:900;letter-spacing:2px;color:#fff;font-variant-numeric:tabular-nums;line-height:1">00:00:00</div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:10px 12px">
+            <!-- Giri\u015f / \u00c7\u0131k\u0131\u015f -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+              <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:10px 12px;text-align:center">
                 <p style="color:var(--text3);font-size:9px;margin:0 0 3px;text-transform:uppercase;letter-spacing:.6px;font-weight:700">Giri\u015f</p>
-                <p style="color:var(--orange2);font-size:20px;font-weight:900;margin:0;letter-spacing:-.3px;font-variant-numeric:tabular-nums">${ci}</p>
+                <p style="color:var(--orange2);font-size:20px;font-weight:900;margin:0;font-variant-numeric:tabular-nums">${ci}</p>
               </div>
-              <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:10px 12px">
-                <p style="color:var(--text3);font-size:9px;margin:0 0 3px;text-transform:uppercase;letter-spacing:.6px;font-weight:700">S\u00fcre</p>
-                <p id="live-duration" style="color:var(--green2);font-size:20px;font-weight:900;margin:0;letter-spacing:-.3px">--</p>
+              <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:10px 12px;text-align:center">
+                <p style="color:var(--text3);font-size:9px;margin:0 0 3px;text-transform:uppercase;letter-spacing:.6px;font-weight:700">\u00c7\u0131k\u0131\u015f</p>
+                <p style="color:${currentAttendance.check_out ? 'var(--red)' : 'var(--text3)'};font-size:20px;font-weight:900;margin:0;font-variant-numeric:tabular-nums">${currentAttendance.check_out ? new Date(currentAttendance.check_out).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}) : '--:--'}</p>
+              </div>
+            </div>
+            <!-- Kalan s\u00fcre -->
+            <div id="live-remaining" style="text-align:center;font-size:12px;font-weight:700;color:var(--text3);padding:6px 0;border-top:1px solid rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.05);margin-bottom:10px">--</div>
+            <!-- Ayl\u0131k \u00f6zet (async doldurulur) -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+              <div style="text-align:center">
+                <p style="color:var(--text3);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin:0 0 2px">Bu Ay</p>
+                <p id="dash-work-days" style="color:var(--text2);font-size:15px;font-weight:900;margin:0">...</p>
+              </div>
+              <div style="text-align:center">
+                <p style="color:var(--text3);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin:0 0 2px">Toplam</p>
+                <p id="dash-total-hours" style="color:var(--orange2);font-size:15px;font-weight:900;margin:0">...</p>
+              </div>
+              <div style="text-align:center">
+                <p style="color:var(--text3);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin:0 0 2px">Seri</p>
+                <p id="dash-streak" style="color:var(--text2);font-size:15px;font-weight:900;margin:0">...</p>
               </div>
             </div>
           </div>
@@ -688,29 +727,22 @@ async function renderHome(c: HTMLElement) {
 
   const teamRecs = teamAtt || [];
   const activeCount = teamRecs.filter((r: any) => r.status === 'checked_in' || r.status === 'checkout_pending').length;
-  const doneCount   = teamRecs.filter((r: any) => r.status === 'checked_out').length;
   const shiftIsOff  = todayShift?.isOff;
   const leaveType   = todayShift?.leaveType;
   const lc = LEAVE_COLORS[leaveType || ''] || '#ea580c';
-  const monthName = new Date().toLocaleDateString('tr-TR', { month: 'long' });
+
+  // Vardiya bitiş saatini module-level değişkene set et
+  currentShiftEndTime = (!shiftIsOff && todayShift?.end) ? todayShift.end : null;
+
+  // Timer kartındaki aylık placeholder'ları doldur
+  const wdEl = document.getElementById('dash-work-days');
+  const thEl = document.getElementById('dash-total-hours');
+  const stEl = document.getElementById('dash-streak');
+  if (wdEl) wdEl.textContent = `${monthStats.workDays}gün`;
+  if (thEl) thEl.textContent = `${monthStats.totalHours}s`;
+  if (stEl) stEl.textContent = monthStats.streak >= 5 ? `🔥${monthStats.streak}` : `${monthStats.streak}`;
 
   c.innerHTML = `<div class="slide-up" style="display:flex;flex-direction:column;gap:8px;padding-top:2px">
-
-    <!-- Ayl\u0131k \u00f6zet \u015ferit -->
-    <div class="monthly-strip">
-      <div class="monthly-pill">
-        <p style="color:var(--text3);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">${esc(monthName)}</p>
-        <p style="color:#fff;font-size:18px;font-weight:900;margin:0;line-height:1">${monthStats.workDays}<span style="font-size:10px;color:var(--text3);font-weight:600;margin-left:2px">g\u00fcn</span></p>
-      </div>
-      <div class="monthly-pill">
-        <p style="color:var(--text3);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Toplam</p>
-        <p style="color:var(--orange2);font-size:18px;font-weight:900;margin:0;line-height:1">${monthStats.totalHours}<span style="font-size:10px;color:var(--text3);font-weight:600;margin-left:2px">saat</span></p>
-      </div>
-      <div class="monthly-pill" style="${monthStats.streak >= 5 ? 'background:rgba(251,146,60,.08);border-color:rgba(251,146,60,.2)' : ''}">
-        <p style="color:var(--text3);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Seri \ud83d\udd25</p>
-        <p style="color:${monthStats.streak >= 5 ? '#fb923c' : 'var(--text2)'};font-size:18px;font-weight:900;margin:0;line-height:1">${monthStats.streak}<span style="font-size:10px;color:var(--text3);font-weight:600;margin-left:2px">g\u00fcn</span></p>
-      </div>
-    </div>
 
     <!-- Vardiya kart\u0131 -->
     ${todayShift ? `
@@ -745,24 +777,17 @@ async function renderHome(c: HTMLElement) {
       </div>
     </div>` : ''}
 
-    <!-- Ekip durumu -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
-      <div style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:14px;padding:10px;text-align:center">
-        <div style="display:flex;align-items:center;justify-content:center;gap:3px;margin-bottom:3px">
-          <div class="online-dot" style="width:5px;height:5px"></div>
-          <p style="color:rgba(34,197,94,.7);font-size:8px;font-weight:700;text-transform:uppercase;margin:0;letter-spacing:.4px">Aktif</p>
-        </div>
-        <p style="color:var(--green2);font-size:24px;font-weight:900;margin:0;line-height:1">${activeCount}</p>
-      </div>
-      <div style="background:rgba(249,115,22,.05);border:1px solid rgba(249,115,22,.12);border-radius:14px;padding:10px;text-align:center">
-        <p style="color:rgba(249,115,22,.6);font-size:8px;font-weight:700;text-transform:uppercase;margin:0 0 3px;letter-spacing:.4px">\u00c7\u0131k\u0131\u015f</p>
-        <p style="color:var(--orange2);font-size:24px;font-weight:900;margin:0;line-height:1">${doneCount}</p>
-      </div>
-      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:10px;text-align:center">
-        <p style="color:var(--text3);font-size:8px;font-weight:700;text-transform:uppercase;margin:0 0 3px;letter-spacing:.4px">Toplam</p>
-        <p style="color:var(--text2);font-size:24px;font-weight:900;margin:0;line-height:1">${teamRecs.length}</p>
-      </div>
-    </div>
+    <!-- Kompakt ekip durumu -->
+    ${teamRecs.length > 0 ? `
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px">
+      <div class="online-dot" style="flex-shrink:0"></div>
+      <span style="color:var(--text2);font-size:12px;font-weight:600">
+        ${activeCount > 0 ? `<span style="color:var(--green2)">${activeCount} ki\u015fi aktif</span>` : ''}
+        ${activeCount > 0 && teamRecs.filter((r: any) => r.status === 'checked_out').length > 0 ? ' \u00b7 ' : ''}
+        ${teamRecs.filter((r: any) => r.status === 'checked_out').length > 0 ? `${teamRecs.filter((r: any) => r.status === 'checked_out').length} \u00e7\u0131k\u0131\u015f yapt\u0131` : ''}
+        ${activeCount === 0 && teamRecs.filter((r: any) => r.status === 'checked_out').length === 0 ? 'Ekipten kimse hen\u00fcz giri\u015f yapmad\u0131' : ''}
+      </span>
+    </div>` : ''}
 
     <!-- \u00c7\u0131k\u0131\u015f butonu -->
     ${isPending ? `
@@ -833,12 +858,14 @@ async function renderTeam(c: HTMLElement) {
   const all = (pers || []).filter((p: any) => p.role !== 'genel_mudur');
 
   const shiftMap = new Map<string, WeekDay>();
+  const fullShiftMap = new Map<string, any>();
   const seenIds = new Set<string>();
   for (const s of (shifts || [])) {
     if (seenIds.has(s.personnel_id)) continue;
     seenIds.add(s.personnel_id);
     try {
       const sched = typeof s.week_schedule === 'string' ? JSON.parse(s.week_schedule) : s.week_schedule;
+      fullShiftMap.set(s.personnel_id, sched);
       const raw = sched?.[dayKey];
       if (raw) shiftMap.set(s.personnel_id, { start: raw.startTime || raw.start, end: raw.endTime || raw.end, isOff: raw.isOff, leaveType: raw.leaveType });
     } catch {}
@@ -871,41 +898,69 @@ async function renderTeam(c: HTMLElement) {
       const ini = p.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2);
       const me = p.id === currentUser!.id;
       const shift = shiftMap.get(p.id);
+      const fullSched = fullShiftMap.get(p.id);
       const isOff = shift?.isOff;
       const leaveLbl = shift?.leaveType || '\u0130zin';
       const lClr = LEAVE_COLORS[leaveLbl] || '#ea580c';
+      const DK_LABELS: Record<string, string> = { monday:'Pzt', tuesday:'Sal', wednesday:'\u00c7ar', thursday:'Per', friday:'Cum', saturday:'Cmt', sunday:'Paz' };
+      const DK_ORDER = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 
-      let isLate = false;
-      if (shift && shift.start && !isOff && cin) {
-        const [sh, sm] = shift.start.split(':').map(Number);
-        const [ch, cm] = cin.split(':').map(Number);
-        if (ch * 60 + cm > sh * 60 + sm + 5) isLate = true;
-      }
+      // Haftal\u0131k program grid
+      const weekGrid = fullSched ? DK_ORDER.map(dk => {
+        const d = fullSched[dk];
+        const isToday = dk === dayKey;
+        const lbl = DK_LABELS[dk];
+        return `<div style="text-align:center;padding:5px 2px;border-radius:8px;${isToday ? 'background:rgba(249,115,22,.1);' : ''}">
+          <div style="font-size:8px;font-weight:700;color:${isToday ? 'var(--orange)' : 'var(--text3)'};margin-bottom:3px">${lbl}</div>
+          ${d?.isOff
+            ? `<div style="font-size:8px;color:#60a5fa;font-weight:600">\u0130zin</div>`
+            : d?.startTime
+              ? `<div style="font-size:7px;color:var(--text2);font-weight:700;line-height:1.4">${d.startTime}<br>${d.endTime}</div>`
+              : `<div style="font-size:8px;color:var(--text3)">\u2014</div>`}
+        </div>`;
+      }).join('') : '';
 
-      return `<div class="card" style="margin-bottom:6px;${me ? 'border-color:rgba(249,115,22,.25)' : ''}">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:38px;height:38px;border-radius:50%;background:${cl}15;border:2px solid ${cl}30;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0">
+      return `<div style="margin-bottom:6px;background:var(--card);border:1px solid ${me ? 'rgba(249,115,22,.25)' : 'var(--border)'};border-radius:18px;overflow:hidden" data-person-id="${p.id}">
+        <!-- Kart ba\u015fl\u0131\u011f\u0131 \u2014 t\u0131klanabilir -->
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 12px 10px;cursor:pointer" data-toggle-sched="${p.id}">
+          <div style="width:40px;height:40px;border-radius:50%;background:${cl}15;border:2px solid ${cl}30;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0">
             <span style="color:${cl};font-size:13px;font-weight:700">${esc(ini)}</span>
-            ${on ? `<div style="position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;background:var(--green);border:2px solid var(--bg)"></div>` : ''}
+            ${on ? `<div style="position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;background:var(--green);border:2px solid var(--bg);box-shadow:0 0 4px var(--green)"></div>` : ''}
           </div>
           <div style="flex:1;min-width:0">
-            <p style="font-size:13px;font-weight:600;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.fullName)}${me ? ' <span style="color:var(--orange);font-size:9px">(Sen)</span>' : ''}</p>
-            <div style="display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap">
-              <span style="color:var(--text3);font-size:10px">${on ? `Giri\u015f: ${cin}` : out ? `${cin} \u2192 ${cout}` : 'Hen\u00fcz giri\u015f yapmad\u0131'}</span>
-              ${isLate ? `<span style="color:var(--red);font-size:9px;font-weight:700">\u25cf Ge\u00e7</span>` : ''}
-            </div>
-            ${shift ? `<div style="margin-top:3px">
-              ${isOff
-                ? `<span style="color:${lClr};font-size:9px;font-weight:600;background:${lClr}12;padding:2px 8px;border-radius:6px;border:1px solid ${lClr}20">${esc(leaveLbl)}</span>`
-                : `<span style="color:var(--text3);font-size:9px;background:rgba(255,255,255,.03);padding:2px 8px;border-radius:6px;border:1px solid var(--border)">${shift.start} \u2013 ${shift.end}</span>`}
-            </div>` : ''}
+            <p style="font-size:13px;font-weight:700;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.fullName)}${me ? ' <span style="color:var(--orange);font-size:9px">(Sen)</span>' : ''}</p>
+            <span style="color:var(--text3);font-size:10px">${on ? `Giri\u015f: ${cin}` : out ? `${cin} \u2192 ${cout}` : 'Hen\u00fcz giri\u015f yapmad\u0131'}</span>
+            ${shift && !isOff ? `<span style="color:var(--text3);font-size:10px"> \u00b7 ${shift.start}\u2013${shift.end}</span>` : ''}
+            ${shift && isOff ? `<span style="color:${lClr};font-size:10px;font-weight:600"> \u00b7 ${esc(leaveLbl)}</span>` : ''}
           </div>
-          <div class="badge" style="background:${on ? 'rgba(34,197,94,.1)' : out ? 'rgba(249,115,22,.1)' : 'rgba(255,255,255,.04)'};color:${on ? 'var(--green)' : out ? 'var(--orange)' : 'var(--text3)'};flex-shrink:0">${on ? 'Aktif' : out ? '\u00c7\u0131k\u0131\u015f' : 'Yok'}</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <div class="badge" style="background:${on ? 'rgba(34,197,94,.1)' : out ? 'rgba(249,115,22,.1)' : 'rgba(255,255,255,.04)'};color:${on ? 'var(--green)' : out ? 'var(--orange)' : 'var(--text3)'}">${on ? 'Aktif' : out ? '\u00c7\u0131k\u0131\u015f' : 'Yok'}</div>
+            ${fullSched ? `<svg id="chevron-${p.id}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="2" style="transition:transform .2s"><polyline points="6 9 12 15 18 9"/></svg>` : ''}
+          </div>
         </div>
+        <!-- Haftal\u0131k program (gizli) -->
+        ${fullSched ? `<div id="sched-${p.id}" style="display:none;padding:0 12px 12px">
+          <div style="border-top:1px solid rgba(255,255,255,.05);padding-top:10px">
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">${weekGrid}</div>
+          </div>
+        </div>` : ''}
       </div>`;
     }).join('')}
     ${all.length === 0 ? '<p style="color:var(--text3);font-size:12px;text-align:center;padding:20px">Personel bulunamad\u0131</p>' : ''}
   </div>`;
+
+  c.querySelectorAll('[data-toggle-sched]').forEach(el => {
+    el.addEventListener('click', () => {
+      const pid = (el as HTMLElement).dataset.toggleSched;
+      if (!pid) return;
+      const schedEl = document.getElementById(`sched-${pid}`);
+      const chevEl  = document.getElementById(`chevron-${pid}`);
+      if (!schedEl) return;
+      const open = schedEl.style.display === 'none' || !schedEl.style.display;
+      schedEl.style.display = open ? 'block' : 'none';
+      if (chevEl) chevEl.style.transform = open ? 'rotate(180deg)' : 'rotate(0)';
+    });
+  });
 }
 
 // ── Schedule Tab ──
