@@ -2405,7 +2405,10 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       )}
 
       {/* ── POS SONUÇ MODAL ── */}
-      {showPosResultModal && posResult && (
+      {showPosResultModal && posResult && (() => {
+        const lastSale = sales[sales.length - 1];
+        const isFreeResult = lastSale?.category === 'Ücretsiz' || lastSale?.total === 0;
+        return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowPosResultModal(false); }}>
           <div className="bg-gradient-to-b from-gray-900 to-[#0c0c14] border border-gray-700/60 rounded-2xl w-full max-w-md shadow-2xl p-6">
             {/* Başarı/Hata İkonu */}
@@ -2419,17 +2422,14 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                   <AlertTriangle className="w-8 h-8 text-red-400" />
                 </div>
               )}
-              
               <h3 className={`text-lg font-bold ${posResult.success ? 'text-emerald-400' : 'text-red-400'}`}>
-                {posResult.success ? 'Satış Başarılı!' : 'İşlem Başarısız'}
+                {posResult.success ? (isFreeResult ? 'Bilet Basıldı!' : 'Satış Başarılı!') : 'İşlem Başarısız'}
               </h3>
-              
-              {posResult.success && posResult.terminalRecordId && (
+              {posResult.success && posResult.terminalRecordId && !isFreeResult && (
                 <p className="text-sm text-gray-400 mt-1">
                   Kayıt No: <span className="text-white font-bold">#{posResult.terminalRecordId}</span>
                 </p>
               )}
-              
               {posResult.error && (
                 <p className="text-sm text-red-300 mt-2 bg-red-900/20 rounded-lg p-2 border border-red-700/30">
                   {posResult.error}
@@ -2437,8 +2437,8 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               )}
             </div>
 
-            {/* Bilet Bilgileri */}
-            {posResult.success && posResult.ticketIds && posResult.ticketIds.length > 0 && (
+            {/* Bilet Bilgileri — sadece ücretsiz olmayan satışlarda */}
+            {posResult.success && posResult.ticketIds && posResult.ticketIds.length > 0 && !isFreeResult && (
               <div className="bg-gray-800/50 rounded-xl p-3 mb-4 border border-gray-700/50">
                 <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2">Bilet Detayları</p>
                 <div className="grid grid-cols-2 gap-2 text-sm">
@@ -2447,7 +2447,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                   <div className="text-gray-400">Bilet ID'leri:</div>
                   <div className="text-white font-mono text-xs">{posResult.ticketIds.join(', ')}</div>
                 </div>
-                {/* Yazdırma Sonucu — sadece başarılıysa göster */}
                 {posResult.printResult && posResult.printResult.printed > 0 && posResult.printResult.failed === 0 && (
                   <div className="mt-2 text-xs px-2 py-1 rounded bg-emerald-900/30 text-emerald-300">
                     🖨️ {posResult.printResult.printed} bilet basıldı
@@ -2456,8 +2455,8 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               </div>
             )}
 
-            {/* POS Durumu */}
-            {posResult.posMessage && (
+            {/* POS Durumu — sadece ücretsiz olmayan satışlarda */}
+            {posResult.posMessage && !isFreeResult && (
               <div className={`text-xs px-3 py-2 rounded-lg mb-4 border ${
                 posResult.posSuccess
                   ? 'bg-emerald-900/20 border-emerald-700/30 text-emerald-300'
@@ -2469,12 +2468,10 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
 
             {/* Butonlar */}
             <div className="flex gap-2.5">
-              {posResult.success && posResult.ticketIds && posResult.ticketIds.length > 0 && (
+              {posResult.success && posResult.ticketIds && posResult.ticketIds.length > 0 && !isFreeResult && (
                 <button
                   onClick={async () => {
-                    // Son satışı bul ve biletleri tekrar bas
                     try {
-                      const lastSale = sales[sales.length - 1];
                       if (lastSale) await handleReprintTicket(lastSale);
                     } catch (err: any) {
                       alert(`❌ Yazdırma hatası: ${err.message}`);
@@ -2487,14 +2484,15 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               )}
               <button
                 onClick={() => { setShowPosResultModal(false); setPosResult(null); }}
-                className={`${posResult.success ? 'px-5' : 'flex-1'} bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white py-2.5 rounded-xl transition-colors text-sm border border-gray-700 font-medium`}
+                className={`${posResult.success && !isFreeResult ? 'px-5' : 'flex-1'} bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white py-2.5 rounded-xl transition-colors text-sm border border-gray-700 font-medium`}
               >
                 Kapat
               </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
