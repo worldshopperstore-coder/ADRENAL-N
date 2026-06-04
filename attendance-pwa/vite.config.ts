@@ -9,12 +9,23 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
-        // Supabase API isteklerini cache'leme — her zaman network'e git
+        // Uygulama shell'ini cache'le (JS, CSS, HTML, assets)
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,woff2}'],
         navigateFallbackDenylist: [/^\/rest/, /^\/auth/],
         runtimeCaching: [
+          // Supabase: her zaman network (hassas veri)
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
             handler: 'NetworkOnly',
+          },
+          // QR kod görselleri: önce cache, sonra network
+          {
+            urlPattern: /^https:\/\/api\.qrserver\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'qr-codes',
+              expiration: { maxEntries: 50, maxAgeSeconds: 86400 },
+            },
           },
         ],
       },
