@@ -151,7 +151,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     adultQty: '0',
     childQty: '0',
     infantQty: '0',
-    paymentType: 'Nakit',
+    paymentType: '',
     splitKkTl: '',
     splitCashTl: '',
     splitCashUsd: '',
@@ -351,7 +351,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       adultQty: '0',
       childQty: '0',
       infantQty: '0',
-      paymentType: 'Nakit',
+      paymentType: '',
       splitKkTl: '',
       splitCashTl: '',
       splitCashUsd: '',
@@ -1535,7 +1535,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                         key={group}
                         onClick={() => {
                           setSelectedCategory(group);
-                          setFormData({ ...formData, packageId: '', adultQty: '0', childQty: '0', infantQty: '0', paymentType: 'Nakit', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: group.startsWith('Çapraz'), selectedCurrency: '' });
+                          setFormData({ ...formData, packageId: '', adultQty: '0', childQty: '0', infantQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: group.startsWith('Çapraz'), selectedCurrency: '' });
                           setSplitMode(false);
                         }}
                         disabled={pkgCount === 0}
