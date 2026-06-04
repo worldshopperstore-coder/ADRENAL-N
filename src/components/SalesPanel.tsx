@@ -118,7 +118,8 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
   const [integrationActive, setIntegrationActive] = useState(false);
   const [integrationReady, setIntegrationReady] = useState(false);
   const [posProcessing, setPosProcessing] = useState(false);
-  const [posProcessingStep, setPosProcessingStep] = useState<'pos' | 'print' | 'done'>('pos');
+  const [posProcessingStep, setPosProcessingStep] = useState<'pos' | 'print' | 'done' | 'error'>('pos');
+  const [posProcessingError, setPosProcessingError] = useState('');
   const [posResult, setPosResult] = useState<ActiveSaleResult | null>(null);
   const [showPosResultModal, setShowPosResultModal] = useState(false);
   const [showPosProcessingModal, setShowPosProcessingModal] = useState(false);
@@ -450,20 +451,19 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       const result = await processActiveSale(request);
       
       if (!result.success) {
-        setPosProcessing(false);
-        setShowPosProcessingModal(false);
-        
-        // failedAt'a göre açıklayıcı hata mesajı
-        let errorMsg = result.error || 'Bilinmeyen hata';
+        let errorMsg = 'İşlem tamamlanamadı.';
         if (result.failedAt === 'pos') {
-          errorMsg = `⚠️ İşlem onaylanmadı.`;
+          errorMsg = 'İşlem onaylanmadı. POS cihazından iptal edildi.';
         } else if (result.failedAt === 'bridge') {
-          errorMsg = `❌ İşlem kaydedilemedi. Tekrar deneyin.`;
+          errorMsg = 'İşlem kaydedilemedi. Tekrar deneyin.';
         } else if (result.failedAt === 'mapping') {
-          errorMsg = `❌ Paket eşlemesi bulunamadı.`;
+          errorMsg = 'Paket eşlemesi bulunamadı.';
+        } else if (result.error) {
+          errorMsg = result.error;
         }
-        
-        setErrorMessage(errorMsg);
+        setPosProcessingError(errorMsg);
+        setPosProcessingStep('error');
+        setPosProcessing(false);
         return;
       }
 
@@ -541,9 +541,9 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       }, 800);
       
     } catch (err) {
+      setPosProcessingError(`İşlem hatası: ${err instanceof Error ? err.message : String(err)}`);
+      setPosProcessingStep('error');
       setPosProcessing(false);
-      setShowPosProcessingModal(false);
-      setErrorMessage(`İşlem hatası: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -2335,33 +2335,37 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
             {/* Animasyonlu Dönen İkon */}
             <div className="text-center mb-6">
               <div className="relative w-20 h-20 mx-auto mb-4">
-                {/* Dış halka — dönen */}
-                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-500 border-r-blue-500 animate-spin" />
-                {/* İç halka — ters dönen */}
-                <div className="absolute inset-2 rounded-full border-4 border-transparent border-b-violet-500 border-l-cyan-500 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
-                {/* Orta ikon */}
+                {posProcessingStep !== 'error' && (
+                  <>
+                    <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-500 border-r-blue-500 animate-spin" />
+                    <div className="absolute inset-2 rounded-full border-4 border-transparent border-b-violet-500 border-l-cyan-500 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
+                  </>
+                )}
                 <div className="absolute inset-0 flex items-center justify-center">
                   {posProcessingStep === 'pos' && <CreditCard className="w-7 h-7 text-blue-400 animate-pulse" />}
                   {posProcessingStep === 'print' && <Printer className="w-7 h-7 text-violet-400 animate-pulse" />}
                   {posProcessingStep === 'done' && <CheckCircle className="w-7 h-7 text-emerald-400" />}
+                  {posProcessingStep === 'error' && <AlertTriangle className="w-7 h-7 text-red-400" />}
                 </div>
               </div>
-              
-              <h3 className="text-lg font-bold text-white mb-1">
+
+              <h3 className={`text-lg font-bold mb-1 ${posProcessingStep === 'error' ? 'text-red-400' : 'text-white'}`}>
                 {posProcessingStep === 'pos' && 'Ödeme Alınıyor...'}
                 {posProcessingStep === 'print' && 'Bilet Basılıyor...'}
                 {posProcessingStep === 'done' && 'İşlem Tamamlandı ✓'}
+                {posProcessingStep === 'error' && 'İşlem Onaylanmadı'}
               </h3>
-              
+
               <p className="text-sm text-gray-400">
                 {posProcessingStep === 'pos' && 'Lütfen müşterinin kartını okutunuz'}
                 {posProcessingStep === 'print' && 'Yazıcıya gönderiliyor...'}
                 {posProcessingStep === 'done' && 'Satış başarıyla tamamlandı'}
+                {posProcessingStep === 'error' && <span className="text-red-300">{posProcessingError}</span>}
               </p>
             </div>
 
-            {/* İlerleme Adımları */}
-            <div className="space-y-2">
+            {/* İlerleme Adımları — hata durumunda gizle */}
+            <div className={`space-y-2 ${posProcessingStep === 'error' ? 'hidden' : ''}`}>
               {(['pos', 'print', 'done'] as const).map((step, i) => {
                 const labels = ['Ödeme', 'Bilet Basım', 'Tamamlandı'];
                 const icons = [CreditCard, Printer, CheckCircle];
@@ -2400,6 +2404,32 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                 );
               })}
             </div>
+
+            {/* Hata butonları */}
+            {posProcessingStep === 'error' && (
+              <div className="flex gap-2 mt-5">
+                <button
+                  onClick={() => {
+                    setPosProcessingStep('pos');
+                    setPosProcessingError('');
+                    handleActiveSale();
+                  }}
+                  className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white py-2.5 rounded-xl font-bold text-sm transition-all"
+                >
+                  Tekrar Dene
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPosProcessingModal(false);
+                    setPosProcessingStep('pos');
+                    setPosProcessingError('');
+                  }}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white py-2.5 rounded-xl text-sm border border-gray-700 font-medium transition-all"
+                >
+                  İptal
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
