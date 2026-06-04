@@ -10,7 +10,7 @@
 
 import { ipcMain } from 'electron';
 import net from 'net';
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, execSync, type ChildProcess } from 'child_process';
 import path from 'path';
 
 export { startBridgeProcess, startBridgeExe };
@@ -197,6 +197,12 @@ function startBridgeExe(cmd: string, args: string[]): Promise<boolean> {
       resolve(bridgeReady);
       return;
     }
+
+    // Önceki oturumdan kalmış tüm pos_bridge.exe'leri temizle
+    try {
+      execSync('taskkill /F /IM pos_bridge.exe /T', { stdio: 'ignore' });
+      console.log('[BRIDGE] Eski bridge processleri temizlendi');
+    } catch { /* process yoksa hata verir, ignore */ }
 
     bridgeReady = false;
 
