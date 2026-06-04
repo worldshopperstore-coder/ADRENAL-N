@@ -196,8 +196,8 @@ input,button,select{font-family:inherit}
 
 .wave-bg{position:fixed;bottom:0;left:0;width:100%;height:32vh;opacity:.08;pointer-events:none;z-index:0}
 
-.page{min-height:100vh;min-height:100dvh;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
-.page-content{position:relative;z-index:2;flex:1;display:flex;flex-direction:column}
+.page{height:100vh;height:100dvh;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
+.page-content{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 
 .ring-pulse{position:absolute;border-radius:50%;border:2px solid currentColor;animation:ringPulse 1.2s ease-out infinite}
 .timer-glow{animation:greenGlow 2s ease-in-out infinite}
@@ -905,18 +905,25 @@ async function renderTeam(c: HTMLElement) {
       const DK_LABELS: Record<string, string> = { monday:'Pzt', tuesday:'Sal', wednesday:'\u00c7ar', thursday:'Per', friday:'Cum', saturday:'Cmt', sunday:'Paz' };
       const DK_ORDER = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 
-      // Haftal\u0131k program grid
+      // Haftal\u0131k program \u2014 schedule tab format\u0131nda dikey liste
+      const DK_FULL: Record<string, string> = { monday:'Pazartesi', tuesday:'Sal\u0131', wednesday:'\u00c7ar\u015famba', thursday:'Per\u015fembe', friday:'Cuma', saturday:'Cumartesi', sunday:'Pazar' };
       const weekGrid = fullSched ? DK_ORDER.map(dk => {
         const d = fullSched[dk];
         const isToday = dk === dayKey;
-        const lbl = DK_LABELS[dk];
-        return `<div style="text-align:center;padding:5px 2px;border-radius:8px;${isToday ? 'background:rgba(249,115,22,.1);' : ''}">
-          <div style="font-size:8px;font-weight:700;color:${isToday ? 'var(--orange)' : 'var(--text3)'};margin-bottom:3px">${lbl}</div>
+        const lbl = DK_FULL[dk] || dk;
+        const lClr = LEAVE_COLORS[d?.leaveType || ''] || '#ea580c';
+        const shiftStart = d?.startTime || d?.start || '';
+        const shiftEnd   = d?.endTime   || d?.end   || '';
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:10px;${isToday ? 'background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.2)' : 'border:1px solid transparent'}">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:12px;font-weight:${isToday ? '700' : '600'};color:${isToday ? 'var(--orange)' : '#fff'}">${lbl}</span>
+            ${isToday ? `<span style="font-size:8px;color:var(--orange);font-weight:700;background:rgba(249,115,22,.1);padding:1px 5px;border-radius:4px">BUG\u00dcN</span>` : ''}
+          </div>
           ${d?.isOff
-            ? `<div style="font-size:8px;color:#60a5fa;font-weight:600">\u0130zin</div>`
-            : d?.startTime
-              ? `<div style="font-size:7px;color:var(--text2);font-weight:700;line-height:1.4">${d.startTime}<br>${d.endTime}</div>`
-              : `<div style="font-size:8px;color:var(--text3)">\u2014</div>`}
+            ? `<span style="color:${lClr};font-size:11px;font-weight:600;background:${lClr}12;padding:2px 8px;border-radius:6px;border:1px solid ${lClr}20">${esc(d.leaveType || '\u0130zin')}</span>`
+            : shiftStart
+              ? `<span style="color:var(--text2);font-size:12px;font-weight:600">${shiftStart} \u2013 ${shiftEnd}</span>`
+              : `<span style="color:var(--text3);font-size:11px">\u2014</span>`}
         </div>`;
       }).join('') : '';
 
@@ -940,8 +947,9 @@ async function renderTeam(c: HTMLElement) {
         </div>
         <!-- Haftal\u0131k program (gizli) -->
         ${fullSched ? `<div id="sched-${p.id}" style="display:none;padding:0 12px 12px">
-          <div style="border-top:1px solid rgba(255,255,255,.05);padding-top:10px">
-            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">${weekGrid}</div>
+          <div style="border-top:1px solid rgba(255,255,255,.05);padding-top:8px">
+            <p style="color:var(--text3);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 6px 2px">Haftalık Program</p>
+            <div style="display:flex;flex-direction:column;gap:2px">${weekGrid}</div>
           </div>
         </div>` : ''}
       </div>`;
