@@ -22,6 +22,7 @@ interface Sale {
   category?: string;
   adultQty: number;
   childQty: number;
+  infantQty?: number;
   currency: 'TL' | 'USD' | 'EUR' | 'KK';
   paymentType: 'Nakit' | 'Kredi Kartı' | 'Çoklu';
   total: number;
@@ -53,6 +54,7 @@ interface AddSaleForm {
   packageId: string;
   adultQty: string;
   childQty: string;
+  infantQty: string;
   paymentType: 'Nakit' | 'Kredi Kartı';
   splitKkTl: string;
   splitCashTl: string;
@@ -148,6 +150,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     packageId: '',
     adultQty: '0',
     childQty: '0',
+    infantQty: '0',
     paymentType: 'Nakit',
     splitKkTl: '',
     splitCashTl: '',
@@ -254,6 +257,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
 
     const adultQty = parseInt(formData.adultQty) || 0;
     const childQty = parseInt(formData.childQty) || 0;
+    const infantQty = parseInt(formData.infantQty) || 0;
     const total = adultQty * selectedPackage.adultPrice + childQty * selectedPackage.childPrice;
 
     let kkTl: number, cashTl: number, cashUsd: number, cashEur: number;
@@ -299,6 +303,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       category: selectedPackage.category,
       adultQty,
       childQty,
+      infantQty: infantQty || undefined,
       currency: selectedPackage.currency as any,
       paymentType,
       total,
@@ -329,6 +334,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       packageId: '',
       adultQty: '0',
       childQty: '0',
+      infantQty: '0',
       paymentType: 'Nakit',
       splitKkTl: '',
       splitCashTl: '',
@@ -355,6 +361,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
 
     const adultQty = parseInt(formData.adultQty) || 0;
     const childQty = parseInt(formData.childQty) || 0;
+    const infantQty = parseInt(formData.infantQty) || 0;
 
     // Contract mapping kontrolü
     if (!hasContractMapping(formData.packageId)) {
@@ -473,6 +480,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         category: selectedPackage.category,
         adultQty,
         childQty,
+        infantQty: infantQty || undefined,
         currency: selectedPackage.currency as any,
         paymentType,
         total,
@@ -500,26 +508,14 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       setSales((prev) => [...prev, newSale]);
 
       // Form sıfırla
-      setFormData({ packageId: '', adultQty: '0', childQty: '0', paymentType: 'Nakit', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: false, selectedCurrency: '', comment: '' });
+      setFormData({ packageId: '', adultQty: '0', childQty: '0', infantQty: '0', paymentType: 'Nakit', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: false, selectedCurrency: '', comment: '' });
       setSplitMode(false);
       setSelectedCategory('');
       setShowAddForm(false);
       
       // İşlem modalını kapat, sonuç modalını göster
       setPosProcessing(false);
-      setPosResult({
-        ...result,
-        _saleInfo: {
-          packageName: selectedPackage.name,
-          packageId: selectedPackage.id,
-          adultQty,
-          childQty,
-          adultPrice: selectedPackage.adultPrice,
-          childPrice: selectedPackage.childPrice,
-          currency: selectedPackage.currency,
-          isFree: isFreePackage,
-        },
-      });
+      setPosResult(result);
       
       // Kısa gecikme ile processing modal'dan sonuç modal'a geçiş
       setTimeout(() => {
@@ -557,6 +553,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
           personnelName: sale.personnelName || getPersonnelName(),
           adultQty: sale.adultQty,
           childQty: sale.childQty,
+          infantQty: sale.infantQty,
           products: [kasaLabel],
           adultPrice: pkg?.adultPrice || 0,
           childPrice: pkg?.childPrice || 0,
@@ -1521,7 +1518,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                         key={group}
                         onClick={() => {
                           setSelectedCategory(group);
-                          setFormData({ ...formData, packageId: '', adultQty: '0', childQty: '0', paymentType: 'Nakit', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: group.startsWith('Çapraz'), selectedCurrency: '' });
+                          setFormData({ ...formData, packageId: '', adultQty: '0', childQty: '0', infantQty: '0', paymentType: 'Nakit', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: group.startsWith('Çapraz'), selectedCurrency: '' });
                           setSplitMode(false);
                         }}
                         disabled={pkgCount === 0}
@@ -1615,7 +1612,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                           >
                             <option value="">Paket Seçiniz...</option>
                             {kasaPackages.filter(pkg => pkg.category === selectedCategory).map((pkg) => (
-                              <option key={pkg.id} value={pkg.id}>{pkg.name} — Y:{pkg.adultPrice} / Ç:{pkg.childPrice} ₺</option>
+                              <option key={pkg.id} value={pkg.id}>{pkg.name}</option>
                             ))}
                           </select>
                           <ChevronRight className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none" />
@@ -1642,7 +1639,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                               }`}
                             >
                               <DollarSign className="w-4 h-4" /> USD
-                              {usdPkg && <span className="text-[10px] opacity-60 ml-0.5">{usdPkg.adultPrice}/{usdPkg.childPrice}</span>}
                             </button>
                             <button
                               type="button"
@@ -1654,49 +1650,87 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                               }`}
                             >
                               <Euro className="w-4 h-4" /> EUR
-                              {eurPkg && <span className="text-[10px] opacity-60 ml-0.5">{eurPkg.adultPrice}/{eurPkg.childPrice}</span>}
                             </button>
                           </div>
                         </div>
                       );
                     })()}
 
-                    {/* ── ADIM 3: Kişi Sayısı + Ödeme Tipi ── */}
-                    <div className="grid grid-cols-3 gap-2.5">
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Yetişkin</label>
-                        <input
-                          type="number" min="0" value={formData.adultQty}
-                          onChange={(e) => setFormData({ ...formData, adultQty: e.target.value })}
-                          className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm text-center focus:outline-none focus:border-emerald-500 transition-colors"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Çocuk</label>
-                        <input
-                          type="number" min="0" value={formData.childQty}
-                          onChange={(e) => setFormData({ ...formData, childQty: e.target.value })}
-                          className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm text-center focus:outline-none focus:border-emerald-500 transition-colors"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Ödeme</label>
-                        {!splitMode ? (
-                          <select
-                            value={formData.paymentType}
-                            onChange={(e) => setFormData({ ...formData, paymentType: e.target.value as any })}
-                            className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500 transition-colors"
-                          >
-                            <option value="Nakit">Nakit</option>
-                            <option value="Kredi Kartı">Kredi Kartı</option>
-                          </select>
-                        ) : (
-                          <div className="w-full px-3 py-2.5 bg-orange-900/20 border border-orange-500/30 rounded-xl text-orange-300 text-sm text-center font-semibold">
-                            Çoklu
+                    {/* ── ADIM 3: Kişi Sayısı ── */}
+                    {(() => {
+                      const hasAny = (parseInt(formData.adultQty) || 0) > 0 || (parseInt(formData.childQty) || 0) > 0;
+                      return (
+                        <div className={`grid gap-2.5 ${hasAny ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Yetişkin</label>
+                            <input
+                              type="number" min="0" value={formData.adultQty}
+                              onChange={(e) => setFormData({ ...formData, adultQty: e.target.value })}
+                              className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm text-center focus:outline-none focus:border-emerald-500 transition-colors"
+                            />
                           </div>
-                        )}
-                      </div>
-                    </div>
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Çocuk</label>
+                            <input
+                              type="number" min="0" value={formData.childQty}
+                              onChange={(e) => setFormData({ ...formData, childQty: e.target.value })}
+                              className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm text-center focus:outline-none focus:border-emerald-500 transition-colors"
+                            />
+                          </div>
+                          {hasAny && (
+                            <div>
+                              <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">INF <span className="text-gray-600 normal-case">(ücretsiz)</span></label>
+                              <input
+                                type="number" min="0" value={formData.infantQty}
+                                onChange={(e) => setFormData({ ...formData, infantQty: e.target.value })}
+                                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm text-center focus:outline-none focus:border-sky-500 transition-colors"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* ── ADIM 4: Ödeme Yöntemi (buton ile aç/kapat) ── */}
+                    {(() => {
+                      const hasAny = (parseInt(formData.adultQty) || 0) > 0 || (parseInt(formData.childQty) || 0) > 0;
+                      if (!formData.packageId || !hasAny) return null;
+                      return (
+                        <div>
+                          {!splitMode && (
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, paymentType: 'Nakit' })}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border transition-all text-sm font-bold ${
+                                  formData.paymentType === 'Nakit'
+                                    ? 'bg-blue-500/20 border-blue-400/60 text-blue-300'
+                                    : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
+                                }`}
+                              >
+                                <Banknote className="w-4 h-4" /> Nakit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, paymentType: 'Kredi Kartı' })}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border transition-all text-sm font-bold ${
+                                  formData.paymentType === 'Kredi Kartı'
+                                    ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300'
+                                    : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
+                                }`}
+                              >
+                                <CreditCard className="w-4 h-4" /> Kredi Kartı
+                              </button>
+                            </div>
+                          )}
+                          {splitMode && (
+                            <div className="w-full px-3 py-2.5 bg-orange-900/20 border border-orange-500/30 rounded-xl text-orange-300 text-sm text-center font-semibold">
+                              Çoklu Ödeme
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* ── Açıklama (Comment) — opsiyonel, aktif modda DB'ye kaydedilir ── */}
                     {integrationActive && (
@@ -1713,57 +1747,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                       </div>
                     )}
 
-                    {/* ── Fiyat + Çoklu Ödeme (kompakt) ── */}
-                    {formData.packageId && (() => {
-                      const pkg = kasaPackages.find(p => p.id === formData.packageId);
-                      if (!pkg) return null;
-                      const adultQ = parseInt(formData.adultQty) || 0;
-                      const childQ = parseInt(formData.childQty) || 0;
-                      const totalForeign = adultQ * pkg.adultPrice + childQ * pkg.childPrice;
-                      if (totalForeign <= 0) return null;
-                      const rate = pkg.currency === 'USD' ? usdRate : pkg.currency === 'EUR' ? eurRate : 0;
-                      const currSymbol = pkg.currency === 'USD' ? '$' : pkg.currency === 'EUR' ? '€' : '₺';
-                      const totalTl = pkg.currency === 'TL' ? totalForeign : totalForeign * rate;
-
-                      return (
-                        <div className={`rounded-lg border px-3 py-2 ${
-                          pkg.currency !== 'TL'
-                            ? 'bg-amber-950/30 border-amber-500/20'
-                            : 'bg-emerald-950/30 border-emerald-500/20'
-                        }`}>
-                          <div className="flex items-center justify-between">
-                            <span className="text-lg font-black text-white">
-                              {totalForeign.toFixed(2)} <span className={`text-sm ${pkg.currency === 'USD' ? 'text-amber-400' : pkg.currency === 'EUR' ? 'text-blue-400' : 'text-emerald-400'}`}>{currSymbol}</span>
-                            </span>
-                            {pkg.currency !== 'TL' && (
-                              <span className="text-sm font-bold text-emerald-400">≈{totalTl.toFixed(2)} ₺ <span className="text-[10px] text-gray-600">({rate.toFixed(2)})</span></span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* ── Çoklu Ödeme Toggle ── */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSplitMode(!splitMode);
-                        if (!splitMode) {
-                          setFormData({ ...formData, splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '' });
-                        }
-                      }}
-                      className={`w-full py-2 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
-                        splitMode
-                          ? 'bg-orange-500/15 text-orange-300 border-orange-500/30'
-                          : 'bg-gray-800/60 text-gray-400 border-gray-700/50 hover:text-gray-200'
-                      }`}
-                    >
-                      <Coins className="w-3 h-3" />
-                      {splitMode ? 'Çoklu Ödemeyi Kapat' : 'Çoklu Ödeme'}
-                    </button>
-
-
-
                     {/* Çapraz Satış badge */}
                     {formData.isCrossSale && (
                       <div className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs bg-orange-500/10 border-orange-500/25 text-orange-400">
@@ -1772,69 +1755,127 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                       </div>
                     )}
 
-                    {/* ── Hata Mesajı ── */}
-                    {errorMessage && (
-                      <div className="bg-red-500/10 text-red-300 text-sm px-4 py-3 rounded-xl border border-red-500/25 flex items-center gap-2">
-                        <span className="text-red-400 text-base">⚠</span> {errorMessage}
-                      </div>
+                    {/* ── Çoklu Ödeme Toggle ── */}
+                    {formData.packageId && ((parseInt(formData.adultQty) || 0) > 0 || (parseInt(formData.childQty) || 0) > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSplitMode(!splitMode);
+                          if (!splitMode) {
+                            setFormData({ ...formData, splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '' });
+                          }
+                        }}
+                        className={`w-full py-2 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                          splitMode
+                            ? 'bg-orange-500/15 text-orange-300 border-orange-500/30'
+                            : 'bg-gray-800/60 text-gray-400 border-gray-700/50 hover:text-gray-200'
+                        }`}
+                      >
+                        <Coins className="w-3 h-3" />
+                        {splitMode ? 'Çoklu Ödemeyi Kapat' : 'Çoklu Ödeme'}
+                      </button>
                     )}
-
-                    {/* ── Aksiyon Butonları ── */}
-                    {(() => {
-                      const cfg = CATEGORY_CONFIG[selectedCategory];
-                      const hasMappingForPkg = formData.packageId ? hasContractMapping(formData.packageId) : false;
-                      const showActiveMode = integrationActive;
-                      const selectedPkg = kasaPackages.find(p => p.id === formData.packageId);
-                      const isFreePackage = selectedPkg && selectedPkg.adultPrice === 0 && selectedPkg.childPrice === 0;
-                      
-                      return (
-                        <div className="space-y-2 pt-1">
-                          {showActiveMode && (
-                            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border ${
-                              integrationReady
-                                ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
-                                : 'bg-yellow-500/10 border-yellow-500/25 text-yellow-400'
-                            }`}>
-                              <Database className="w-3.5 h-3.5" />
-                              <span className="font-semibold">{integrationReady ? 'Bağlantı Aktif' : 'Bağlantı Yok'}</span>
-                              {formData.packageId && !hasMappingForPkg && (
-                                <span className="text-yellow-400 ml-auto">⚠ DB eşlemesi yok</span>
-                              )}
-                            </div>
-                          )}
-                          
-                          <div className="flex gap-2.5">
-                            {showActiveMode ? (
-                              <button
-                                onClick={handleActiveSale}
-                                disabled={posProcessing || !formData.packageId || (formData.adultQty === '0' && formData.childQty === '0')}
-                                className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:from-gray-700 disabled:to-gray-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
-                              >
-                                <Zap className="w-4 h-4" /> {isFreePackage ? 'Bilet Bas' : 'Ödeme Al'}
-                              </button>
-                            ) : (
-                              <button
-                                onClick={handleAddSale}
-                                disabled={posProcessing}
-                                className={`flex-1 bg-gradient-to-r ${cfg.badge} hover:opacity-90 disabled:opacity-50 text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2`}
-                              >
-                                <Check className="w-4 h-4" /> Satışı Kaydet
-                              </button>
-                            )}
-                            
-                            <button
-                              onClick={() => { setShowAddForm(false); setSelectedCategory(''); setErrorMessage(''); setSplitMode(false); }}
-                              className="px-5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white py-3 rounded-xl transition-colors text-sm border border-gray-700 font-medium"
-                            >
-                              İptal
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })()}
                   </div>
                 )}
               </div>
+
+              {/* SAĞ PANEL: Özet (paket + kişi girilince görünür) */}
+              {(() => {
+                const pkg = kasaPackages.find(p => p.id === formData.packageId);
+                const adultQ = parseInt(formData.adultQty) || 0;
+                const childQ = parseInt(formData.childQty) || 0;
+                const infantQ = parseInt(formData.infantQty) || 0;
+                const hasAny = adultQ > 0 || childQ > 0;
+                if (!pkg || !hasAny || splitMode) return null;
+                const currSymbol = pkg.currency === 'USD' ? '$' : pkg.currency === 'EUR' ? '€' : '₺';
+                const rate = pkg.currency === 'USD' ? usdRate : pkg.currency === 'EUR' ? eurRate : 0;
+                const total = adultQ * pkg.adultPrice + childQ * pkg.childPrice;
+                const totalTl = pkg.currency === 'TL' ? total : total * rate;
+                const isFree = pkg.adultPrice === 0 && pkg.childPrice === 0;
+                const cfg = CATEGORY_CONFIG[selectedCategory];
+                const showActiveMode = integrationActive;
+                const hasMappingForPkg = hasContractMapping(formData.packageId);
+                return (
+                  <div className="flex-shrink-0 sm:w-64 sm:border-l border-t sm:border-t-0 border-gray-700/40 p-3 sm:p-4 flex flex-col gap-3">
+                    <label className="block text-[10px] text-gray-400 font-bold uppercase tracking-widest">Özet</label>
+                    <div className="space-y-1.5">
+                      <div className="bg-gray-800/60 rounded-xl px-3 py-2">
+                        <p className="text-[10px] text-gray-500 mb-0.5">Paket</p>
+                        <p className="text-sm font-bold text-white truncate">{pkg.name}</p>
+                        {formData.selectedCurrency && <p className="text-[10px] text-gray-500">{formData.selectedCurrency}</p>}
+                      </div>
+                      {adultQ > 0 && (
+                        <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/40">
+                          <span className="text-xs text-gray-400">Yetişkin × {adultQ}</span>
+                          <span className="text-xs font-bold text-white">{(adultQ * pkg.adultPrice).toFixed(2)} {currSymbol}</span>
+                        </div>
+                      )}
+                      {childQ > 0 && (
+                        <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/40">
+                          <span className="text-xs text-gray-400">Çocuk × {childQ}</span>
+                          <span className="text-xs font-bold text-white">{(childQ * pkg.childPrice).toFixed(2)} {currSymbol}</span>
+                        </div>
+                      )}
+                      {infantQ > 0 && (
+                        <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/40">
+                          <span className="text-xs text-gray-400">INF × {infantQ}</span>
+                          <span className="text-xs font-bold text-sky-400">Ücretsiz</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-900 border border-gray-700/50 mt-1">
+                        <span className="text-xs font-bold text-gray-300">Toplam</span>
+                        <div className="text-right">
+                          <p className="text-base font-black text-white">{total.toFixed(2)} <span className={`text-sm ${pkg.currency === 'USD' ? 'text-amber-400' : pkg.currency === 'EUR' ? 'text-blue-400' : 'text-emerald-400'}`}>{currSymbol}</span></p>
+                          {pkg.currency !== 'TL' && <p className="text-[10px] text-gray-500">≈{totalTl.toFixed(0)} ₺</p>}
+                        </div>
+                      </div>
+                      {formData.paymentType && (
+                        <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/40">
+                          <span className="text-xs text-gray-400">Ödeme</span>
+                          <span className={`text-xs font-bold ${formData.paymentType === 'Kredi Kartı' ? 'text-emerald-400' : 'text-blue-400'}`}>{formData.paymentType}</span>
+                        </div>
+                      )}
+                    </div>
+                    {showActiveMode && (
+                      <div className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] border ${integrationReady ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' : 'bg-yellow-500/10 border-yellow-500/25 text-yellow-400'}`}>
+                        <Database className="w-3 h-3" />
+                        <span className="font-semibold">{integrationReady ? 'Bağlantı Aktif' : 'Bağlantı Yok'}</span>
+                        {!hasMappingForPkg && <span className="text-yellow-400 ml-auto">⚠ eşleme yok</span>}
+                      </div>
+                    )}
+                    {errorMessage && (
+                      <div className="bg-red-500/10 text-red-300 text-xs px-3 py-2 rounded-xl border border-red-500/25">
+                        ⚠ {errorMessage}
+                      </div>
+                    )}
+                    <div className="mt-auto space-y-2">
+                      {showActiveMode ? (
+                        <button
+                          onClick={handleActiveSale}
+                          disabled={posProcessing}
+                          className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:from-gray-700 disabled:to-gray-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
+                        >
+                          <Zap className="w-4 h-4" /> {isFree ? 'Bilet Bas' : 'Ödeme Al'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleAddSale}
+                          disabled={posProcessing}
+                          className={`w-full bg-gradient-to-r ${cfg.badge} hover:opacity-90 disabled:opacity-50 text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2`}
+                        >
+                          <Check className="w-4 h-4" /> Satışı Kaydet
+                        </button>
+                      )}
+                      <button
+                        onClick={() => { setShowAddForm(false); setSelectedCategory(''); setErrorMessage(''); setSplitMode(false); }}
+                        className="w-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white py-2 rounded-xl transition-colors text-sm border border-gray-700 font-medium"
+                      >
+                        İptal
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* SAĞ PANEL: Çoklu Ödeme (splitMode aktifken görünür) */}
               {splitMode && (
@@ -2411,39 +2452,10 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               {posResult.success && posResult.ticketIds && posResult.ticketIds.length > 0 && (
                 <button
                   onClick={async () => {
-                    // Manuel bilet basımı (tekrar bas)
+                    // Son satışı bul ve biletleri tekrar bas
                     try {
-                      const saleInfo = posResult._saleInfo;
-                      if (!saleInfo || !posResult.ticketIds || !posResult.terminalRecordId) return;
-                      
-                      const kasaLabel = currentKasaId === 'wildpark' ? 'WILDPARK' : currentKasaId === 'sinema' ? 'XD SINEMA' : 'FACE2FACE';
-                      
-                      const printData = buildTicketPrintData(
-                        {
-                          terminalRecordId: posResult.terminalRecordId,
-                          ticketIds: posResult.ticketIds,
-                          ticketGroupMap: posResult.ticketGroupMap as Record<string, number[]> | undefined,
-                        },
-                        {
-                          packageName: saleInfo.packageName,
-                          kasaId: currentKasaId as any,
-                          personnelName: getPersonnelName(),
-                          adultQty: saleInfo.adultQty,
-                          childQty: saleInfo.childQty,
-                          products: [kasaLabel],
-                          adultPrice: saleInfo.adultPrice,
-                          childPrice: saleInfo.childPrice,
-                          currency: saleInfo.currency,
-                          isFree: saleInfo.isFree,
-                        },
-                      );
-                      
-                      const pResult = await printTickets(printData);
-                      if (pResult.success) {
-                        alert(`✅ ${pResult.printed} bilet basıldı!`);
-                      } else {
-                        alert(`⚠️ Yazdırma: ${pResult.printed} basıldı, ${pResult.failed} başarısız\n${pResult.errors.join('\n')}`);
-                      }
+                      const lastSale = sales[sales.length - 1];
+                      if (lastSale) await handleReprintTicket(lastSale);
                     } catch (err: any) {
                       alert(`❌ Yazdırma hatası: ${err.message}`);
                     }

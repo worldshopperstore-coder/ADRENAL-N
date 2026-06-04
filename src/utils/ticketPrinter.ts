@@ -20,7 +20,7 @@ export interface TicketPrintData {
   ticketId: number;                // DB ticket ID (Tickets.Id)
   terminalRecordId: number;        // İşlem no (TerminalRecords.Id)
   packageName: string;             // Paket adı: "M.Y", "Visitor", "Ç.XD+WP"
-  ticketType: 'ADU' | 'CHL' | 'COMP';
+  ticketType: 'ADU' | 'CHL' | 'COMP' | 'INF';
   kasaId: 'wildpark' | 'sinema' | 'face2face';
   kasaLabel: string;               // "WILDPARK", "XD SİNEMA", "FACE2FACE"
   products: string[];              // ["WILDPARK", "CINEMA"] (combo ise çoklu)
@@ -45,6 +45,7 @@ const TICKET_TYPE_LABELS: Record<string, string> = {
   ADU: 'ADU',
   CHL: 'CHL',
   COMP: 'COMP',
+  INF: 'INF',
 };
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -110,6 +111,8 @@ function generateTicketZPL(ticket: TicketPrintData): string {
   });
   const timeText = '09:00 TO 20:00';
 
+  const isInfant = ticket.ticketType === 'INF';
+
   // ── ZPL Komutu (onaylanan final layout) ──
   // PW=552 (69mm), LL=808 (101mm), ^A0B (270° döndürülmüş)
   // Tüm fontlar aynı: TT0003M_ (TrueType)
@@ -122,7 +125,7 @@ function generateTicketZPL(ticket: TicketPrintData): string {
 ^FT120,748^A@B,28,28,E:TT0003M_.FNT^FD${kategoriZpl}^FS
 ^FT158,748^A@B,28,28,E:TT0003M_.FNT^FD${paketZpl}^FS
 ^FO105,338^A@B,38,32,E:TT0003M_.FNT^FD${ticket.date}^FS
-^FO201,329^BQN,2,6^FDQA,${qrData}^FS`;
+${isInfant ? '' : `^FO201,329^BQN,2,6^FDQA,${qrData}^FS`}`;
 
   // Entrance satırları — QR'dan uzak, saat ile entrance yakın
   const entranceStartX = 390;
@@ -228,6 +231,7 @@ export function buildTicketPrintData(
     personnelName: string;
     adultQty: number;
     childQty: number;
+    infantQty?: number;
     compQty?: number;
     products: string[];          // Ürün adları: ["WILDPARK", "CINEMA"]
     adultPrice: number;
@@ -366,6 +370,27 @@ export function buildTicketPrintData(
     });
   }
   
+  // INF biletleri — DB ticket ID'si olmaz, terminalRecordId'yi ID olarak kullan
+  const infQty = request.infantQty || 0;
+  for (let i = 0; i < infQty; i++) {
+    printData.push({
+      ticketId: 0,  // INF'nin DB kaydı yok
+      terminalRecordId: saleResult.terminalRecordId,
+      packageName: request.packageName,
+      ticketType: 'INF',
+      kasaId: request.kasaId,
+      kasaLabel,
+      products: request.products,
+      price: 0,
+      currency: request.currency,
+      personnelName: request.personnelName,
+      date: dateStr,
+      time: timeStr,
+      groupIndex: i + 1,
+      groupTotal: infQty,
+    });
+  }
+
   return printData;
 }
 
