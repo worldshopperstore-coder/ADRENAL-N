@@ -29,6 +29,7 @@ export interface ActiveSaleRequest {
   adultQty: number;
   childQty: number;
   compQty?: number;                     // FREE biletler için
+  infantQty?: number;                   // INF (ücretsiz, QR kodsuz) biletler için
   paymentType: 'Nakit' | 'Kredi Kartı';
   currency: 'TL' | 'USD' | 'EUR';
   kasaId: 'wildpark' | 'sinema' | 'face2face';
@@ -240,6 +241,7 @@ async function tryPrintTickets(
         adultQty: request.adultQty,
         childQty: request.childQty,
         compQty: request.compQty,
+        infantQty: request.infantQty,
         products: productNames,
         adultPrice: request.adultPrice || 0,
         childPrice: request.childPrice || 0,

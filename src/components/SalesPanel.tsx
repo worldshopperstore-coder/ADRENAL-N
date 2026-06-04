@@ -165,23 +165,36 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
   // Visitor, Çapraz Visitor, Acenta gibi hem USD hem EUR olan kategoriler
   const isDualCurrencyCategory = (cat: string) => ['Visitor', 'Çapraz Visitor', 'Acenta'].includes(cat);
 
+  // Para sembolünü temizle: "Acenta $12" → "Acenta 12"
+  const cleanPkgName = (name: string) => name.replace(/[$€]\s*/g, '').trim();
+
   // Bir kategorideki benzersiz paket isimlerini getir (USD/EUR tekrarlarını kaldır)
+  // Acenta için: "Acenta $12" ve "Acenta €12" → tek "Acenta 12", küçükten büyüğe sırala
   const getUniquePackageNames = (cat: string): { name: string; baseName: string }[] => {
     const pkgs = kasaPackages.filter(p => p.category === cat);
     const seen = new Set<string>();
     const result: { name: string; baseName: string }[] = [];
     for (const p of pkgs) {
-      if (!seen.has(p.name)) {
-        seen.add(p.name);
-        result.push({ name: p.name, baseName: p.name });
+      const base = cleanPkgName(p.name);
+      if (!seen.has(base)) {
+        seen.add(base);
+        result.push({ name: base, baseName: base });
       }
+    }
+    // Acenta için fiyata göre küçükten büyüğe sırala
+    if (cat === 'Acenta') {
+      result.sort((a, b) => {
+        const na = parseInt(a.name.replace(/\D/g, '')) || 0;
+        const nb = parseInt(b.name.replace(/\D/g, '')) || 0;
+        return na - nb;
+      });
     }
     return result;
   };
 
-  // Paket adı + para birimi → gerçek paket ID'si
-  const resolvePackageId = (packageName: string, currency: 'USD' | 'EUR', cat: string): string => {
-    const pkg = kasaPackages.find(p => p.category === cat && p.name === packageName && p.currency === currency);
+  // Paket base adı + para birimi → gerçek paket ID'si
+  const resolvePackageId = (baseName: string, currency: 'USD' | 'EUR', cat: string): string => {
+    const pkg = kasaPackages.find(p => p.category === cat && cleanPkgName(p.name) === baseName && p.currency === currency);
     return pkg?.id || '';
   };
   
@@ -414,6 +427,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       packageName: selectedPackage.name,
       adultQty,
       childQty,
+      infantQty: infantQty || undefined,
       paymentType: splitMode ? (splitPayments?.kkTl && splitPayments.kkTl > 0 ? 'Kredi Kartı' : 'Nakit') : formData.paymentType,
       currency: selectedPackage.currency as any,
       kasaId: currentKasaId as any,
@@ -1658,26 +1672,29 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
 
                     {/* ── ADIM 3: Kişi Sayısı ── */}
                     {(() => {
+                      const pkgSelected = !!formData.packageId;
                       const hasAny = (parseInt(formData.adultQty) || 0) > 0 || (parseInt(formData.childQty) || 0) > 0;
                       return (
-                        <div className={`grid gap-2.5 ${hasAny ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                        <div className={`grid gap-2.5 ${hasAny && pkgSelected ? 'grid-cols-3' : 'grid-cols-2'}`}>
                           <div>
                             <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Yetişkin</label>
                             <input
                               type="number" min="0" value={formData.adultQty}
+                              disabled={!pkgSelected}
                               onChange={(e) => setFormData({ ...formData, adultQty: e.target.value })}
-                              className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm text-center focus:outline-none focus:border-emerald-500 transition-colors"
+                              className={`w-full px-3 py-2.5 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm text-center focus:outline-none focus:border-emerald-500 transition-colors ${!pkgSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
                             />
                           </div>
                           <div>
                             <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Çocuk</label>
                             <input
                               type="number" min="0" value={formData.childQty}
+                              disabled={!pkgSelected}
                               onChange={(e) => setFormData({ ...formData, childQty: e.target.value })}
-                              className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm text-center focus:outline-none focus:border-emerald-500 transition-colors"
+                              className={`w-full px-3 py-2.5 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm text-center focus:outline-none focus:border-emerald-500 transition-colors ${!pkgSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
                             />
                           </div>
-                          {hasAny && (
+                          {hasAny && pkgSelected && (
                             <div>
                               <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">INF <span className="text-gray-600 normal-case">(ücretsiz)</span></label>
                               <input
