@@ -55,7 +55,7 @@ interface AddSaleForm {
   adultQty: string;
   childQty: string;
   infantQty: string;
-  paymentType: 'Nakit' | 'Kredi Kartı';
+  paymentType: 'Nakit' | 'Kredi Kartı' | '';
   splitKkTl: string;
   splitCashTl: string;
   splitCashUsd: string;
@@ -264,6 +264,10 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       setErrorMessage('Lütfen paket ve miktar seçiniz');
       return;
     }
+    if (!splitMode && !formData.paymentType) {
+      setErrorMessage('Lütfen ödeme yöntemini seçiniz');
+      return;
+    }
 
     const selectedPackage = kasaPackages.find((p) => p.id === formData.packageId);
     if (!selectedPackage) return;
@@ -277,7 +281,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     let paymentType: 'Nakit' | 'Kredi Kartı' | 'Çoklu';
 
     if (splitMode) {
-      // Split payment mode
       kkTl = parseFloat(formData.splitKkTl) || 0;
       cashTl = parseFloat(formData.splitCashTl) || 0;
       cashUsd = parseFloat(formData.splitCashUsd) || 0;
@@ -299,13 +302,13 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       const methodCount = [kkTl > 0, cashTl > 0, cashUsd > 0, cashEur > 0].filter(Boolean).length;
       paymentType = methodCount > 1 ? 'Çoklu' : kkTl > 0 ? 'Kredi Kartı' : 'Nakit';
     } else {
-      // Simple payment mode
-      const distribution = calculateSaleDistribution(total, selectedPackage.currency, formData.paymentType, usdRate, eurRate);
+      const pt = formData.paymentType as 'Nakit' | 'Kredi Kartı';
+      const distribution = calculateSaleDistribution(total, selectedPackage.currency, pt, usdRate, eurRate);
       kkTl = distribution.kkTl;
       cashTl = distribution.cashTl;
       cashUsd = distribution.cashUsd;
       cashEur = distribution.cashEur;
-      paymentType = formData.paymentType;
+      paymentType = pt;
     }
 
     setErrorMessage('');
@@ -389,7 +392,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
 
     // Split payment bilgisi + ödeme tipi belirleme
     let splitPayments: ActiveSaleRequest['splitPayments'] = undefined;
-    let paymentType: 'Nakit' | 'Kredi Kartı' | 'Çoklu' = formData.paymentType;
+    let paymentType: 'Nakit' | 'Kredi Kartı' | 'Çoklu' = (formData.paymentType as 'Nakit' | 'Kredi Kartı') || 'Nakit';
 
     if (splitMode) {
       const kkTlVal = parseFloat(formData.splitKkTl) || 0;
@@ -428,7 +431,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       adultQty,
       childQty,
       infantQty: infantQty || undefined,
-      paymentType: splitMode ? (splitPayments?.kkTl && splitPayments.kkTl > 0 ? 'Kredi Kartı' : 'Nakit') : formData.paymentType,
+      paymentType: splitMode ? (splitPayments?.kkTl && splitPayments.kkTl > 0 ? 'Kredi Kartı' : 'Nakit') : ((formData.paymentType || 'Nakit') as 'Nakit' | 'Kredi Kartı'),
       currency: selectedPackage.currency as any,
       kasaId: currentKasaId as any,
       personnelName: getPersonnelName(),
@@ -522,7 +525,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       setSales((prev) => [...prev, newSale]);
 
       // Form sıfırla
-      setFormData({ packageId: '', adultQty: '0', childQty: '0', infantQty: '0', paymentType: 'Nakit', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: false, selectedCurrency: '', comment: '' });
+      setFormData({ packageId: '', adultQty: '0', childQty: '0', infantQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: false, selectedCurrency: '', comment: '' });
       setSplitMode(false);
       setSelectedCategory('');
       setShowAddForm(false);
@@ -1869,16 +1872,16 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                       {showActiveMode ? (
                         <button
                           onClick={handleActiveSale}
-                          disabled={posProcessing}
-                          className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:from-gray-700 disabled:to-gray-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
+                          disabled={posProcessing || (!splitMode && !formData.paymentType && !isFree)}
+                          className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
                         >
                           <Zap className="w-4 h-4" /> {isFree ? 'Bilet Bas' : 'Ödeme Al'}
                         </button>
                       ) : (
                         <button
                           onClick={handleAddSale}
-                          disabled={posProcessing}
-                          className={`w-full bg-gradient-to-r ${cfg.badge} hover:opacity-90 disabled:opacity-50 text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2`}
+                          disabled={posProcessing || (!splitMode && !formData.paymentType && !isFree)}
+                          className={`w-full bg-gradient-to-r ${cfg.badge} hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2`}
                         >
                           <Check className="w-4 h-4" /> Satışı Kaydet
                         </button>
