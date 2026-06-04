@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Megaphone } from 'lucide-react';
+import { Megaphone, Download, RefreshCw } from 'lucide-react';
 import { getActiveAnnouncements, type Announcement } from '@/utils/announcementsDB';
 import AppLayout from '@/components/AppLayout';
 import DashboardTab from '@/components/DashboardTab';
@@ -29,6 +29,13 @@ export default function App() {
   });
   const [announcementPopup, setAnnouncementPopup] = useState<Announcement[]>([]);
   const [maintenanceNotice, setMaintenanceNotice] = useState<string | null>(null);
+  const [updateState, setUpdateState] = useState<{
+    available: boolean;
+    version?: string;
+    downloading: boolean;
+    percent: number;
+    ready: boolean;
+  }>({ available: false, downloading: false, percent: 0, ready: false });
 
   const checkAnnouncements = async () => {
     const announcements = await getActiveAnnouncements();
@@ -108,6 +115,24 @@ export default function App() {
     const interval = setInterval(checkAnnouncements, 60_000);
     return () => clearInterval(interval);
   }, [session]);
+
+  // Otomatik güncelleme IPC olayları
+  useEffect(() => {
+    const ipc = (window as any).electron?.ipcRenderer;
+    if (!ipc) return;
+
+    ipc.on('updater:update-available', (data: { version: string }) => {
+      setUpdateState(s => ({ ...s, available: true, version: data.version, downloading: true }));
+    });
+
+    ipc.on('updater:download-progress', (data: { percent: number }) => {
+      setUpdateState(s => ({ ...s, percent: data.percent }));
+    });
+
+    ipc.on('updater:update-downloaded', () => {
+      setUpdateState(s => ({ ...s, downloading: false, ready: true }));
+    });
+  }, []);
 
   // Login işlemi
   const handleLogin = (kasa: KasaInfo, personnel: Personnel) => {
@@ -239,6 +264,47 @@ export default function App() {
             >
               Tamam, Anladım
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Güncelleme banner'ı */}
+      {updateState.available && (
+        <div className="fixed bottom-0 left-0 right-0 z-[90] p-3">
+          <div className="bg-gray-900 border border-blue-500/40 rounded-2xl px-4 py-3 shadow-2xl flex items-center gap-3">
+            <div className="w-9 h-9 bg-blue-600/20 border border-blue-500/40 rounded-xl flex items-center justify-center flex-shrink-0">
+              {updateState.ready
+                ? <RefreshCw className="w-4 h-4 text-blue-400" />
+                : <Download className="w-4 h-4 text-blue-400" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              {updateState.ready ? (
+                <>
+                  <p className="text-sm font-bold text-white leading-tight">Güncelleme hazır!</p>
+                  <p className="text-xs text-gray-400">v{updateState.version} — Uygulamayı kapatınca otomatik kurulur</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-bold text-white leading-tight">
+                    Güncelleme indiriliyor… %{updateState.percent}
+                  </p>
+                  <div className="mt-1.5 h-1 bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                      style={{ width: `${updateState.percent}%` }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            {updateState.ready && (
+              <button
+                onClick={() => (window as any).electron?.ipcRenderer.invoke('updater:install')}
+                className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors flex-shrink-0"
+              >
+                Şimdi Kur
+              </button>
+            )}
           </div>
         </div>
       )}
