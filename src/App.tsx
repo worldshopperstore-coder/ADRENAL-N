@@ -285,22 +285,36 @@ export default function App() {
 
       {/* Güncelleme hazır — modal */}
       {updateState.ready && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-blue-500/40 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <div className="text-center mb-5">
-              <div className="w-16 h-16 mx-auto mb-3 bg-blue-500/20 border-2 border-blue-500/40 rounded-full flex items-center justify-center">
-                <RefreshCw className="w-7 h-7 text-blue-400" />
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="bg-gradient-to-b from-gray-900 to-gray-950 border border-gray-700/60 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            {/* İkon */}
+            <div className="flex flex-col items-center mb-5">
+              <div className="relative mb-4">
+                <div className="w-16 h-16 bg-blue-500/15 border-2 border-blue-500/30 rounded-full flex items-center justify-center">
+                  <RefreshCw className="w-7 h-7 text-blue-400" />
+                </div>
+                <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-gray-900">
+                  <Download className="w-2.5 h-2.5 text-white" />
+                </div>
               </div>
-              <h3 className="text-lg font-bold text-white">Yeni Sürüm Hazır</h3>
+              <h3 className="text-lg font-bold text-white">Güncelleme Hazır</h3>
               {updateState.version && (
-                <p className="text-sm text-gray-400 mt-1">v{updateState.version}</p>
+                <span className="mt-1.5 text-xs font-semibold px-3 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25">
+                  v{updateState.version}
+                </span>
               )}
             </div>
-            <div className="h-1.5 bg-blue-500 rounded-full mb-5" />
+            {/* Tam dolu bar */}
+            <div className="h-1 bg-gray-800 rounded-full mb-5 overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full w-full" />
+            </div>
+            <p className="text-xs text-gray-500 text-center mb-4">
+              Yeni sürüm indirildi. Hemen kurabilir ya da sonraki açılışta otomatik kurulmasını bekleyebilirsiniz.
+            </p>
             <div className="flex gap-3">
               <button
                 onClick={() => (window as any).electron?.ipcRenderer.invoke('updater:install')}
-                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
+                className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold py-2.5 rounded-xl transition-all text-sm shadow-lg shadow-blue-500/20"
               >
                 Şimdi Kur
               </button>
@@ -311,7 +325,6 @@ export default function App() {
                 Sonra
               </button>
             </div>
-            <p className="text-[10px] text-gray-600 text-center mt-3">Sonra'ya basarsan uygulama kapanınca otomatik kurulur</p>
           </div>
         </div>
       )}
