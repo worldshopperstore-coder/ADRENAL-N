@@ -17,3 +17,7 @@ export function getPersonnelId() {
 export function getPersonnelName() {
   return getUserSession()?.personnel?.fullName || '';
 }
+
+export function getPersonnelUsername() {
+  return getUserSession()?.personnel?.username || getUserSession()?.personnel?.fullName || '';
+}

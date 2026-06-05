@@ -34,7 +34,8 @@ export interface ActiveSaleRequest {
   currency: 'TL' | 'USD' | 'EUR';
   kasaId: 'wildpark' | 'sinema' | 'face2face';
   personnelName: string;
-  
+  personnelUsername?: string;             // Atlantis DB createdBy formatı (y.celebi)
+
   // Yazdırma için fiyat bilgileri
   adultPrice: number;
   childPrice: number;
@@ -204,7 +205,7 @@ function buildSalePayload(
     contractHeaderId: mapping.contractHeaderId,
     contractName: mapping.contractHeaderName,
     terminalAccountId,
-    createdBy: request.personnelName,
+    createdBy: request.personnelUsername || request.personnelName,
     comment: request.comment || undefined,
     tickets,
     payments,

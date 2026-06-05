@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, ShoppingCart, FileSpreadsheet, FileText, X, CreditCard, Banknote, DollarSign, Euro, TrendingUp, Users, User, Tag, Globe, ArrowLeftRight, Shuffle, Building2, Package, ChevronRight, Check, Coins, Zap, Loader2, Printer, CheckCircle, AlertTriangle, Database, Wifi } from 'lucide-react';
 import { INITIAL_PACKAGES, type PackageItem } from '@/data/packages';
 import { getPackagesByKasa } from '@/utils/packagesDB';
-import { getUserSession, getKasaId, getPersonnelId, getPersonnelName } from '@/utils/session';
+import { getUserSession, getKasaId, getPersonnelId, getPersonnelName, getPersonnelUsername } from '@/utils/session';
 import { 
   saveSalesToFirebase, 
   loadSalesFromFirebase, 
@@ -436,6 +436,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       currency: selectedPackage.currency as any,
       kasaId: currentKasaId as any,
       personnelName: getPersonnelName(),
+      personnelUsername: getPersonnelUsername(),
       adultPrice: selectedPackage.adultPrice,
       childPrice: selectedPackage.childPrice,
       splitPayments,
