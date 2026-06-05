@@ -13,6 +13,7 @@ import { INITIAL_PACKAGES, type PackageItem } from '@/data/packages';
 import { createContract, updateContractPrice, type CreateContractRequest } from '@/utils/posBridge';
 import { getPersonnelUsername } from '@/utils/session';
 import { isIntegrationEnabled } from '@/utils/posManager';
+import { getContractMapping } from '@/data/atlantisContracts';
 
 type KasaId = 'wildpark' | 'sinema' | 'face2face';
 type Category = 'Münferit' | 'Visitor' | 'Çapraz Münferit' | 'Çapraz Visitor' | 'Acenta';
@@ -339,18 +340,37 @@ export default function PackagesAdminTab() {
     setPriceError('');
 
     try {
-      // Atlantis DB güncelle (sadece atlantis paketi ise)
+      // DB fiyat güncelle
       const pkg = priceEditPkg as any;
-      if (integrationActive && pkg.atlantisProducts?.length > 0) {
-        const priceUpdates = pkg.atlantisProducts.flatMap((p: any) => [
-          { priceId: p.aduPriceId, newPrice: adu },
-          { priceId: p.chlPriceId, newPrice: chl },
-        ]);
-        const result = await updateContractPrice(priceUpdates, getPersonnelUsername());
-        if (!result.success) {
-          setPriceError(result.error || 'Fiyat güncellenemedi');
-          setPriceSaving(false);
-          return;
+      if (integrationActive) {
+        let priceUpdates: { priceId: number; newPrice: number }[] = [];
+
+        if (pkg.atlantisProducts?.length > 0) {
+          // Adrenalin'den oluşturulan dinamik kontrat
+          priceUpdates = pkg.atlantisProducts.flatMap((p: any) => [
+            { priceId: p.aduPriceId, newPrice: adu },
+            { priceId: p.chlPriceId, newPrice: chl },
+          ]);
+        } else {
+          // Mevcut sabit kontrat — atlantisContracts.ts'den priceId bul
+          const mapping = getContractMapping(priceEditPkg.id);
+          if (mapping) {
+            priceUpdates = mapping.products.flatMap(p => {
+              const updates = [];
+              if (p.prices.ADU) updates.push({ priceId: p.prices.ADU.priceId, newPrice: adu });
+              if (p.prices.CHL) updates.push({ priceId: p.prices.CHL.priceId, newPrice: chl });
+              return updates;
+            });
+          }
+        }
+
+        if (priceUpdates.length > 0) {
+          const result = await updateContractPrice(priceUpdates, getPersonnelUsername());
+          if (!result.success) {
+            setPriceError(result.error || 'Fiyat güncellenemedi');
+            setPriceSaving(false);
+            return;
+          }
         }
       }
 

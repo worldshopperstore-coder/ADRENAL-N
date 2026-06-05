@@ -83,8 +83,8 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
     setHovered(true);
   };
   const handleMouseLeave = () => {
-    if (rateEditMode) return; // Kur düzenleme modundayken sidebar kapanmasın
-    hoverTimerRef.current = setTimeout(() => setHovered(false), 200);
+    if (rateEditMode) return;
+    hoverTimerRef.current = setTimeout(() => setHovered(false), 600);
   };
 
   const theme = getKasaTheme(session.kasa.id);
