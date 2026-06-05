@@ -422,7 +422,10 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
       )}
 
       {/* Main Content */}
-      <main className={`flex-1 overflow-auto min-w-0 mt-8 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
+      <main
+        className={`flex-1 overflow-auto min-w-0 mt-8 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}
+        style={{ backgroundColor: theme.pageOverlay }}
+      >
         <div className="pt-14 md:pt-0 h-full">
           {children}
         </div>

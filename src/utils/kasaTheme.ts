@@ -11,6 +11,8 @@ interface KasaTheme {
   badgeBg: string;         // badge background
   badgeBorder: string;     // badge border
   badgeText: string;       // badge text
+  pageBg: string;          // ana sayfa arka plan tonu
+  pageOverlay: string;     // CSS rgba rengi (inline style için)
 }
 
 const themes: Record<KasaId, KasaTheme> = {
@@ -23,6 +25,8 @@ const themes: Record<KasaId, KasaTheme> = {
     badgeBg: 'bg-emerald-500/10',
     badgeBorder: 'border-emerald-500/20',
     badgeText: 'text-emerald-400',
+    pageBg: 'bg-emerald-950/30',
+    pageOverlay: 'rgba(6, 78, 59, 0.12)',
   },
   sinema: {
     accent: 'text-violet-400',
@@ -33,6 +37,8 @@ const themes: Record<KasaId, KasaTheme> = {
     badgeBg: 'bg-violet-500/10',
     badgeBorder: 'border-violet-500/20',
     badgeText: 'text-violet-400',
+    pageBg: 'bg-violet-950/30',
+    pageOverlay: 'rgba(46, 16, 101, 0.12)',
   },
   face2face: {
     accent: 'text-sky-400',
@@ -43,6 +49,8 @@ const themes: Record<KasaId, KasaTheme> = {
     badgeBg: 'bg-sky-500/10',
     badgeBorder: 'border-sky-500/20',
     badgeText: 'text-sky-400',
+    pageBg: 'bg-sky-950/30',
+    pageOverlay: 'rgba(8, 47, 73, 0.12)',
   },
   genel: {
     accent: 'text-amber-400',
@@ -53,6 +61,8 @@ const themes: Record<KasaId, KasaTheme> = {
     badgeBg: 'bg-amber-500/10',
     badgeBorder: 'border-amber-500/20',
     badgeText: 'text-amber-400',
+    pageBg: 'bg-amber-950/20',
+    pageOverlay: 'rgba(78, 52, 6, 0.10)',
   },
 };
 
