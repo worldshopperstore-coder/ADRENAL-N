@@ -437,6 +437,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       kasaId: currentKasaId as any,
       personnelName: getPersonnelName(),
       personnelUsername: getPersonnelUsername(),
+      packageItem: selectedPackage,
       adultPrice: selectedPackage.adultPrice,
       childPrice: selectedPackage.childPrice,
       splitPayments,

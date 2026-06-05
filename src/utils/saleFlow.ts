@@ -35,6 +35,7 @@ export interface ActiveSaleRequest {
   kasaId: 'wildpark' | 'sinema' | 'face2face';
   personnelName: string;
   personnelUsername?: string;             // Atlantis DB createdBy formatı (y.celebi)
+  packageItem?: any;                      // Dinamik kontrat için tam paket objesi
 
   // Yazdırma için fiyat bilgileri
   adultPrice: number;
@@ -273,8 +274,8 @@ async function tryPrintTickets(
  * Ödeme onaylanmazsa DB'ye hiçbir şey yazılmaz, bilet basılmaz.
  */
 export async function processActiveSale(request: ActiveSaleRequest): Promise<ActiveSaleResult> {
-  // 1) Contract mapping
-  const mapping = getContractMapping(request.packageId);
+  // 1) Contract mapping — önce sabit map, sonra dinamik
+  const mapping = getContractMapping(request.packageId) || buildDynamicMapping(request.packageItem);
   if (!mapping) {
     return {
       success: false,
@@ -411,7 +412,35 @@ export async function checkIntegrationReady(): Promise<{
   };
 }
 
-/** Package ID'nin DB eşlemesi var mı? */
-export function hasContractMapping(packageId: string): boolean {
-  return !!getContractMapping(packageId);
+/** Package ID'nin DB eşlemesi var mı? (sabit map veya dinamik Supabase paketi) */
+export function hasContractMapping(packageId: string, pkg?: any): boolean {
+  if (getContractMapping(packageId)) return true;
+  // Dinamik: Supabase'den gelen atlantis paketleri
+  if (pkg?.atlantisContractHeaderId && pkg?.atlantisContractId && pkg?.atlantisProducts?.length > 0) return true;
+  return false;
+}
+
+/** Supabase'deki dinamik paketten ContractMapping oluştur */
+export function buildDynamicMapping(pkg: any): import('@/data/atlantisContracts').ContractMapping | undefined {
+  if (!pkg?.atlantisContractId || !pkg?.atlantisProducts?.length) return undefined;
+  return {
+    packageId: pkg.id,
+    contractHeaderId: pkg.atlantisContractHeaderId,
+    contractHeaderName: pkg.name,
+    contractId: pkg.atlantisContractId,
+    currencyId: pkg.currency === 'USD' ? 1 : pkg.currency === 'EUR' ? 2 : 3,
+    isCombo: pkg.atlantisProducts.length > 1,
+    isFree: pkg.adultPrice === 0 && pkg.childPrice === 0,
+    products: pkg.atlantisProducts.map((p: any) => ({
+      contractProductId: p.contractProductId,
+      productId: p.productId,
+      productName: p.productId === 1004 ? 'WILDPARK ENTRANCE' : p.productId === 1005 ? 'CINEMA ENTRANCE' : 'FACE2FACE ENTRANCE',
+      prices: {
+        ADU: { contractTicketTypeId: p.aduTicketTypeId, priceId: p.aduPriceId, price: pkg.adultPrice },
+        CHL: { contractTicketTypeId: p.chlTicketTypeId, priceId: p.chlPriceId, price: pkg.childPrice },
+      },
+      gateId: p.gateId,
+      gateLocation: p.gateLocation,
+    })),
+  };
 }

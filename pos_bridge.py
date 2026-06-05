@@ -530,6 +530,206 @@ def send_pos_payment(payload: dict) -> dict:
 
 
 
+# ── Kontrat Oluşturma ────────────────────────────────────
+
+GATE_CONFIG = {
+    1004: {'gateId': 3, 'gateLocation': 2},   # WILDPARK
+    1005: {'gateId': 2, 'gateLocation': 1},   # CINEMA
+    1008: {'gateId': 1, 'gateLocation': 1},   # FACE2FACE
+}
+
+CONTRACT_GROUPS = {
+    'wildpark_munferit': 5,
+    'wildpark_acente':   3,
+    'sinema_munferit':   11,
+    'sinema_acente':     10,
+    'f2f_munferit':      1,
+    'f2f_acente':        2,
+    'ortak_acente':      12,
+}
+
+def create_contract(payload: dict) -> dict:
+    """
+    Yeni kontrat zinciri oluşturur:
+    ContractTicketTypes (ADU+CHL) → ContractHeaders →
+    Market/Region/PaymentType/TicketType bağlantıları →
+    Contracts → ContractProducts → ContractProductPrices
+
+    payload = {
+        "name": "WILD KAMPANYA %50",
+        "currencyId": 3,           # 1=USD, 2=EUR, 3=TRY
+        "contractGroupId": 5,      # 5=WP münferit, 11=Sinema münferit...
+        "startDate": "2026-06-01",
+        "endDate": "2026-06-15",
+        "priority": 1,
+        "createdBy": "y.celebi",
+        "products": [
+            { "productId": 1004, "adultPrice": 200, "childPrice": 150 },
+            { "productId": 1005, "adultPrice": 0,   "childPrice": 0   }
+        ]
+    }
+    """
+    try:
+        db = get_connection()
+        cur = db.cursor()
+        now_str = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000')
+        created_by = payload.get('createdBy', 'ADRENALIN')
+        name = payload['name']
+        currency_id = payload['currencyId']
+        group_id = payload['contractGroupId']
+        start_date = payload['startDate']
+        end_date = payload['endDate']
+        priority = payload.get('priority', 1)
+        products = payload['products']  # [{ productId, adultPrice, childPrice }]
+
+        # 1) ContractTicketTypes — ADU ve CHL için yeni çift
+        cur.execute("""
+            INSERT INTO ContractTicketTypes (TypeId, Comment, CreateDate, UpdateDate, CreatedBy, UpdatedBy, ExtraJson, IsDeleted)
+            VALUES (1, '', %s, %s, %s, %s, NULL, 0);
+            SELECT SCOPE_IDENTITY();
+        """, (now_str, now_str, created_by, created_by))
+        adu_tt_id = int(cur.fetchone()[0])
+
+        cur.execute("""
+            INSERT INTO ContractTicketTypes (TypeId, Comment, CreateDate, UpdateDate, CreatedBy, UpdatedBy, ExtraJson, IsDeleted)
+            VALUES (2, '', %s, %s, %s, %s, NULL, 0);
+            SELECT SCOPE_IDENTITY();
+        """, (now_str, now_str, created_by, created_by))
+        chl_tt_id = int(cur.fetchone()[0])
+
+        # 2) ContractHeaders
+        cur.execute("""
+            INSERT INTO ContractHeaders (Name, IsActive, IsPOSEnabled, CustomerId, ContractCurrencyId, ContractGroupId,
+                CreateDate, UpdateDate, CreatedBy, UpdatedBy, ExtraJson, IsDeleted, ValidDays, IsVoucherEnabled)
+            VALUES (%s, 1, 1, NULL, %s, %s, %s, %s, %s, %s, NULL, 0, NULL, 0);
+            SELECT SCOPE_IDENTITY();
+        """, (name, currency_id, group_id, now_str, now_str, created_by, created_by))
+        header_id = int(cur.fetchone()[0])
+
+        # 3) MarketContractHeaders — Market 1
+        cur.execute("INSERT INTO MarketContractHeaders (Market_Id, ContractHeader_Id) VALUES (1, %s)", (header_id,))
+
+        # 4) RegionContractHeaders — Region 1
+        cur.execute("INSERT INTO RegionContractHeaders (Region_Id, ContractHeader_Id) VALUES (1, %s)", (header_id,))
+
+        # 5) PaymentTypeContractHeaders — KK(2) + Nakit(3)
+        cur.execute("INSERT INTO PaymentTypeContractHeaders (PaymentType_Id, ContractHeader_Id) VALUES (2, %s)", (header_id,))
+        cur.execute("INSERT INTO PaymentTypeContractHeaders (PaymentType_Id, ContractHeader_Id) VALUES (3, %s)", (header_id,))
+
+        # 6) ContractTicketTypeContractHeaders — ADU + CHL
+        cur.execute("INSERT INTO ContractTicketTypeContractHeaders (ContractTicketType_Id, ContractHeader_Id) VALUES (%s, %s)", (adu_tt_id, header_id))
+        cur.execute("INSERT INTO ContractTicketTypeContractHeaders (ContractTicketType_Id, ContractHeader_Id) VALUES (%s, %s)", (chl_tt_id, header_id))
+
+        # 7) Contracts
+        cur.execute("""
+            INSERT INTO Contracts (Name, IsActive, ContractHeaderId, StartDate, EndDate,
+                CreateDate, UpdateDate, CreatedBy, UpdatedBy, ExtraJson, IsDeleted, Priority)
+            VALUES ('', 1, %s, %s, %s, %s, %s, %s, %s, NULL, 0, %s);
+            SELECT SCOPE_IDENTITY();
+        """, (header_id, start_date, end_date, now_str, now_str, created_by, created_by, priority))
+        contract_id = int(cur.fetchone()[0])
+
+        # 8) ContractProducts + ContractProductPrices — her ürün için
+        contract_product_ids = []
+        for prod in products:
+            product_id = prod['productId']
+            adult_price = prod['adultPrice']
+            child_price = prod['childPrice']
+            gate = GATE_CONFIG.get(product_id, {'gateId': None, 'gateLocation': None})
+
+            cur.execute("""
+                INSERT INTO ContractProducts (ContractId, ProductId, CreateDate, UpdateDate, CreatedBy, UpdatedBy, ExtraJson, IsDeleted)
+                VALUES (%s, %s, %s, %s, %s, %s, NULL, 0);
+                SELECT SCOPE_IDENTITY();
+            """, (contract_id, product_id, now_str, now_str, created_by, created_by))
+            cp_id = int(cur.fetchone()[0])
+
+            # ADU fiyatı
+            cur.execute("""
+                INSERT INTO ContractProductPrices (ContractProductId, TicketTypeId, Price, CreateDate, UpdateDate, CreatedBy, UpdatedBy, ExtraJson, IsDeleted)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, 0);
+                SELECT SCOPE_IDENTITY();
+            """, (cp_id, adu_tt_id, adult_price, now_str, now_str, created_by, created_by))
+            adu_price_id = int(cur.fetchone()[0])
+
+            # CHL fiyatı
+            cur.execute("""
+                INSERT INTO ContractProductPrices (ContractProductId, TicketTypeId, Price, CreateDate, UpdateDate, CreatedBy, UpdatedBy, ExtraJson, IsDeleted)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, 0);
+                SELECT SCOPE_IDENTITY();
+            """, (cp_id, chl_tt_id, child_price, now_str, now_str, created_by, created_by))
+            chl_price_id = int(cur.fetchone()[0])
+
+            contract_product_ids.append({
+                'productId': product_id,
+                'contractProductId': cp_id,
+                'aduTicketTypeId': adu_tt_id,
+                'aduPriceId': adu_price_id,
+                'chlTicketTypeId': chl_tt_id,
+                'chlPriceId': chl_price_id,
+                'gateId': gate['gateId'],
+                'gateLocation': gate['gateLocation'],
+            })
+
+        db.commit()
+        print(f"[BRIDGE] Kontrat oluşturuldu: HeaderId={header_id} ContractId={contract_id} '{name}'", flush=True)
+
+        return {
+            'success': True,
+            'contractHeaderId': header_id,
+            'contractId': contract_id,
+            'aduTicketTypeId': adu_tt_id,
+            'chlTicketTypeId': chl_tt_id,
+            'products': contract_product_ids,
+        }
+
+    except Exception as e:
+        try:
+            db.rollback()
+        except:
+            pass
+        if 'connection' in str(e).lower() or 'closed' in str(e).lower():
+            reconnect()
+        return {'success': False, 'error': str(e)}
+
+
+def update_contract_price(payload: dict) -> dict:
+    """
+    Mevcut kontratın fiyatlarını günceller.
+    payload = {
+        "priceUpdates": [
+            { "priceId": 2470, "newPrice": 200 },
+            { "priceId": 2471, "newPrice": 150 }
+        ],
+        "updatedBy": "y.celebi"
+    }
+    """
+    try:
+        db = get_connection()
+        cur = db.cursor()
+        now_str = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000')
+        updated_by = payload.get('updatedBy', 'ADRENALIN')
+        updates = payload['priceUpdates']
+
+        for upd in updates:
+            cur.execute("""
+                UPDATE ContractProductPrices
+                SET Price=%s, UpdateDate=%s, UpdatedBy=%s
+                WHERE Id=%s
+            """, (upd['newPrice'], now_str, updated_by, upd['priceId']))
+
+        db.commit()
+        print(f"[BRIDGE] {len(updates)} fiyat güncellendi", flush=True)
+        return {'success': True, 'updated': len(updates)}
+
+    except Exception as e:
+        try:
+            db.rollback()
+        except:
+            pass
+        return {'success': False, 'error': str(e)}
+
+
 # ── Bugünkü Satış Sayısı ──────────────────────────────────
 
 def get_today_sales() -> dict:
@@ -629,7 +829,15 @@ class BridgeHandler(BaseHTTPRequestHandler):
         elif path == '/pos-payment':
             result = send_pos_payment(payload)
             self._send_json(200 if result['success'] else 500, result)
-        
+
+        elif path == '/contract/create':
+            result = create_contract(payload)
+            self._send_json(200 if result['success'] else 500, result)
+
+        elif path == '/contract/price':
+            result = update_contract_price(payload)
+            self._send_json(200 if result['success'] else 500, result)
+
         else:
             self._send_json(404, {'error': 'Not found'})
 

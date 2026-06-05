@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Package, Plus, Trash2, Edit2, Save, X, ArrowLeft, ChevronDown, ChevronRight,
-  TreePine, Monitor, Users2,
+  TreePine, Monitor, Users2, Zap, DollarSign,
 } from 'lucide-react';
 import {
   getPackagesByKasa,
@@ -10,6 +10,9 @@ import {
   deletePackage,
 } from '@/utils/packagesDB';
 import { INITIAL_PACKAGES, type PackageItem } from '@/data/packages';
+import { createContract, updateContractPrice, type CreateContractRequest } from '@/utils/posBridge';
+import { getPersonnelUsername } from '@/utils/session';
+import { isIntegrationEnabled } from '@/utils/posManager';
 
 type KasaId = 'wildpark' | 'sinema' | 'face2face';
 type Category = 'Münferit' | 'Visitor' | 'Çapraz Münferit' | 'Çapraz Visitor' | 'Acenta';
@@ -48,6 +51,58 @@ const emptyForm = (kasaId: KasaId): Omit<PackageItem, 'id'> & { kasaId: KasaId }
   currency: 'TL',
 });
 
+// Kasa → Atlantis ContractGroupId (münferit için)
+const KASA_GROUP: Record<KasaId, number> = {
+  wildpark:  5,
+  sinema:    11,
+  face2face: 1,
+};
+
+// Kasa → varsayılan ürün
+const KASA_PRODUCT: Record<KasaId, 1004 | 1005 | 1008> = {
+  wildpark:  1004,
+  sinema:    1005,
+  face2face: 1008,
+};
+
+const PRODUCT_LABELS: Record<number, string> = {
+  1004: 'WildPark Entrance',
+  1005: 'Cinema Entrance',
+  1008: 'Face2Face Entrance',
+};
+
+interface ContractForm {
+  name: string;
+  currency: Currency;
+  startDate: string;
+  endDate: string;
+  category: Category;
+  // Ürünler: her biri seçili mi + fiyatları
+  products: {
+    productId: 1004 | 1005 | 1008;
+    selected: boolean;
+    adultPrice: string;
+    childPrice: string;
+  }[];
+}
+
+const emptyContractForm = (kasaId: KasaId): ContractForm => {
+  const today = new Date().toISOString().slice(0, 10);
+  const nextMonth = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  return {
+    name: '',
+    currency: 'TL',
+    startDate: today,
+    endDate: nextMonth,
+    category: 'Münferit',
+    products: [
+      { productId: 1004, selected: kasaId === 'wildpark', adultPrice: '0', childPrice: '0' },
+      { productId: 1005, selected: kasaId === 'sinema',   adultPrice: '0', childPrice: '0' },
+      { productId: 1008, selected: kasaId === 'face2face', adultPrice: '0', childPrice: '0' },
+    ],
+  };
+};
+
 export default function PackagesAdminTab() {
   const [selectedKasa, setSelectedKasa] = useState<KasaId | null>(null);
   const [packages, setPackages]         = useState<PackageItem[]>([]);
@@ -65,6 +120,22 @@ export default function PackagesAdminTab() {
   const [openCats, setOpenCats]         = useState<Record<string, boolean>>(
     Object.fromEntries(CATEGORIES.map(c => [c, true]))
   );
+
+  // Kontrat oluşturma
+  const [showContractForm, setShowContractForm] = useState(false);
+  const [contractForm, setContractForm] = useState<ContractForm | null>(null);
+  const [contractSaving, setContractSaving] = useState(false);
+  const [contractError, setContractError] = useState('');
+  const [contractSuccess, setContractSuccess] = useState('');
+
+  // Fiyat güncelleme
+  const [priceEditPkg, setPriceEditPkg] = useState<PackageItem | null>(null);
+  const [newAdultPrice, setNewAdultPrice] = useState('');
+  const [newChildPrice, setNewChildPrice] = useState('');
+  const [priceSaving, setPriceSaving] = useState(false);
+  const [priceError, setPriceError] = useState('');
+
+  const integrationActive = isIntegrationEnabled();
 
   const load = useCallback(async (kasaId: KasaId) => {
     setLoading(true);
@@ -187,6 +258,112 @@ export default function PackagesAdminTab() {
   const toggleCat = (cat: Category) =>
     setOpenCats(s => ({ ...s, [cat]: !s[cat] }));
 
+  // ── Kontrat oluştur (Atlantis DB + Supabase) ──────────────────────────
+  const handleCreateContract = async () => {
+    if (!contractForm || !selectedKasa) return;
+    const selectedProducts = contractForm.products.filter(p => p.selected);
+    if (!contractForm.name.trim()) { setContractError('Kontrat adı gerekli'); return; }
+    if (selectedProducts.length === 0) { setContractError('En az bir ürün seçin'); return; }
+    if (!contractForm.startDate || !contractForm.endDate) { setContractError('Tarih aralığı gerekli'); return; }
+
+    setContractSaving(true);
+    setContractError('');
+    setContractSuccess('');
+
+    const currencyId = contractForm.currency === 'USD' ? 1 : contractForm.currency === 'EUR' ? 2 : 3;
+
+    try {
+      let contractResult = null;
+      if (integrationActive) {
+        const request: CreateContractRequest = {
+          name: contractForm.name.trim(),
+          currencyId: currencyId as 1 | 2 | 3,
+          contractGroupId: KASA_GROUP[selectedKasa],
+          startDate: contractForm.startDate,
+          endDate: contractForm.endDate,
+          priority: 1,
+          createdBy: getPersonnelUsername(),
+          products: selectedProducts.map(p => ({
+            productId: p.productId,
+            adultPrice: parseFloat(p.adultPrice) || 0,
+            childPrice: parseFloat(p.childPrice) || 0,
+          })),
+        };
+        contractResult = await createContract(request);
+        if (!contractResult.success) {
+          setContractError(`Atlantis DB hatası: ${contractResult.error}`);
+          setContractSaving(false);
+          return;
+        }
+      }
+
+      // Supabase'e paket kaydet
+      const newPkg: PackageItem = {
+        id: contractResult
+          ? `atlantis_${contractResult.contractHeaderId}`
+          : `custom_${Date.now()}`,
+        kasaId: selectedKasa,
+        name: contractForm.name.trim(),
+        category: contractForm.category,
+        adultPrice: parseFloat(selectedProducts[0].adultPrice) || 0,
+        childPrice: parseFloat(selectedProducts[0].childPrice) || 0,
+        currency: contractForm.currency,
+        // Atlantis eşleme bilgileri
+        ...(contractResult && {
+          atlantisContractHeaderId: contractResult.contractHeaderId,
+          atlantisContractId: contractResult.contractId,
+          atlantisProducts: contractResult.products,
+        }),
+      } as PackageItem;
+
+      await addPackage(selectedKasa, newPkg);
+      await load(selectedKasa);
+
+      setContractSuccess(`✅ "${contractForm.name}" kontratı oluşturuldu!${contractResult ? ` (Atlantis ID: ${contractResult.contractHeaderId})` : ''}`);
+      setContractForm(null);
+      setShowContractForm(false);
+    } catch (err: any) {
+      setContractError(`Hata: ${err.message}`);
+    }
+    setContractSaving(false);
+  };
+
+  // ── Fiyat güncelle (Atlantis DB + Supabase) ───────────────────────────
+  const handlePriceUpdate = async () => {
+    if (!priceEditPkg || !selectedKasa) return;
+    const adu = parseFloat(newAdultPrice);
+    const chl = parseFloat(newChildPrice);
+    if (isNaN(adu) || isNaN(chl)) { setPriceError('Geçerli fiyat girin'); return; }
+
+    setPriceSaving(true);
+    setPriceError('');
+
+    try {
+      // Atlantis DB güncelle (sadece atlantis paketi ise)
+      const pkg = priceEditPkg as any;
+      if (integrationActive && pkg.atlantisProducts?.length > 0) {
+        const priceUpdates = pkg.atlantisProducts.flatMap((p: any) => [
+          { priceId: p.aduPriceId, newPrice: adu },
+          { priceId: p.chlPriceId, newPrice: chl },
+        ]);
+        const result = await updateContractPrice(priceUpdates, getPersonnelUsername());
+        if (!result.success) {
+          setPriceError(`Atlantis DB hatası: ${result.error}`);
+          setPriceSaving(false);
+          return;
+        }
+      }
+
+      // Supabase güncelle
+      await updatePackage(selectedKasa, priceEditPkg.id, { adultPrice: adu, childPrice: chl });
+      await load(selectedKasa);
+      setPriceEditPkg(null);
+    } catch (err: any) {
+      setPriceError(`Hata: ${err.message}`);
+    }
+    setPriceSaving(false);
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -197,7 +374,7 @@ export default function PackagesAdminTab() {
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1">
           <div className="w-10 h-10 bg-violet-500/10 border border-violet-500/20 rounded-xl flex items-center justify-center">
             <kasa.Icon className={`w-5 h-5 ${kasa.text}`} />
           </div>
@@ -206,6 +383,12 @@ export default function PackagesAdminTab() {
             <p className="text-xs text-gray-500 mt-0.5">{packages.length} paket</p>
           </div>
         </div>
+        <button
+          onClick={() => { setContractForm(emptyContractForm(selectedKasa)); setShowContractForm(true); setContractError(''); setContractSuccess(''); }}
+          className="flex items-center gap-2 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white text-sm font-bold px-4 py-2 rounded-xl transition-all shadow-lg shadow-orange-500/20"
+        >
+          <Zap className="w-4 h-4" /> Yeni Kontrat
+        </button>
       </div>
 
       {/* Varsayılan paket banner */}
@@ -327,6 +510,11 @@ export default function PackagesAdminTab() {
                                 </td>
                                 <td className="px-4 py-2.5 text-right">
                                   <div className="flex items-center justify-end gap-1">
+                                    <button
+                                      onClick={() => { setPriceEditPkg(pkg); setNewAdultPrice(String(pkg.adultPrice)); setNewChildPrice(String(pkg.childPrice)); setPriceError(''); }}
+                                      title="Fiyat Güncelle"
+                                      className="p-2 sm:p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-emerald-400 transition-colors"
+                                    ><DollarSign className="w-3.5 h-3.5" /></button>
                                     <button onClick={() => openEdit(pkg)} className="p-2 sm:p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-yellow-400 transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
                                     <button onClick={() => handleDelete(pkg)} className="p-2 sm:p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-red-400 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                                   </div>
@@ -444,6 +632,196 @@ export default function PackagesAdminTab() {
               >
                 İptal
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── YENİ KONTRAT FORMU MODAL ── */}
+      {showContractForm && contractForm && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div className="flex items-center justify-between p-5 border-b border-gray-800">
+              <div className="flex items-center gap-3">
+                <Zap className="w-5 h-5 text-orange-400" />
+                <h3 className="text-lg font-bold text-white">Yeni Kontrat Oluştur</h3>
+              </div>
+              <button onClick={() => setShowContractForm(false)} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Kontrat Adı */}
+              <div>
+                <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Kontrat Adı</label>
+                <input
+                  type="text" placeholder="örn: WILD KAMPANYA %50"
+                  value={contractForm.name}
+                  onChange={e => setContractForm(f => f && ({ ...f, name: e.target.value }))}
+                  className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-orange-500"
+                />
+              </div>
+
+              {/* Kategori + Para Birimi */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Kategori</label>
+                  <select
+                    value={contractForm.category}
+                    onChange={e => setContractForm(f => f && ({ ...f, category: e.target.value as Category }))}
+                    className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-orange-500"
+                  >
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Para Birimi</label>
+                  <select
+                    value={contractForm.currency}
+                    onChange={e => setContractForm(f => f && ({ ...f, currency: e.target.value as Currency }))}
+                    className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-orange-500"
+                  >
+                    {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Geçerlilik Tarihleri */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Başlangıç</label>
+                  <input type="date" value={contractForm.startDate}
+                    onChange={e => setContractForm(f => f && ({ ...f, startDate: e.target.value }))}
+                    className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Bitiş</label>
+                  <input type="date" value={contractForm.endDate}
+                    onChange={e => setContractForm(f => f && ({ ...f, endDate: e.target.value }))}
+                    className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+              </div>
+
+              {/* Ürünler (Combo) */}
+              <div>
+                <label className="block text-xs text-gray-400 mb-2 font-medium uppercase tracking-wider">Ürünler</label>
+                <div className="space-y-2">
+                  {contractForm.products.map((prod, idx) => (
+                    <div key={prod.productId} className={`rounded-xl border p-3 transition-all ${prod.selected ? 'bg-orange-500/5 border-orange-500/30' : 'bg-gray-800/40 border-gray-700/50'}`}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <input type="checkbox" checked={prod.selected}
+                          onChange={e => setContractForm(f => {
+                            if (!f) return f;
+                            const prods = [...f.products];
+                            prods[idx] = { ...prods[idx], selected: e.target.checked };
+                            return { ...f, products: prods };
+                          })}
+                          className="w-4 h-4 accent-orange-500"
+                        />
+                        <span className={`text-sm font-semibold ${prod.selected ? 'text-white' : 'text-gray-500'}`}>
+                          {PRODUCT_LABELS[prod.productId]}
+                        </span>
+                      </div>
+                      {prod.selected && (
+                        <div className="grid grid-cols-2 gap-2 ml-7">
+                          <div>
+                            <label className="text-[10px] text-gray-500 mb-0.5 block">Yetişkin</label>
+                            <input type="number" min="0" step="0.5" value={prod.adultPrice}
+                              onChange={e => setContractForm(f => {
+                                if (!f) return f;
+                                const prods = [...f.products];
+                                prods[idx] = { ...prods[idx], adultPrice: e.target.value };
+                                return { ...f, products: prods };
+                              })}
+                              className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:outline-none focus:border-orange-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-gray-500 mb-0.5 block">Çocuk</label>
+                            <input type="number" min="0" step="0.5" value={prod.childPrice}
+                              onChange={e => setContractForm(f => {
+                                if (!f) return f;
+                                const prods = [...f.products];
+                                prods[idx] = { ...prods[idx], childPrice: e.target.value };
+                                return { ...f, products: prods };
+                              })}
+                              className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:outline-none focus:border-orange-500"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {!integrationActive && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-3 py-2 text-yellow-400 text-xs">
+                  ⚠️ Entegrasyon kapalı — kontrat sadece Supabase'e kaydedilir, Atlantis DB'ye yazılmaz.
+                </div>
+              )}
+
+              {contractError && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 text-red-400 text-xs">{contractError}</div>}
+              {contractSuccess && <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2 text-emerald-400 text-xs">{contractSuccess}</div>}
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={handleCreateContract}
+                  disabled={contractSaving}
+                  className="flex-1 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 disabled:opacity-50 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all"
+                >
+                  {contractSaving ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Oluşturuluyor...</> : <><Zap className="w-4 h-4" /> Kontrat Oluştur</>}
+                </button>
+                <button onClick={() => setShowContractForm(false)} className="px-5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white py-2.5 rounded-xl text-sm border border-gray-700 transition-colors">İptal</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── FİYAT GÜNCELLE MODAL ── */}
+      {priceEditPkg && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-sm shadow-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">Fiyat Güncelle</h3>
+              </div>
+              <button onClick={() => setPriceEditPkg(null)} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-sm text-gray-400 mb-4 font-medium">{priceEditPkg.name} <span className={`text-xs px-2 py-0.5 rounded-full ${CUR_COLOR[priceEditPkg.currency as Currency]}`}>{priceEditPkg.currency}</span></p>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="text-xs text-gray-400 mb-1.5 block font-medium">Yetişkin</label>
+                <input type="number" min="0" step="0.5" value={newAdultPrice}
+                  onChange={e => setNewAdultPrice(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1.5 block font-medium">Çocuk</label>
+                <input type="number" min="0" step="0.5" value={newChildPrice}
+                  onChange={e => setNewChildPrice(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+            {!integrationActive && (
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-3 py-2 text-yellow-400 text-xs mb-3">
+                ⚠️ Entegrasyon kapalı — sadece Supabase fiyatı güncellenir.
+              </div>
+            )}
+            {priceError && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 text-red-400 text-xs mb-3">{priceError}</div>}
+            <div className="flex gap-3">
+              <button
+                onClick={handlePriceUpdate}
+                disabled={priceSaving}
+                className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all"
+              >
+                {priceSaving ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Kaydediliyor...</> : <><Save className="w-4 h-4" /> Kaydet</>}
+              </button>
+              <button onClick={() => setPriceEditPkg(null)} className="px-5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white py-2.5 rounded-xl text-sm border border-gray-700 transition-colors">İptal</button>
             </div>
           </div>
         </div>

@@ -102,6 +102,69 @@ export async function isBridgeAvailable(): Promise<boolean> {
   }
 }
 
+// ── Kontrat Yönetimi ──────────────────────────────────────
+
+export interface CreateContractRequest {
+  name: string;
+  currencyId: 1 | 2 | 3;           // 1=USD, 2=EUR, 3=TRY
+  contractGroupId: number;
+  startDate: string;                // "2026-06-01"
+  endDate: string;                  // "2026-06-15"
+  priority?: number;
+  createdBy: string;                // "y.celebi"
+  products: {
+    productId: 1004 | 1005 | 1008; // WP / CINEMA / F2F
+    adultPrice: number;
+    childPrice: number;
+  }[];
+}
+
+export interface CreateContractResult {
+  success: boolean;
+  contractHeaderId?: number;
+  contractId?: number;
+  aduTicketTypeId?: number;
+  chlTicketTypeId?: number;
+  products?: {
+    productId: number;
+    contractProductId: number;
+    aduTicketTypeId: number;
+    aduPriceId: number;
+    chlTicketTypeId: number;
+    chlPriceId: number;
+    gateId: number | null;
+    gateLocation: number | null;
+  }[];
+  error?: string;
+}
+
+/** Atlantis DB'ye yeni kontrat zinciri oluştur */
+export async function createContract(request: CreateContractRequest): Promise<CreateContractResult> {
+  try {
+    return await bridgeFetch('/contract/create', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/** Mevcut kontratın fiyatlarını güncelle */
+export async function updateContractPrice(
+  priceUpdates: { priceId: number; newPrice: number }[],
+  updatedBy: string
+): Promise<{ success: boolean; updated?: number; error?: string }> {
+  try {
+    return await bridgeFetch('/contract/price', {
+      method: 'POST',
+      body: JSON.stringify({ priceUpdates, updatedBy }),
+    });
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 /** POS Server'a bridge TCP üzerinden ödeme gönder */
 export async function submitPosPayment(transactionData: object): Promise<{
   success: boolean;
