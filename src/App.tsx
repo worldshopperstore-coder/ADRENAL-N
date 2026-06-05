@@ -268,43 +268,50 @@ export default function App() {
         </div>
       )}
 
-      {/* Güncelleme banner'ı */}
-      {updateState.available && (
-        <div className="fixed bottom-0 left-0 right-0 z-[90] p-3">
-          <div className="bg-gray-900 border border-blue-500/40 rounded-2xl px-4 py-3 shadow-2xl flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue-600/20 border border-blue-500/40 rounded-xl flex items-center justify-center flex-shrink-0">
-              {updateState.ready
-                ? <RefreshCw className="w-4 h-4 text-blue-400" />
-                : <Download className="w-4 h-4 text-blue-400" />}
+      {/* Güncelleme indiriliyor — küçük bildirim */}
+      {updateState.available && !updateState.ready && (
+        <div className="fixed bottom-4 right-4 z-[90] max-w-xs">
+          <div className="bg-gray-900 border border-blue-500/30 rounded-2xl px-4 py-3 shadow-2xl">
+            <div className="flex items-center gap-2 mb-2">
+              <Download className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+              <p className="text-xs font-bold text-white">Güncelleme indiriliyor… %{updateState.percent}</p>
             </div>
-            <div className="flex-1 min-w-0">
-              {updateState.ready ? (
-                <>
-                  <p className="text-sm font-bold text-white leading-tight">Güncelleme hazır!</p>
-                  <p className="text-xs text-gray-400">v{updateState.version} — Uygulamayı kapatınca otomatik kurulur</p>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm font-bold text-white leading-tight">
-                    Güncelleme indiriliyor… %{updateState.percent}
-                  </p>
-                  <div className="mt-1.5 h-1 bg-gray-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                      style={{ width: `${updateState.percent}%` }}
-                    />
-                  </div>
-                </>
+            <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${updateState.percent}%` }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Güncelleme hazır — modal */}
+      {updateState.ready && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-blue-500/40 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="text-center mb-5">
+              <div className="w-16 h-16 mx-auto mb-3 bg-blue-500/20 border-2 border-blue-500/40 rounded-full flex items-center justify-center">
+                <RefreshCw className="w-7 h-7 text-blue-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Yeni Sürüm Hazır</h3>
+              {updateState.version && (
+                <p className="text-sm text-gray-400 mt-1">v{updateState.version}</p>
               )}
             </div>
-            {updateState.ready && (
+            <div className="h-1.5 bg-blue-500 rounded-full mb-5" />
+            <div className="flex gap-3">
               <button
                 onClick={() => (window as any).electron?.ipcRenderer.invoke('updater:install')}
-                className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors flex-shrink-0"
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
               >
                 Şimdi Kur
               </button>
-            )}
+              <button
+                onClick={() => setUpdateState(s => ({ ...s, ready: false }))}
+                className="px-4 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white py-2.5 rounded-xl transition-colors text-sm border border-gray-700"
+              >
+                Sonra
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-600 text-center mt-3">Sonra'ya basarsan uygulama kapanınca otomatik kurulur</p>
           </div>
         </div>
       )}

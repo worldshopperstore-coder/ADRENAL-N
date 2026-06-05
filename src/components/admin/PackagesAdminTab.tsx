@@ -291,7 +291,7 @@ export default function PackagesAdminTab() {
         };
         contractResult = await createContract(request);
         if (!contractResult.success) {
-          setContractError(`Atlantis DB hatası: ${contractResult.error}`);
+          setContractError(contractResult.error || 'Kontrat oluşturulamadı');
           setContractSaving(false);
           return;
         }
@@ -319,7 +319,7 @@ export default function PackagesAdminTab() {
       await addPackage(selectedKasa, newPkg);
       await load(selectedKasa);
 
-      setContractSuccess(`✅ "${contractForm.name}" kontratı oluşturuldu!${contractResult ? ` (Atlantis ID: ${contractResult.contractHeaderId})` : ''}`);
+      setContractSuccess(`✅ "${contractForm.name}" kontratı oluşturuldu!`);
       setContractForm(null);
       setShowContractForm(false);
     } catch (err: any) {
@@ -348,7 +348,7 @@ export default function PackagesAdminTab() {
         ]);
         const result = await updateContractPrice(priceUpdates, getPersonnelUsername());
         if (!result.success) {
-          setPriceError(`Atlantis DB hatası: ${result.error}`);
+          setPriceError(result.error || 'Fiyat güncellenemedi');
           setPriceSaving(false);
           return;
         }
@@ -757,11 +757,11 @@ export default function PackagesAdminTab() {
 
               {!integrationActive && (
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-3 py-2 text-yellow-400 text-xs">
-                  ⚠️ Entegrasyon kapalı — kontrat sadece Supabase'e kaydedilir, Atlantis DB'ye yazılmaz.
+                  ⚠️ Sistem bağlantısı kapalı — kontrat sadece yerel kayıt olarak oluşturulur.
                 </div>
               )}
 
-              {contractError && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 text-red-400 text-xs">{contractError}</div>}
+              {contractError && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 text-red-400 text-xs">⚠️ {contractError}</div>}
               {contractSuccess && <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2 text-emerald-400 text-xs">{contractSuccess}</div>}
 
               <div className="flex gap-3 pt-1">
@@ -809,7 +809,7 @@ export default function PackagesAdminTab() {
             </div>
             {!integrationActive && (
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-3 py-2 text-yellow-400 text-xs mb-3">
-                ⚠️ Entegrasyon kapalı — sadece Supabase fiyatı güncellenir.
+                ⚠️ Sistem bağlantısı kapalı — sadece yerel fiyat güncellenir.
               </div>
             )}
             {priceError && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 text-red-400 text-xs mb-3">{priceError}</div>}
