@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { LogOut, Package, Droplets, Share2, LayoutDashboard, Briefcase, User, Menu, X, Shield, BarChart3, Users, Wallet, TrendingUp, FileText, ChevronLeft, Settings, Bug, Minus, Copy, Wifi, WifiOff, Loader2 } from 'lucide-react';
+import { LogOut, Package, Droplets, Share2, LayoutDashboard, Briefcase, User, Menu, X, Shield, BarChart3, Users, Wallet, TrendingUp, FileText, ChevronLeft, Settings, Bug, Minus, Copy, Wifi, WifiOff, Loader2, Pencil, Check } from 'lucide-react';
 import { loadAdvancesFromSupabase } from '@/utils/kasaSettingsDB';
 import { loadExchangeRates, loadExchangeRatesFromSupabase, saveExchangeRates } from '@/utils/dailyData';
 import { getKasaTheme } from '@/utils/kasaTheme';
@@ -54,6 +54,10 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
   const [usdRate, setUsdRate] = useState(savedRates.usd);
   const [eurRate, setEurRate] = useState(savedRates.eur);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [rateEditMode, setRateEditMode] = useState(false);
+  const [rateSaved, setRateSaved] = useState(false);
+  const [usdDraft, setUsdDraft] = useState('');
+  const [eurDraft, setEurDraft] = useState('');
 
   const sidebarCollapsed = collapsed && !hovered;
 
@@ -129,6 +133,24 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
     const v = isNaN(value) ? 0 : value;
     setEurRate(v);
     debouncedSaveRates(usdRate, v);
+  };
+
+  const openRateEdit = () => {
+    setUsdDraft(usdRate.toString());
+    setEurDraft(eurRate.toString());
+    setRateEditMode(true);
+    setRateSaved(false);
+  };
+
+  const saveRateEdit = () => {
+    const usd = parseFloat(usdDraft) || usdRate;
+    const eur = parseFloat(eurDraft) || eurRate;
+    setUsdRate(usd);
+    setEurRate(eur);
+    saveExchangeRates(usd, eur);
+    setRateEditMode(false);
+    setRateSaved(true);
+    setTimeout(() => setRateSaved(false), 2500);
   };
 
   const toggleCollapse = () => {
@@ -316,22 +338,48 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
                     <div className="bg-gray-800/50 rounded-lg border border-gray-700/30 overflow-hidden">
                       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700/30 border-b border-gray-700/20">
                         <TrendingUp className="w-3 h-3 text-gray-400" />
-                        <span className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">Kurlar</span>
+                        <span className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider flex-1">Kurlar</span>
+                        {rateSaved ? (
+                          <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold">
+                            <Check className="w-3 h-3" /> Kaydedildi
+                          </span>
+                        ) : rateEditMode ? (
+                          <button onClick={saveRateEdit} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 font-bold transition-colors">
+                            <Check className="w-3 h-3" /> Kaydet
+                          </button>
+                        ) : (
+                          <button onClick={openRateEdit} className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-amber-400 transition-colors">
+                            <Pencil className="w-3 h-3" /> Düzenle
+                          </button>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 divide-x divide-gray-700/30">
                         <div className="px-2.5 py-1.5">
-                          <label htmlFor="usd-rate" className="text-[10px] text-gray-500 mb-0.5 block">USD / TL</label>
-                          <div className="flex items-center">
-                            <input id="usd-rate" type="number" step="0.01" value={usdRate} onChange={(e) => handleUsdRateChange(parseFloat(e.target.value))} className="bg-transparent font-bold text-amber-400 outline-none w-full text-xs focus:ring-1 focus:ring-amber-500/30 rounded px-0.5 electron-no-drag" />
-                            <span className="text-[10px] text-gray-500 flex-shrink-0">₺</span>
-                          </div>
+                          <label className="text-[10px] text-gray-500 mb-0.5 block">USD / TL</label>
+                          {rateEditMode ? (
+                            <input
+                              type="number" step="0.01" value={usdDraft}
+                              onChange={(e) => setUsdDraft(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && saveRateEdit()}
+                              autoFocus
+                              className="bg-gray-700/50 border border-amber-500/40 font-bold text-amber-400 outline-none w-full text-xs rounded px-1.5 py-0.5 electron-no-drag"
+                            />
+                          ) : (
+                            <span className="font-bold text-amber-400 text-xs">{usdRate.toFixed(2)} ₺</span>
+                          )}
                         </div>
                         <div className="px-2.5 py-1.5">
-                          <label htmlFor="eur-rate" className="text-[10px] text-gray-500 mb-0.5 block">EUR / TL</label>
-                          <div className="flex items-center">
-                            <input id="eur-rate" type="number" step="0.01" value={eurRate} onChange={(e) => handleEurRateChange(parseFloat(e.target.value))} className="bg-transparent font-bold text-orange-300 outline-none w-full text-xs focus:ring-1 focus:ring-orange-500/30 rounded px-0.5 electron-no-drag" />
-                            <span className="text-[10px] text-gray-500 flex-shrink-0">₺</span>
-                          </div>
+                          <label className="text-[10px] text-gray-500 mb-0.5 block">EUR / TL</label>
+                          {rateEditMode ? (
+                            <input
+                              type="number" step="0.01" value={eurDraft}
+                              onChange={(e) => setEurDraft(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && saveRateEdit()}
+                              className="bg-gray-700/50 border border-orange-500/40 font-bold text-orange-300 outline-none w-full text-xs rounded px-1.5 py-0.5 electron-no-drag"
+                            />
+                          ) : (
+                            <span className="font-bold text-orange-300 text-xs">{eurRate.toFixed(2)} ₺</span>
+                          )}
                         </div>
                       </div>
                     </div>

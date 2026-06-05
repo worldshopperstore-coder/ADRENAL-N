@@ -57,6 +57,7 @@ export default function TeamTab() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord[]>([]);
   const [qrTokens, setQrTokens] = useState<Record<string, string>>({});
+  const [qrFullscreen, setQrFullscreen] = useState<{ token: string; name: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<string[]>(() => {
@@ -399,7 +400,11 @@ export default function TeamTab() {
                       <div className="flex items-center gap-3">
                         {qrToken ? (
                           <>
-                            <div className="flex-shrink-0 bg-white p-1.5 rounded-lg">
+                            <div
+                              className="flex-shrink-0 bg-white p-1.5 rounded-lg cursor-pointer hover:scale-105 transition-transform active:scale-95"
+                              onClick={() => setQrFullscreen({ token: qrToken, name: p.fullName })}
+                              title="Büyütmek için tıkla"
+                            >
                               <img
                                 src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`https://yoklama.adrenalin.app/scan?token=${qrToken}`)}`}
                                 alt="QR"
@@ -452,6 +457,24 @@ export default function TeamTab() {
       <p className="text-xs text-gray-700 text-right">
         Son güncelleme: {lastRefresh.toLocaleTimeString('tr-TR')}
       </p>
+
+      {/* QR Tam Ekran Modal */}
+      {qrFullscreen && (
+        <div
+          className="fixed inset-0 bg-black/95 z-[200] flex flex-col items-center justify-center p-6"
+          onClick={() => setQrFullscreen(null)}
+        >
+          <p className="text-white font-bold text-lg mb-6">{qrFullscreen.name}</p>
+          <div className="bg-white p-4 rounded-2xl shadow-2xl">
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`https://yoklama.adrenalin.app/scan?token=${qrFullscreen.token}`)}`}
+              alt="QR"
+              className="w-64 h-64"
+            />
+          </div>
+          <p className="text-gray-400 text-sm mt-6">Kapatmak için ekrana dokun</p>
+        </div>
+      )}
     </div>
   );
 }

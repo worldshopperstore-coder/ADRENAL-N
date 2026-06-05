@@ -2441,7 +2441,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowPosResultModal(false); }}>
           <div className="bg-gradient-to-b from-gray-900 to-[#0c0c14] border border-gray-700/60 rounded-2xl w-full max-w-md shadow-2xl p-6">
-            {/* Başarı/Hata İkonu */}
+            {/* İkon */}
             <div className="text-center mb-5">
               {posResult.success ? (
                 <div className="w-16 h-16 mx-auto mb-3 bg-emerald-500/20 rounded-full flex items-center justify-center border-2 border-emerald-500/40">
@@ -2453,11 +2453,11 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                 </div>
               )}
               <h3 className={`text-lg font-bold ${posResult.success ? 'text-emerald-400' : 'text-red-400'}`}>
-                {posResult.success ? (isFreeResult ? 'Bilet Basıldı!' : 'Satış Başarılı!') : 'İşlem Başarısız'}
+                {posResult.success ? 'İşlem Tamamlandı' : 'İşlem Başarısız'}
               </h3>
-              {posResult.success && posResult.terminalRecordId && !isFreeResult && (
+              {posResult.success && posResult.printResult && posResult.printResult.printed > 0 && (
                 <p className="text-sm text-gray-400 mt-1">
-                  Kayıt No: <span className="text-white font-bold">#{posResult.terminalRecordId}</span>
+                  <span className="text-white font-bold">{posResult.printResult.printed}</span> bilet başarıyla basıldı
                 </p>
               )}
               {posResult.error && (
@@ -2467,38 +2467,9 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               )}
             </div>
 
-            {/* Bilet Bilgileri — sadece ücretsiz olmayan satışlarda */}
-            {posResult.success && posResult.ticketIds && posResult.ticketIds.length > 0 && !isFreeResult && (
-              <div className="bg-gray-800/50 rounded-xl p-3 mb-4 border border-gray-700/50">
-                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2">Bilet Detayları</p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="text-gray-400">Bilet Sayısı:</div>
-                  <div className="text-white font-bold">{posResult.ticketIds.length}</div>
-                  <div className="text-gray-400">Bilet ID'leri:</div>
-                  <div className="text-white font-mono text-xs">{posResult.ticketIds.join(', ')}</div>
-                </div>
-                {posResult.printResult && posResult.printResult.printed > 0 && posResult.printResult.failed === 0 && (
-                  <div className="mt-2 text-xs px-2 py-1 rounded bg-emerald-900/30 text-emerald-300">
-                    🖨️ {posResult.printResult.printed} bilet basıldı
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* POS Durumu — sadece ücretsiz olmayan satışlarda */}
-            {posResult.posMessage && !isFreeResult && (
-              <div className={`text-xs px-3 py-2 rounded-lg mb-4 border ${
-                posResult.posSuccess
-                  ? 'bg-emerald-900/20 border-emerald-700/30 text-emerald-300'
-                  : 'bg-yellow-900/20 border-yellow-700/30 text-yellow-300'
-              }`}>
-                POS: {posResult.posMessage}
-              </div>
-            )}
-
             {/* Butonlar */}
             <div className="flex gap-2.5">
-              {posResult.success && posResult.ticketIds && posResult.ticketIds.length > 0 && !isFreeResult && (
+              {posResult.success && posResult.ticketIds && posResult.ticketIds.length > 0 && (
                 <button
                   onClick={async () => {
                     try {
@@ -2509,12 +2480,12 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                   }}
                   className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all"
                 >
-                  <Printer className="w-4 h-4" /> Bilet Bas
+                  <Printer className="w-4 h-4" /> Tekrar Bas
                 </button>
               )}
               <button
                 onClick={() => { setShowPosResultModal(false); setPosResult(null); }}
-                className={`${posResult.success && !isFreeResult ? 'px-5' : 'flex-1'} bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white py-2.5 rounded-xl transition-colors text-sm border border-gray-700 font-medium`}
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white py-2.5 rounded-xl transition-colors text-sm border border-gray-700 font-medium"
               >
                 Kapat
               </button>
