@@ -63,6 +63,7 @@ interface AddSaleForm {
   isCrossSale: boolean;
   selectedCurrency: 'USD' | 'EUR' | '';
   comment: string;
+  payInTl: boolean;
 }
 
 export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpdate }: { usdRate: number; eurRate: number; onSalesUpdate?: (sales: Sale[]) => void }) {
@@ -160,6 +161,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     isCrossSale: false,
     selectedCurrency: '',
     comment: '',
+    payInTl: false,
   });
 
   // ── Dövizli kategori yardımcıları ──────────────────────
@@ -232,7 +234,8 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     currency: string,
     paymentType: string,
     usdRate: number,
-    eurRate: number
+    eurRate: number,
+    payInTl: boolean = false
   ) => {
     let kkTl = 0;
     let cashTl = 0;
@@ -240,7 +243,11 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     let cashEur = 0;
 
     if (paymentType === 'Nakit') {
-      if (currency === 'USD') {
+      if (payInTl && currency === 'USD') {
+        cashTl = amount * usdRate;
+      } else if (payInTl && currency === 'EUR') {
+        cashTl = amount * eurRate;
+      } else if (currency === 'USD') {
         cashUsd = amount;
       } else if (currency === 'EUR') {
         cashEur = amount;
@@ -294,17 +301,23 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
 
       const saleCurrency = selectedPackage.currency;
       const totalInTl = saleCurrency === 'USD' ? total * usdRate : saleCurrency === 'EUR' ? total * eurRate : total;
-      const paidTl = kkTl + cashTl + (cashUsd * usdRate) + (cashEur * eurRate);
+      // kkTl alanı: dövizli pakette döviz cinsinden girilir, TL'ye çevrilir
+      const kkTlConverted = saleCurrency === 'USD' ? kkTl * usdRate : saleCurrency === 'EUR' ? kkTl * eurRate : kkTl;
+      const paidTl = kkTlConverted + cashTl + (cashUsd * usdRate) + (cashEur * eurRate);
       if (Math.abs(totalInTl - paidTl) > 0.99) {
-        setErrorMessage(`Ödeme tutarı toplam ile eşleşmiyor. Kalan: ${(totalInTl - paidTl).toFixed(2)} ₺`);
+        const remainingInCurrency = saleCurrency === 'USD' ? (totalInTl - paidTl) / usdRate : saleCurrency === 'EUR' ? (totalInTl - paidTl) / eurRate : (totalInTl - paidTl);
+        const sym = saleCurrency === 'USD' ? '$' : saleCurrency === 'EUR' ? '€' : '₺';
+        setErrorMessage(`Ödeme tutarı toplam ile eşleşmiyor. Kalan: ${remainingInCurrency.toFixed(2)} ${sym}`);
         return;
       }
+      // Gerçek kkTl değerini güncelle (dövizden TL'ye çevrilmiş)
+      kkTl = kkTlConverted;
 
       const methodCount = [kkTl > 0, cashTl > 0, cashUsd > 0, cashEur > 0].filter(Boolean).length;
       paymentType = methodCount > 1 ? 'Çoklu' : kkTl > 0 ? 'Kredi Kartı' : 'Nakit';
     } else {
       const pt = formData.paymentType as 'Nakit' | 'Kredi Kartı';
-      const distribution = calculateSaleDistribution(total, selectedPackage.currency, pt, usdRate, eurRate);
+      const distribution = calculateSaleDistribution(total, selectedPackage.currency, pt, usdRate, eurRate, formData.payInTl);
       kkTl = distribution.kkTl;
       cashTl = distribution.cashTl;
       cashUsd = distribution.cashUsd;
@@ -360,6 +373,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       isCrossSale: false,
       selectedCurrency: '',
       comment: '',
+      payInTl: false,
     });
     setSplitMode(false);
     setSelectedCategory('');
@@ -401,16 +415,20 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       const cashUsdVal = parseFloat(formData.splitCashUsd) || 0;
       const cashEurVal = parseFloat(formData.splitCashEur) || 0;
 
+      // Dövizli pakette KK alanı döviz cinsinden girildi, TL'ye çevir
+      const kkRate = selectedPackage.currency === 'USD' ? usdRate : selectedPackage.currency === 'EUR' ? eurRate : 1;
+      const kkTlConverted = selectedPackage.currency !== 'TL' ? kkTlVal * kkRate : kkTlVal;
+
       splitPayments = {
-        kkTl: kkTlVal,
+        kkTl: kkTlConverted,
         cashTl: cashTlVal,
         cashUsd: cashUsdVal,
         cashEur: cashEurVal,
       };
 
       // Ödeme tipi belirle
-      const methodCount = [kkTlVal > 0, cashTlVal > 0, cashUsdVal > 0, cashEurVal > 0].filter(Boolean).length;
-      paymentType = methodCount > 1 ? 'Çoklu' : kkTlVal > 0 ? 'Kredi Kartı' : 'Nakit';
+      const methodCount = [kkTlConverted > 0, cashTlVal > 0, cashUsdVal > 0, cashEurVal > 0].filter(Boolean).length;
+      paymentType = methodCount > 1 ? 'Çoklu' : kkTlConverted > 0 ? 'Kredi Kartı' : 'Nakit';
     } else {
       // Kredi kartı seçilmişse ve dövizli paketse, TL'ye çevirip KK olarak gönder
       if (formData.paymentType === 'Kredi Kartı' && selectedPackage.currency !== 'TL') {
@@ -423,6 +441,18 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
           cashEur: 0,
         };
         paymentType = 'Kredi Kartı';
+      }
+      // Nakit + TL karşılığında öde seçilmişse, döviz tutarını TL'ye çevirip cashTl olarak gönder
+      if (formData.paymentType === 'Nakit' && formData.payInTl && selectedPackage.currency !== 'TL') {
+        const total = adultQty * selectedPackage.adultPrice + childQty * selectedPackage.childPrice;
+        const rate = selectedPackage.currency === 'USD' ? usdRate : eurRate;
+        splitPayments = {
+          kkTl: 0,
+          cashTl: total * rate,
+          cashUsd: 0,
+          cashEur: 0,
+        };
+        paymentType = 'Nakit';
       }
     }
 
@@ -527,7 +557,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       setSales((prev) => [...prev, newSale]);
 
       // Form sıfırla
-      setFormData({ packageId: '', adultQty: '0', childQty: '0', infantQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: false, selectedCurrency: '', comment: '' });
+      setFormData({ packageId: '', adultQty: '0', childQty: '0', infantQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: false, selectedCurrency: '', comment: '', payInTl: false });
       setSplitMode(false);
       setSelectedCategory('');
       setShowAddForm(false);
@@ -1537,7 +1567,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                         key={group}
                         onClick={() => {
                           setSelectedCategory(group);
-                          setFormData({ ...formData, packageId: '', adultQty: '0', childQty: '0', infantQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: group.startsWith('Çapraz'), selectedCurrency: '' });
+                          setFormData({ ...formData, packageId: '', adultQty: '0', childQty: '0', infantQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: group.startsWith('Çapraz'), selectedCurrency: '', payInTl: false });
                           setSplitMode(false);
                         }}
                         disabled={pkgCount === 0}
@@ -1734,7 +1764,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setFormData({ ...formData, paymentType: 'Kredi Kartı' })}
+                                onClick={() => setFormData({ ...formData, paymentType: 'Kredi Kartı', payInTl: false })}
                                 className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border transition-all text-sm font-bold ${
                                   formData.paymentType === 'Kredi Kartı'
                                     ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300'
@@ -1749,6 +1779,27 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                             <div className="w-full px-3 py-2.5 bg-orange-900/20 border border-orange-500/30 rounded-xl text-orange-300 text-sm text-center font-semibold">
                               Çoklu Ödeme
                             </div>
+                          )}
+                          {/* TL Karşılığında Öde — sadece nakit + dövizli kategoride */}
+                          {!splitMode && formData.paymentType === 'Nakit' && isDualCurrencyCategory(selectedCategory) && formData.selectedCurrency && (
+                            <button
+                              type="button"
+                              onClick={() => setFormData({ ...formData, payInTl: !formData.payInTl })}
+                              className={`mt-2 w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all text-sm ${
+                                formData.payInTl
+                                  ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
+                                  : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300 hover:border-gray-600'
+                              }`}
+                            >
+                              <div className={`w-4 h-4 rounded flex-shrink-0 border flex items-center justify-center transition-all ${
+                                formData.payInTl
+                                  ? 'bg-emerald-500 border-emerald-400'
+                                  : 'bg-transparent border-gray-600'
+                              }`}>
+                                {formData.payInTl && <span className="text-white text-[10px] font-black leading-none">✓</span>}
+                              </div>
+                              <span className="font-semibold">TL Karşılığında Öde</span>
+                            </button>
                           )}
                         </div>
                       );
@@ -1848,13 +1899,19 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                         <span className="text-xs font-bold text-gray-300">Toplam</span>
                         <div className="text-right">
                           <p className="text-base font-black text-white">{total.toFixed(2)} <span className={`text-sm ${pkg.currency === 'USD' ? 'text-amber-400' : pkg.currency === 'EUR' ? 'text-blue-400' : 'text-emerald-400'}`}>{currSymbol}</span></p>
-                          {pkg.currency !== 'TL' && <p className="text-[10px] text-gray-500">≈{totalTl.toFixed(0)} ₺</p>}
+                          {pkg.currency !== 'TL' && (
+                            formData.payInTl
+                              ? <p className="text-[10px] text-emerald-400 font-bold">= {totalTl.toFixed(2)} ₺ nakit</p>
+                              : <p className="text-[10px] text-gray-500">≈{totalTl.toFixed(0)} ₺</p>
+                          )}
                         </div>
                       </div>
                       {formData.paymentType && (
                         <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/40">
                           <span className="text-xs text-gray-400">Ödeme</span>
-                          <span className={`text-xs font-bold ${formData.paymentType === 'Kredi Kartı' ? 'text-emerald-400' : 'text-blue-400'}`}>{formData.paymentType}</span>
+                          <span className={`text-xs font-bold ${formData.paymentType === 'Kredi Kartı' ? 'text-emerald-400' : 'text-blue-400'}`}>
+                            {formData.paymentType}{formData.payInTl && formData.paymentType === 'Nakit' ? ' (₺)' : ''}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -1918,24 +1975,27 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                     const splitTl = parseFloat(formData.splitCashTl) || 0;
                     const splitUsd = parseFloat(formData.splitCashUsd) || 0;
                     const splitEur = parseFloat(formData.splitCashEur) || 0;
-                    const paidTl = splitKk + splitTl + (splitUsd * usdRate) + (splitEur * eurRate);
+                    // KK dövizli pakette döviz cinsinden girilir
+                    const splitKkInTl = saleCurrency === 'USD' ? splitKk * usdRate : saleCurrency === 'EUR' ? splitKk * eurRate : splitKk;
+                    const paidTl = splitKkInTl + splitTl + (splitUsd * usdRate) + (splitEur * eurRate);
                     const remaining = totalInTl - paidTl;
-                    const remainingUsd = usdRate > 0 ? remaining / usdRate : 0;
-                    const remainingEur = eurRate > 0 ? remaining / eurRate : 0;
+                    const remainingInCurrency = saleCurrency === 'USD' ? remaining / usdRate : saleCurrency === 'EUR' ? remaining / eurRate : remaining;
+                    const currSym = saleCurrency === 'USD' ? '$' : saleCurrency === 'EUR' ? '€' : '₺';
+                    const kkLabel = saleCurrency === 'USD' ? 'KK $' : saleCurrency === 'EUR' ? 'KK €' : 'KK ₺';
 
                     return saleTotal > 0 ? (
                       <div className="space-y-2">
                         <div className="text-[10px] text-center text-white font-bold">
-                          {saleTotal.toFixed(2)} {saleCurrency === 'TL' ? '₺' : saleCurrency === 'USD' ? '$' : '€'}
+                          {saleTotal.toFixed(2)} {currSym}
                           {saleCurrency !== 'TL' && <span className="text-gray-500"> (≈{totalInTl.toFixed(0)}₺)</span>}
                         </div>
                         <div className="space-y-1.5">
                           <div>
-                            <label className="block text-[9px] text-emerald-400/80 mb-0.5 font-semibold">KK ₺</label>
+                            <label className="block text-[9px] text-emerald-400/80 mb-0.5 font-semibold">{kkLabel}</label>
                             <input
                               type="number" min="0" step="0.01" value={formData.splitKkTl}
                               onChange={(e) => setFormData({ ...formData, splitKkTl: e.target.value })}
-                              placeholder={remaining > 0.01 ? `${remaining.toFixed(0)}` : '0'}
+                              placeholder={remainingInCurrency > 0.01 ? `${remainingInCurrency.toFixed(2)}` : '0'}
                               className="w-full px-2 py-1.5 bg-gray-800 border border-emerald-700/40 rounded-lg text-emerald-300 text-xs focus:outline-none focus:border-emerald-500 placeholder-emerald-900/80"
                             />
                           </div>
@@ -1944,25 +2004,25 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                             <input
                               type="number" min="0" step="0.01" value={formData.splitCashTl}
                               onChange={(e) => setFormData({ ...formData, splitCashTl: e.target.value })}
-                              placeholder={remaining > 0.01 ? `${remaining.toFixed(0)}` : '0'}
+                              placeholder={remaining > 0.01 ? `${remaining.toFixed(2)}` : '0'}
                               className="w-full px-2 py-1.5 bg-gray-800 border border-blue-700/40 rounded-lg text-blue-300 text-xs focus:outline-none focus:border-blue-500 placeholder-blue-900/80"
                             />
                           </div>
                           <div>
-                            <label className="block text-[9px] text-amber-400/80 mb-0.5 font-semibold">USD $</label>
+                            <label className="block text-[9px] text-amber-400/80 mb-0.5 font-semibold">Nakit $</label>
                             <input
                               type="number" min="0" step="0.01" value={formData.splitCashUsd}
                               onChange={(e) => setFormData({ ...formData, splitCashUsd: e.target.value })}
-                              placeholder={remaining > 0.01 ? `${remainingUsd.toFixed(0)}` : '0'}
+                              placeholder={remaining > 0.01 ? `${(remaining / usdRate).toFixed(2)}` : '0'}
                               className="w-full px-2 py-1.5 bg-gray-800 border border-amber-700/40 rounded-lg text-amber-300 text-xs focus:outline-none focus:border-amber-500 placeholder-amber-900/80"
                             />
                           </div>
                           <div>
-                            <label className="block text-[9px] text-violet-400/80 mb-0.5 font-semibold">EUR €</label>
+                            <label className="block text-[9px] text-violet-400/80 mb-0.5 font-semibold">Nakit €</label>
                             <input
                               type="number" min="0" step="0.01" value={formData.splitCashEur}
                               onChange={(e) => setFormData({ ...formData, splitCashEur: e.target.value })}
-                              placeholder={remaining > 0.01 ? `${remainingEur.toFixed(0)}` : '0'}
+                              placeholder={remaining > 0.01 ? `${(remaining / eurRate).toFixed(2)}` : '0'}
                               className="w-full px-2 py-1.5 bg-gray-800 border border-violet-700/40 rounded-lg text-violet-300 text-xs focus:outline-none focus:border-violet-500 placeholder-violet-900/80"
                             />
                           </div>
@@ -1977,8 +2037,8 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                           {Math.abs(remaining) < 0.01
                             ? '✓ Tamamlandı'
                             : remaining > 0
-                              ? `Kalan: ${remaining.toFixed(2)}₺`
-                              : `Fazla: ${Math.abs(remaining).toFixed(2)}₺`
+                              ? `Kalan: ${remainingInCurrency.toFixed(2)} ${currSym}`
+                              : `Fazla: ${Math.abs(remainingInCurrency).toFixed(2)} ${currSym}`
                           }
                         </div>
                       </div>
