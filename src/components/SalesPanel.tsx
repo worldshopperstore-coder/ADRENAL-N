@@ -1781,7 +1781,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                             </div>
                           )}
                           {/* TL Karşılığında Öde — sadece nakit + dövizli kategoride */}
-                          {!splitMode && formData.paymentType === 'Nakit' && isDualCurrencyCategory(selectedCategory) && formData.selectedCurrency && (
+                          {!splitMode && formData.paymentType === 'Nakit' && isDualCurrencyCategory(selectedCategory) && formData.packageId && (
                             <button
                               type="button"
                               onClick={() => setFormData({ ...formData, payInTl: !formData.payInTl })}
