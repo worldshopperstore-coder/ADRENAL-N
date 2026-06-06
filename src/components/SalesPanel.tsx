@@ -1523,7 +1523,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       {/* ── ADD SALE MODAL ── */}
       {showAddForm && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-3 overscroll-contain" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddForm(false); setSelectedCategory(''); setErrorMessage(''); setSplitMode(false); } }}>
-          <div className="bg-gradient-to-b from-gray-900 to-[#0c0c14] border border-gray-700/60 rounded-2xl w-full max-w-4xl shadow-2xl transition-all duration-300 max-h-[92vh] flex flex-col">
+          <div className="bg-gradient-to-b from-gray-900 to-[#0c0c14] border border-gray-700/60 rounded-2xl w-full max-w-5xl shadow-2xl transition-all duration-300 max-h-[92vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex-shrink-0 bg-gradient-to-r from-gray-900/95 via-gray-900/98 to-gray-900/95 backdrop-blur-xl border-b border-gray-700/50 px-5 py-3 rounded-t-2xl">
               <div className="flex items-center justify-between">
@@ -1960,9 +1960,13 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               {splitMode && (
               <div className="flex-shrink-0 sm:w-64 sm:border-l border-t sm:border-t-0 border-gray-700/40 p-3 sm:p-4 overflow-y-auto">
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-1">
                     <label className="block text-[10px] text-orange-400 font-bold uppercase tracking-widest">Çoklu Ödeme</label>
-                    <button type="button" onClick={() => setSplitMode(false)} className="text-[9px] text-gray-500 hover:text-gray-300">✕ Kapat</button>
+                    {integrationActive && (
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${integrationReady ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' : 'bg-yellow-500/10 border-yellow-500/25 text-yellow-400'}`}>
+                        {integrationReady ? '● Aktif' : '● Bağlantı Yok'}
+                      </span>
+                    )}
                   </div>
                   {(() => {
                     const selectedPkg = kasaPackages.find(p => p.id === formData.packageId);
@@ -1985,47 +1989,38 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
 
                     return saleTotal > 0 ? (
                       <div className="space-y-2">
-                        <div className="text-[10px] text-center text-white font-bold">
-                          {saleTotal.toFixed(2)} {currSym}
-                          {saleCurrency !== 'TL' && <span className="text-gray-500"> (≈{totalInTl.toFixed(0)}₺)</span>}
+                        {/* Özet */}
+                        <div className="bg-gray-800/60 rounded-xl px-3 py-2 space-y-1">
+                          <p className="text-xs font-bold text-white truncate">{selectedPkg?.name}</p>
+                          <div className="flex items-center justify-between text-[10px] text-gray-400">
+                            <span>
+                              {adultQ > 0 && `${adultQ} Yetişkin`}
+                              {adultQ > 0 && childQ > 0 && ' + '}
+                              {childQ > 0 && `${childQ} Çocuk`}
+                            </span>
+                            <span className="font-black text-white">
+                              {saleTotal.toFixed(2)} {currSym}
+                              {saleCurrency !== 'TL' && <span className="text-gray-500 font-normal"> ≈{totalInTl.toFixed(0)}₺</span>}
+                            </span>
+                          </div>
                         </div>
                         <div className="space-y-1.5">
-                          <div>
-                            <label className="block text-[9px] text-emerald-400/80 mb-0.5 font-semibold">{kkLabel}</label>
-                            <input
-                              type="number" min="0" step="0.01" value={formData.splitKkTl}
-                              onChange={(e) => setFormData({ ...formData, splitKkTl: e.target.value })}
-                              placeholder={remainingInCurrency > 0.01 ? `${remainingInCurrency.toFixed(2)}` : '0'}
-                              className="w-full px-2 py-1.5 bg-gray-800 border border-emerald-700/40 rounded-lg text-emerald-300 text-xs focus:outline-none focus:border-emerald-500 placeholder-emerald-900/80"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[9px] text-blue-400/80 mb-0.5 font-semibold">Nakit ₺</label>
-                            <input
-                              type="number" min="0" step="0.01" value={formData.splitCashTl}
-                              onChange={(e) => setFormData({ ...formData, splitCashTl: e.target.value })}
-                              placeholder={remaining > 0.01 ? `${remaining.toFixed(2)}` : '0'}
-                              className="w-full px-2 py-1.5 bg-gray-800 border border-blue-700/40 rounded-lg text-blue-300 text-xs focus:outline-none focus:border-blue-500 placeholder-blue-900/80"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[9px] text-amber-400/80 mb-0.5 font-semibold">Nakit $</label>
-                            <input
-                              type="number" min="0" step="0.01" value={formData.splitCashUsd}
-                              onChange={(e) => setFormData({ ...formData, splitCashUsd: e.target.value })}
-                              placeholder={remaining > 0.01 ? `${(remaining / usdRate).toFixed(2)}` : '0'}
-                              className="w-full px-2 py-1.5 bg-gray-800 border border-amber-700/40 rounded-lg text-amber-300 text-xs focus:outline-none focus:border-amber-500 placeholder-amber-900/80"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[9px] text-violet-400/80 mb-0.5 font-semibold">Nakit €</label>
-                            <input
-                              type="number" min="0" step="0.01" value={formData.splitCashEur}
-                              onChange={(e) => setFormData({ ...formData, splitCashEur: e.target.value })}
-                              placeholder={remaining > 0.01 ? `${(remaining / eurRate).toFixed(2)}` : '0'}
-                              className="w-full px-2 py-1.5 bg-gray-800 border border-violet-700/40 rounded-lg text-violet-300 text-xs focus:outline-none focus:border-violet-500 placeholder-violet-900/80"
-                            />
-                          </div>
+                          {[
+                            { label: kkLabel, value: formData.splitKkTl, key: 'splitKkTl', placeholder: remainingInCurrency > 0.01 ? remainingInCurrency.toFixed(2) : '0', borderColor: 'border-emerald-600/50 focus:border-emerald-500' },
+                            { label: 'Nakit ₺', value: formData.splitCashTl, key: 'splitCashTl', placeholder: remaining > 0.01 ? remaining.toFixed(2) : '0', borderColor: 'border-blue-600/50 focus:border-blue-500' },
+                            { label: 'Nakit $', value: formData.splitCashUsd, key: 'splitCashUsd', placeholder: remaining > 0.01 ? (remaining / usdRate).toFixed(2) : '0', borderColor: 'border-amber-600/50 focus:border-amber-500' },
+                            { label: 'Nakit €', value: formData.splitCashEur, key: 'splitCashEur', placeholder: remaining > 0.01 ? (remaining / eurRate).toFixed(2) : '0', borderColor: 'border-violet-600/50 focus:border-violet-500' },
+                          ].map(({ label, value, key, placeholder, borderColor }) => (
+                            <div key={key}>
+                              <label className="block text-[9px] text-gray-400 mb-0.5 font-semibold">{label}</label>
+                              <input
+                                type="number" min="0" step="0.01" value={value}
+                                onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
+                                placeholder={placeholder}
+                                className={`w-full px-2 py-1.5 bg-gray-800/80 border ${borderColor} rounded-lg text-gray-200 text-xs focus:outline-none placeholder-gray-600 transition-colors`}
+                              />
+                            </div>
+                          ))}
                         </div>
                         <div className={`text-[10px] font-bold text-center py-1.5 rounded-md border ${
                           Math.abs(remaining) < 0.01
@@ -2040,6 +2035,37 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                               ? `Kalan: ${remainingInCurrency.toFixed(2)} ${currSym}`
                               : `Fazla: ${Math.abs(remainingInCurrency).toFixed(2)} ${currSym}`
                           }
+                        </div>
+                        {/* Satışı Kaydet / Ödeme Al butonu */}
+                        {errorMessage && (
+                          <div className="bg-red-500/10 text-red-300 text-xs px-3 py-2 rounded-xl border border-red-500/25">
+                            ⚠ {errorMessage}
+                          </div>
+                        )}
+                        <div className="space-y-2 pt-1">
+                          {integrationActive ? (
+                            <button
+                              onClick={handleActiveSale}
+                              disabled={posProcessing || Math.abs(remaining) > 0.99}
+                              className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
+                            >
+                              <Zap className="w-4 h-4" /> Ödeme Al
+                            </button>
+                          ) : (
+                            <button
+                              onClick={handleAddSale}
+                              disabled={posProcessing || Math.abs(remaining) > 0.99}
+                              className={`w-full bg-gradient-to-r ${CATEGORY_CONFIG[selectedCategory]?.badge || 'from-orange-600 to-orange-700'} hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2`}
+                            >
+                              <Check className="w-4 h-4" /> Satışı Kaydet
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setSplitMode(false)}
+                            className="w-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white py-2 rounded-xl transition-colors text-sm border border-gray-700 font-medium"
+                          >
+                            İptal
+                          </button>
                         </div>
                       </div>
                     ) : (
