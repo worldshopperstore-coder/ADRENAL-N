@@ -102,8 +102,8 @@ export async function getWeeklyProgress(kasaId: string, weekStart?: string): Pro
 
     let usdRate = 0, eurRate = 0;
     try {
-      // Önce kasa bazlı kur, yoksa genel exchange_rates
-      const kasaKeys = ['wildpark', 'sinema', 'face2face'];
+      // Tüm kasa localStorage key'lerini dene
+      const kasaKeys = ['wildpark', 'sinema', 'face2face', 'xd-sinema', 'xd'];
       for (const kid of kasaKeys) {
         const r = JSON.parse(localStorage.getItem(`exchange_rates_${kid}`) || 'null');
         if (r?.usd && r?.eur) { usdRate = Number(r.usd); eurRate = Number(r.eur); break; }
@@ -113,8 +113,13 @@ export async function getWeeklyProgress(kasaId: string, weekStart?: string): Pro
         usdRate = Number(r.usd) || 0;
         eurRate = Number(r.eur) || 0;
       }
+      // Supabase'den dene
+      if ((!usdRate || !eurRate) && supabase) {
+        const { data: kr } = await supabase.from('kasa_rates').select('usd, eur').limit(1);
+        if (kr?.[0]) { usdRate = Number(kr[0].usd); eurRate = Number(kr[0].eur); }
+      }
     } catch { /* default */ }
-    if (!usdRate || !eurRate) return null; // Kur girilmemiş, hesaplama yapılamaz
+    // Kur yoksa dövizli satışları 0 sayarak devam et (TL satışları yine hesaplanır)
 
     let totalTl = 0;
     const personnelMap: Record<string, { name: string; totalTl: number }> = {};
