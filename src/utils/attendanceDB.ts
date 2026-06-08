@@ -143,6 +143,57 @@ export async function checkOutAttendance(personnelId: string): Promise<boolean> 
   return !error;
 }
 
+/**
+ * Dünden açık kalan checked_in / checkout_pending kaydı varsa
+ * shift endTime ile otomatik olarak checked_out yap.
+ * Login sırasında çağrılır.
+ */
+export async function autoCloseYesterdayAttendance(
+  personnelId: string,
+  shiftEndTime: string | null  // "HH:mm" formatında, örn. "17:30"
+): Promise<boolean> {
+  if (!supabase) return false;
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Bugün dışındaki checked_in veya checkout_pending kayıtları bul
+  const { data, error } = await supabase
+    .from('attendance')
+    .select('*')
+    .eq('personnel_id', personnelId)
+    .in('status', ['checked_in', 'checkout_pending'])
+    .neq('date', today)
+    .order('date', { ascending: false })
+    .limit(1);
+
+  if (error || !data || data.length === 0) return false;
+
+  const record = data[0] as AttendanceRecord;
+
+  // Çıkış saatini belirle: shift endTime varsa onu kullan, yoksa 23:59
+  let checkOutTime: string;
+  if (shiftEndTime) {
+    // O günün tarihiyle shift endTime'ı birleştir
+    const [h, m] = shiftEndTime.split(':').map(Number);
+    const dt = new Date(`${record.date}T00:00:00`);
+    dt.setHours(h, m, 0, 0);
+    checkOutTime = dt.toISOString();
+  } else {
+    // Fallback: o günün 23:59'u
+    checkOutTime = new Date(`${record.date}T23:59:00`).toISOString();
+  }
+
+  const { error: updateError } = await supabase
+    .from('attendance')
+    .update({
+      status: 'checked_out',
+      check_out: checkOutTime,
+      checkout_token: null,
+    })
+    .eq('id', record.id);
+
+  return !updateError;
+}
+
 /** Admin: Personel yoklama geçmişi */
 export async function getPersonnelAttendance(personnelId: string, startDate?: string, endDate?: string): Promise<AttendanceRecord[]> {
   if (!supabase) return [];

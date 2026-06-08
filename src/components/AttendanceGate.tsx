@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { QrCode, CheckCircle2, Clock, Smartphone, Wifi, LogOut, XCircle } from 'lucide-react';
-import { generateSessionToken, createAttendanceSession, checkAttendanceStatus } from '@/utils/attendanceDB';
+import { generateSessionToken, createAttendanceSession, checkAttendanceStatus, autoCloseYesterdayAttendance } from '@/utils/attendanceDB';
+import { getPersonnelShift } from '@/utils/personnelSupabaseDB';
 
 interface AttendanceGateProps {
   personnelId: string;
@@ -32,6 +33,17 @@ export default function AttendanceGate({ personnelId, personnelName, kasaId, onC
     
     async function checkExisting() {
       try {
+        const today = new Date().toISOString().slice(0, 10);
+
+        // Dünden açık kalan kayıt varsa shift endTime ile otomatik kapat
+        const shift = await getPersonnelShift(personnelId);
+        const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayName = dayNames[yesterday.getDay()] as keyof typeof shift;
+        const shiftEndTime = shift?.[yesterdayName]?.isOff ? null : (shift?.[yesterdayName]?.endTime || null);
+        await autoCloseYesterdayAttendance(personnelId, shiftEndTime);
+
         const record = await checkAttendanceStatus(personnelId);
 
         // Çıkış yapmış → tekrar girişi engelle
@@ -40,21 +52,21 @@ export default function AttendanceGate({ personnelId, personnelName, kasaId, onC
           return;
         }
 
-        // Aktif veya çıkış bekliyor → direkt geçir
-        if (record && (record.status === 'checked_in' || record.status === 'checkout_pending')) {
+        // Bugünkü aktif kayıt → direkt geçir
+        if (record && record.date === today && (record.status === 'checked_in' || record.status === 'checkout_pending')) {
           setStatus('confirmed');
           setTimeout(onConfirmed, 1500);
           return;
         }
 
-        // Pending kayıt varsa mevcut token'ı kullan (TeamTab'dan oluşturulmuş olabilir)
-        if (record && record.status === 'pending' && record.session_token) {
+        // Bugünkü pending kayıt varsa mevcut token'ı kullan
+        if (record && record.date === today && record.status === 'pending' && record.session_token) {
           setSessionToken(record.session_token);
           setStatus('waiting');
           return;
         }
 
-        // Kayıt yok → yeni token oluştur
+        // Kayıt yok veya eski tarihli → yeni token oluştur
         const token = generateSessionToken(personnelId);
         setSessionToken(token);
         await createAttendanceSession(personnelId, personnelName, kasaId, token);
@@ -66,12 +78,12 @@ export default function AttendanceGate({ personnelId, personnelName, kasaId, onC
           await new Promise(r => setTimeout(r, 2000 * attempt));
           try {
             const retryRecord = await checkAttendanceStatus(personnelId);
-            if (retryRecord && (retryRecord.status === 'checked_in' || retryRecord.status === 'checkout_pending')) {
+            if (retryRecord && retryRecord.date === today && (retryRecord.status === 'checked_in' || retryRecord.status === 'checkout_pending')) {
               setStatus('confirmed');
               setTimeout(onConfirmed, 1500);
               return;
             }
-            if (retryRecord && retryRecord.status === 'pending' && retryRecord.session_token) {
+            if (retryRecord && retryRecord.date === today && retryRecord.status === 'pending' && retryRecord.session_token) {
               setSessionToken(retryRecord.session_token);
               setStatus('waiting');
               return;

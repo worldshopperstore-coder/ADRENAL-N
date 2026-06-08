@@ -299,9 +299,25 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
         if (row.workedMin > netSchedMin + 15) row.overtimeMin = row.workedMin - netSchedMin;
         row.status = row.lateMin > 0 ? 'late' : 'normal';
       } else if (att?.check_in && !att?.check_out) {
-        const gross = Math.round((Date.now() - new Date(att.check_in).getTime()) / 60000);
+        const isToday = dateStr === fmtDate(today);
+        let gross: number;
+        if (isToday) {
+          // Bugün hâlâ çalışıyor → şu ana kadar
+          gross = Math.round((Date.now() - new Date(att.check_in).getTime()) / 60000);
+        } else {
+          // Geçmiş gün, çıkış yapılmamış → shift endTime'a kadar say
+          if (endTime) {
+            const [eH, eM] = endTime.split(':').map(Number);
+            const endDt = new Date(`${dateStr}T00:00:00`);
+            endDt.setHours(eH, eM, 0, 0);
+            gross = Math.round((endDt.getTime() - new Date(att.check_in).getTime()) / 60000);
+            gross = Math.max(0, gross);
+          } else {
+            gross = Math.round((new Date(`${dateStr}T23:59:00`).getTime() - new Date(att.check_in).getTime()) / 60000);
+          }
+        }
         row.grossWorkedMin = gross; row.breakMin = 0; row.workedMin = gross;
-        row.suspicious = gross > 16 * 60;
+        row.suspicious = !isToday; // Geçmiş günde çıkış yoksa her zaman şüpheli işaretle
         row.status = 'normal';
       } else if (scheduledMin > 0 && dateStr <= fmtDate(today)) {
         row.status = 'absent';
