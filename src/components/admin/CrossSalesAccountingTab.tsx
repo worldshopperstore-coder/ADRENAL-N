@@ -165,7 +165,25 @@ export default function CrossSalesAccountingTab() {
         // lastKnownRate hâlâ null ise: o gün için kur yok, hesaplanamaz
       }
 
-      const hasAnyRate = ratesMap.size > 0;
+      let hasAnyRate = ratesMap.size > 0;
+
+      // daily_rates tablosunda hiç veri yoksa kasa_rates'ten mevcut kuru al (fallback)
+      if (!hasAnyRate) {
+        const { data: kasaRateData } = await supabase
+          .from('kasa_rates')
+          .select('usd, eur')
+          .limit(1);
+        if (kasaRateData?.[0]) {
+          const fallback = { usd: Number(kasaRateData[0].usd), eur: Number(kasaRateData[0].eur) };
+          for (let d = 1; d <= lastDay; d++) {
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            ratesMap.set(dateStr, fallback);
+            carried.add(dateStr);
+          }
+          hasAnyRate = true;
+        }
+      }
+
       setNoRateAtAll(!hasAnyRate);
       setCarriedRateDates(carried);
       setDailyRates(ratesMap);
