@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, ShoppingCart, FileSpreadsheet, FileText, X, CreditCard, Banknote, DollarSign, Euro, TrendingUp, Users, User, Tag, Globe, ArrowLeftRight, Shuffle, Building2, Package, ChevronRight, Check, Coins, Zap, Loader2, Printer, CheckCircle, AlertTriangle, Database, Wifi } from 'lucide-react';
+import { Plus, ShoppingCart, FileSpreadsheet, FileText, X, CreditCard, Banknote, DollarSign, Euro, TrendingUp, Users, User, Tag, Globe, ArrowLeftRight, Shuffle, Building2, Package, ChevronRight, Check, Coins, Zap, Loader2, Printer, CheckCircle, AlertTriangle, Database, Wifi, Target } from 'lucide-react';
 import { INITIAL_PACKAGES, type PackageItem } from '@/data/packages';
 import { getPackagesByKasa } from '@/utils/packagesDB';
 import { getUserSession, getKasaId, getPersonnelId, getPersonnelName, getPersonnelUsername } from '@/utils/session';
@@ -14,6 +14,7 @@ import { getKasaSettings, loadAdvancesFromSupabase } from '@/utils/kasaSettingsD
 import { processActiveSale, processActiveRefund, checkIntegrationReady, hasContractMapping, type ActiveSaleRequest, type ActiveSaleResult } from '@/utils/saleFlow';
 import { isIntegrationEnabled } from '@/utils/posManager';
 import { printTickets, buildTicketPrintData } from '@/utils/ticketPrinter';
+import { getWeeklyTarget, getWeeklyProgress, getCurrentWeekStart } from '@/utils/weeklyTargetsDB';
 
 
 interface Sale {
@@ -1443,6 +1444,17 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
   const cashTlTotal = totals.cashTl + (totals.cashUsd * usdRate) + (totals.cashEur * eurRate);
   const grandTotal = totals.kkTl + cashTlTotal;
 
+  // ── Haftalık Hedef ──
+  const [weeklyTarget, setWeeklyTarget] = useState(0);
+  const [weeklyCumulativeTl, setWeeklyCumulativeTl] = useState(0);
+  const weeklyPercentage = weeklyTarget > 0 ? Math.min((weeklyCumulativeTl / weeklyTarget) * 100, 100) : 0;
+
+  useEffect(() => {
+    if (!currentKasaId || currentKasaId === 'genel') return;
+    getWeeklyTarget(currentKasaId).then(t => setWeeklyTarget(t?.targetAmount || 0));
+    getWeeklyProgress(currentKasaId).then(p => setWeeklyCumulativeTl(p?.totalTl || 0));
+  }, [currentKasaId, sales]);
+
   return (
     <div className="p-3 sm:p-4 lg:p-6 space-y-4">
       {/* ── HEADER ── */}
@@ -2079,6 +2091,40 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── HAFTALIK HEDEF PROGRESS BAR ── */}
+      {weeklyTarget > 0 && (
+        <div className="bg-gray-900/60 border border-gray-700/40 rounded-2xl px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Target className="w-4 h-4 text-rose-400 flex-shrink-0" />
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">Haftalık Hedef</span>
+            <div className="flex-1 h-3 bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ease-out ${
+                  weeklyPercentage >= 100 ? 'bg-gradient-to-r from-emerald-500 to-green-400' :
+                  weeklyPercentage >= 75  ? 'bg-gradient-to-r from-amber-500 to-yellow-400' :
+                  weeklyPercentage >= 50  ? 'bg-gradient-to-r from-orange-500 to-amber-400' :
+                  'bg-gradient-to-r from-rose-500 to-red-400'
+                }`}
+                style={{ width: `${Math.min(weeklyPercentage, 100)}%` }}
+              />
+            </div>
+            <span className={`text-sm font-black flex-shrink-0 min-w-[3rem] text-right ${
+              weeklyPercentage >= 100 ? 'text-emerald-400' :
+              weeklyPercentage >= 75  ? 'text-amber-400' :
+              weeklyPercentage >= 50  ? 'text-orange-400' :
+              'text-rose-400'
+            }`}>
+              %{weeklyPercentage.toFixed(0)}{weeklyPercentage >= 100 ? ' 🎉' : ''}
+            </span>
+          </div>
+          {weeklyPercentage >= 100 && (
+            <p className="text-center text-xs text-emerald-400 font-bold mt-2 animate-pulse">
+              🎉 Tebrikler! Haftalık hedefe ulaşıldı!
+            </p>
+          )}
         </div>
       )}
 
