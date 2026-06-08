@@ -152,6 +152,17 @@ export default function CrossSalesAccountingTab() {
           ? { usd: Number(prevRateData[0].usd), eur: Number(prevRateData[0].eur) }
           : null;
 
+      // daily_rates'te hiç kayıt yoksa kasa_rates'ten mevcut kuru al (personelin girdiği kur)
+      if (!lastKnownRate && ratesMap.size === 0) {
+        const { data: kasaRateData } = await supabase
+          .from('kasa_rates')
+          .select('usd, eur')
+          .limit(1);
+        if (kasaRateData?.[0]) {
+          lastKnownRate = { usd: Number(kasaRateData[0].usd), eur: Number(kasaRateData[0].eur) };
+        }
+      }
+
       // Ay içindeki eksik günleri carry-forward ile doldur
       const carried = new Set<string>();
       for (let d = 1; d <= lastDay; d++) {
