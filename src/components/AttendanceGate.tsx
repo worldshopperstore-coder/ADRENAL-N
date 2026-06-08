@@ -14,7 +14,7 @@ interface AttendanceGateProps {
 
 export default function AttendanceGate({ personnelId, personnelName, kasaId, onConfirmed, onLogout, isAdmin }: AttendanceGateProps) {
   const [sessionToken, setSessionToken] = useState('');
-  const [status, setStatus] = useState<'generating' | 'waiting' | 'confirmed' | 'checked_out'>('generating');
+  const [status, setStatus] = useState<'generating' | 'waiting' | 'confirmed' | 'checked_out' | 'no_shift'>('generating');
   const [dots, setDots] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dotsRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -34,15 +34,34 @@ export default function AttendanceGate({ personnelId, personnelName, kasaId, onC
     async function checkExisting() {
       try {
         const today = new Date().toISOString().slice(0, 10);
+        const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+
+        // Shift kontrolü — tanımlı değilse girişi engelle
+        const shift = await getPersonnelShift(personnelId);
+        if (!shift) {
+          setStatus('no_shift');
+          return;
+        }
+        const todayName = dayNames[new Date().getDay()] as keyof typeof shift;
+        const todayShift = shift[todayName];
+        // Bugün izin günüyse de giriş yapmasın (shift var ama isOff=true)
+        // Not: checked_in kaydı zaten varsa geçir (aynı gün tekrar kontrol)
 
         // Dünden açık kalan kayıt varsa shift endTime ile otomatik kapat
-        const shift = await getPersonnelShift(personnelId);
-        const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayName = dayNames[yesterday.getDay()] as keyof typeof shift;
-        const shiftEndTime = shift?.[yesterdayName]?.isOff ? null : (shift?.[yesterdayName]?.endTime || null);
+        const shiftEndTime = shift[yesterdayName]?.isOff ? null : (shift[yesterdayName]?.endTime || null);
         await autoCloseYesterdayAttendance(personnelId, shiftEndTime);
+
+        // Bugünkü kayıt yoksa ve bugün izin günüyse engelle
+        const existingRecord = await checkAttendanceStatus(personnelId);
+        const alreadyCheckedIn = existingRecord && existingRecord.date === today &&
+          (existingRecord.status === 'checked_in' || existingRecord.status === 'checkout_pending');
+        if (!alreadyCheckedIn && todayShift?.isOff) {
+          setStatus('no_shift');
+          return;
+        }
 
         const record = await checkAttendanceStatus(personnelId);
 
@@ -162,7 +181,24 @@ export default function AttendanceGate({ personnelId, personnelName, kasaId, onC
       </svg>
 
       <div className="relative z-10 text-center px-6 max-w-md w-full">
-        {status === 'checked_out' ? (
+        {status === 'no_shift' ? (
+          /* ── Vardiya Tanımlı Değil ── */
+          <div className="animate-fade-in">
+            <div className="w-24 h-24 mx-auto mb-6 bg-amber-500/20 rounded-full flex items-center justify-center border-2 border-amber-400/50">
+              <XCircle className="w-12 h-12 text-amber-400" />
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-2">Vardiya Tanımlanmamış</h1>
+            <p className="text-lg text-amber-300 font-medium">{personnelName}</p>
+            <p className="text-sm text-gray-400 mt-3">Bugün için vardiya planınız bulunmuyor.<br />Lütfen yöneticinize başvurun.</p>
+            <button
+              onClick={onLogout}
+              className="mt-8 flex items-center justify-center gap-2 text-gray-400 hover:text-amber-400 transition-colors text-sm mx-auto bg-white/5 border border-white/10 rounded-xl px-6 py-3"
+            >
+              <LogOut className="w-4 h-4" />
+              Giriş Ekranına Dön
+            </button>
+          </div>
+        ) : status === 'checked_out' ? (
           /* ── Çıkış Yapılmış — Tekrar Giriş Engellendi ── */
           <div className="animate-fade-in">
             <div className="w-24 h-24 mx-auto mb-6 bg-red-500/20 rounded-full flex items-center justify-center border-2 border-red-400/50">
