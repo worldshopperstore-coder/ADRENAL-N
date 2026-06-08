@@ -100,12 +100,21 @@ export async function getWeeklyProgress(kasaId: string, weekStart?: string): Pro
     if (error) throw error;
     if (!data || data.length === 0) return { totalTl: 0, personnelBreakdown: [] };
 
-    let usdRate = 35, eurRate = 38;
+    let usdRate = 0, eurRate = 0;
     try {
-      const r = JSON.parse(localStorage.getItem('exchange_rates') || '{}');
-      usdRate = Number(r.usd) || 35;
-      eurRate = Number(r.eur) || 38;
+      // Önce kasa bazlı kur, yoksa genel exchange_rates
+      const kasaKeys = ['wildpark', 'sinema', 'face2face'];
+      for (const kid of kasaKeys) {
+        const r = JSON.parse(localStorage.getItem(`exchange_rates_${kid}`) || 'null');
+        if (r?.usd && r?.eur) { usdRate = Number(r.usd); eurRate = Number(r.eur); break; }
+      }
+      if (!usdRate || !eurRate) {
+        const r = JSON.parse(localStorage.getItem('exchange_rates') || '{}');
+        usdRate = Number(r.usd) || 0;
+        eurRate = Number(r.eur) || 0;
+      }
     } catch { /* default */ }
+    if (!usdRate || !eurRate) return null; // Kur girilmemiş, hesaplama yapılamaz
 
     let totalTl = 0;
     const personnelMap: Record<string, { name: string; totalTl: number }> = {};
