@@ -71,11 +71,16 @@ export default function AttendanceGate({ personnelId, personnelName, kasaId, onC
           return;
         }
 
-        // Bugünkü aktif kayıt → direkt geçir
+        // Bugünkü aktif kayıt → check_in saati de bugünse direkt geçir
         if (record && record.date === today && (record.status === 'checked_in' || record.status === 'checkout_pending')) {
-          setStatus('confirmed');
-          setTimeout(onConfirmed, 1500);
-          return;
+          const checkInDate = record.check_in ? new Date(record.check_in).toISOString().slice(0, 10) : null;
+          if (checkInDate === today) {
+            setStatus('confirmed');
+            setTimeout(onConfirmed, 1500);
+            return;
+          }
+          // check_in dünden kalma — bu kaydı kapat, yeni QR iste
+          await autoCloseYesterdayAttendance(personnelId, shiftEndTime);
         }
 
         // Bugünkü pending kayıt varsa mevcut token'ı kullan
@@ -93,16 +98,20 @@ export default function AttendanceGate({ personnelId, personnelName, kasaId, onC
       } catch (err) {
         // Supabase hatası — 3 kez daha dene
         console.error('Yoklama kontrolü başarısız, yeniden deneniyor:', err);
+        const retryToday = new Date().toISOString().slice(0, 10);
         for (let attempt = 1; attempt <= 3; attempt++) {
           await new Promise(r => setTimeout(r, 2000 * attempt));
           try {
             const retryRecord = await checkAttendanceStatus(personnelId);
-            if (retryRecord && retryRecord.date === today && (retryRecord.status === 'checked_in' || retryRecord.status === 'checkout_pending')) {
-              setStatus('confirmed');
-              setTimeout(onConfirmed, 1500);
-              return;
+            if (retryRecord && retryRecord.date === retryToday && (retryRecord.status === 'checked_in' || retryRecord.status === 'checkout_pending')) {
+              const retryCheckInDate = retryRecord.check_in ? new Date(retryRecord.check_in).toISOString().slice(0, 10) : null;
+              if (retryCheckInDate === retryToday) {
+                setStatus('confirmed');
+                setTimeout(onConfirmed, 1500);
+                return;
+              }
             }
-            if (retryRecord && retryRecord.date === today && retryRecord.status === 'pending' && retryRecord.session_token) {
+            if (retryRecord && retryRecord.date === retryToday && retryRecord.status === 'pending' && retryRecord.session_token) {
               setSessionToken(retryRecord.session_token);
               setStatus('waiting');
               return;
