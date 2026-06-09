@@ -185,9 +185,10 @@ export async function autoCloseYesterdayAttendance(
       const [h, m] = shiftEndTime.split(':').map(Number);
       const dt = new Date(`${recordDate}T00:00:00`);
       dt.setHours(h, m, 0, 0);
+      dt.setMinutes(dt.getMinutes() - 5); // QR okutmadan giderse 5 dk eksik
       checkOutTime = dt.toISOString();
     } else {
-      checkOutTime = new Date(`${recordDate}T23:59:00`).toISOString();
+      checkOutTime = new Date(`${recordDate}T23:54:00`).toISOString(); // 23:59 - 5 dk
     }
 
     const { error: updateError } = await supabase
