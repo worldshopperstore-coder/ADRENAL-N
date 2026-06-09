@@ -155,43 +155,50 @@ export async function autoCloseYesterdayAttendance(
   if (!supabase) return false;
   const today = new Date().toISOString().slice(0, 10);
 
-  // Bugün dışındaki checked_in veya checkout_pending kayıtları bul
+  // Açık kalan kayıtları bul: date bugün değil VEYA check_in tarihi bugün değil
   const { data, error } = await supabase
     .from('attendance')
     .select('*')
     .eq('personnel_id', personnelId)
     .in('status', ['checked_in', 'checkout_pending'])
-    .neq('date', today)
     .order('date', { ascending: false })
-    .limit(1);
+    .limit(5);
 
   if (error || !data || data.length === 0) return false;
 
-  const record = data[0] as AttendanceRecord;
+  // check_in tarihi bugün olmayan kayıtları filtrele
+  const staleRecords = data.filter((r: any) => {
+    const checkInDate = r.check_in ? new Date(r.check_in).toISOString().slice(0, 10) : r.date;
+    return checkInDate !== today;
+  }) as AttendanceRecord[];
 
-  // Çıkış saatini belirle: shift endTime varsa onu kullan, yoksa 23:59
-  let checkOutTime: string;
-  if (shiftEndTime) {
-    // O günün tarihiyle shift endTime'ı birleştir
-    const [h, m] = shiftEndTime.split(':').map(Number);
-    const dt = new Date(`${record.date}T00:00:00`);
-    dt.setHours(h, m, 0, 0);
-    checkOutTime = dt.toISOString();
-  } else {
-    // Fallback: o günün 23:59'u
-    checkOutTime = new Date(`${record.date}T23:59:00`).toISOString();
+  if (staleRecords.length === 0) return false;
+
+  let allClosed = true;
+  for (const record of staleRecords) {
+    // Çıkış saatini belirle: shift endTime varsa onu kullan, yoksa 23:59
+    let checkOutTime: string;
+    const recordDate = record.check_in
+      ? new Date(record.check_in).toISOString().slice(0, 10)
+      : record.date;
+    if (shiftEndTime) {
+      const [h, m] = shiftEndTime.split(':').map(Number);
+      const dt = new Date(`${recordDate}T00:00:00`);
+      dt.setHours(h, m, 0, 0);
+      checkOutTime = dt.toISOString();
+    } else {
+      checkOutTime = new Date(`${recordDate}T23:59:00`).toISOString();
+    }
+
+    const { error: updateError } = await supabase
+      .from('attendance')
+      .update({ status: 'checked_out', check_out: checkOutTime, checkout_token: null })
+      .eq('id', record.id);
+
+    if (updateError) allClosed = false;
   }
 
-  const { error: updateError } = await supabase
-    .from('attendance')
-    .update({
-      status: 'checked_out',
-      check_out: checkOutTime,
-      checkout_token: null,
-    })
-    .eq('id', record.id);
-
-  return !updateError;
+  return allClosed;
 }
 
 /** Admin: Personel yoklama geçmişi */
