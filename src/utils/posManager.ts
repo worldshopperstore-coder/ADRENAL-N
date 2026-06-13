@@ -147,10 +147,15 @@ export async function sendPosPayment(request: PosPaymentRequest): Promise<PosPay
       const response = result.response;
       const status = response?.TransactionStatus;
       const errorCode = response?.TransactionErrorCode;
-      
+
+      console.info(`[POS] Yanıt: TransactionStatus=${status} | ErrorCode=${errorCode} | Message=${response?.TransactionMessage || response?.StatusMessage || '-'}`);
+      console.info(`[POS] Ham yanıt: ${JSON.stringify(response)}`);
+
       if (status === 0 && (errorCode === null || errorCode === undefined || errorCode === 0)) {
+        console.info('[POS] İşlem başarılı ✓');
         return { success: true, transactionStatus: 0, statusMessage: 'İşlem başarılı', rawResponse: response };
       } else {
+        console.warn(`[POS] İşlem başarısız — status=${status}, errorCode=${errorCode}`);
         return {
           success: false,
           transactionStatus: status,
