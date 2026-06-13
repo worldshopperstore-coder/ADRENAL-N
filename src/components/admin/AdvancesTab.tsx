@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Wallet, Save, RotateCcw, TreePine, Monitor, Users2, Target } from 'lucide-react';
 import { getKasaSettings, updateKasaAdvances } from '@/utils/kasaSettingsDB';
 import { supabase } from '@/config/supabase';
-import { saveWeeklyTarget, getWeeklyTarget, getCurrentWeekStart } from '@/utils/weeklyTargetsDB';
+import { saveWeeklyTarget, getWeeklyTarget, getWeeklyProgress, getCurrentWeekStart } from '@/utils/weeklyTargetsDB';
 
 type KasaId = 'wildpark' | 'sinema' | 'face2face';
 
@@ -266,6 +266,7 @@ type KasaCardProps = { kasa: typeof KASAS[number] };
 function WeeklyTargetCard({ kasa }: KasaCardProps) {
   const [targetAmount, setTargetAmount] = useState(0);
   const [original, setOriginal] = useState(0);
+  const [currentTl, setCurrentTl] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -274,10 +275,14 @@ function WeeklyTargetCard({ kasa }: KasaCardProps) {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const t = await getWeeklyTarget(kasa.id, weekStart);
+      const [t, p] = await Promise.all([
+        getWeeklyTarget(kasa.id, weekStart),
+        getWeeklyProgress(kasa.id, weekStart),
+      ]);
       const amount = t?.targetAmount || 0;
       setTargetAmount(amount);
       setOriginal(amount);
+      setCurrentTl(p?.totalTl || 0);
       setLoading(false);
     })();
   }, [kasa.id, weekStart]);
@@ -338,6 +343,27 @@ function WeeklyTargetCard({ kasa }: KasaCardProps) {
             <span className="text-xs text-gray-500 w-24 text-right">{fmt(targetAmount)} ₺</span>
           </div>
           {msg && <p className={`text-xs font-medium mt-2 ${msg.ok ? 'text-green-400' : 'text-yellow-400'}`}>{msg.text}</p>}
+
+          {/* Bu haftaki gerçekleşme */}
+          {targetAmount > 0 && (() => {
+            const pct = Math.min((currentTl / targetAmount) * 100, 100);
+            const color = pct >= 100 ? 'bg-emerald-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-rose-500';
+            return (
+              <div className="mt-4 space-y-2">
+                <div className="flex justify-between text-xs text-gray-400">
+                  <span>Bu Hafta Gerçekleşme</span>
+                  <span className="font-bold text-white">%{pct.toFixed(1)}</span>
+                </div>
+                <div className="w-full bg-gray-800 rounded-full h-2">
+                  <div className={`h-2 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-400">{fmt(Math.round(currentTl))} ₺</span>
+                  <span className="text-gray-500">/ {fmt(targetAmount)} ₺</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
