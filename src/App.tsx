@@ -25,7 +25,10 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [session, setSession] = useState<UserSession | null>(null);
   const [attendanceConfirmed, setAttendanceConfirmed] = useState(() => {
-    return localStorage.getItem('attendanceConfirmed') === 'true';
+    const saved = localStorage.getItem('attendanceConfirmed');
+    const savedDate = localStorage.getItem('attendanceConfirmedDate');
+    const today = new Date().toISOString().slice(0, 10);
+    return saved === 'true' && savedDate === today;
   });
   const [announcementPopup, setAnnouncementPopup] = useState<Announcement[]>([]);
   const [maintenanceNotice, setMaintenanceNotice] = useState<string | null>(null);
@@ -197,7 +200,9 @@ export default function App() {
         isAdmin={session.personnel.role === 'genel_mudur'}
         onConfirmed={() => {
           setAttendanceConfirmed(true);
+          const today = new Date().toISOString().slice(0, 10);
           localStorage.setItem('attendanceConfirmed', 'true');
+          localStorage.setItem('attendanceConfirmedDate', today);
         }}
         onLogout={handleLogout}
       />
