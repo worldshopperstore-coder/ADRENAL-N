@@ -88,6 +88,7 @@ export default function App() {
           localStorage.removeItem('currentKasaTitle');
           localStorage.removeItem('currentKasaPaxName');
           localStorage.removeItem('attendanceConfirmed');
+          localStorage.removeItem('attendanceConfirmedDate');
           localStorage.removeItem('sessionLoginDate');
           if (restored?.personnel?.id) {
             setPersonnelOffline(restored.personnel.id);
@@ -175,6 +176,7 @@ export default function App() {
     setSession(null);
     setAttendanceConfirmed(false);
     localStorage.removeItem('attendanceConfirmed');
+    localStorage.removeItem('attendanceConfirmedDate');
     localStorage.removeItem('userSession');
     localStorage.removeItem('sessionLoginDate');
     localStorage.removeItem('currentUserName');
