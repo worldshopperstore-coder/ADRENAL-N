@@ -13,10 +13,11 @@ import net from 'net';
 import { spawn, execSync, type ChildProcess } from 'child_process';
 import path from 'path';
 
-export { startBridgeProcess, startBridgeExe };
+export { startBridgeProcess, startBridgeExe, startPosServer, stopPosServer };
 
 let bridgeProcess: ChildProcess | null = null;
 let bridgeReady = false;
+let posServerProcess: ChildProcess | null = null;
 
 // ── POS Server TCP Client ─────────────────────────────────
 
@@ -244,6 +245,39 @@ function startBridgeExe(cmd: string, args: string[]): Promise<boolean> {
       resolve(false);
     });
   });
+}
+
+function startPosServer(posServerPath: string): void {
+  try {
+    execSync('taskkill /F /IM PosServer.exe /T', { stdio: 'ignore' });
+  } catch { /* zaten kapalıysa hata verir, ignore */ }
+
+  posServerProcess = spawn(posServerPath, [], {
+    stdio: 'ignore',
+    windowsHide: true,
+    detached: false,
+  });
+
+  posServerProcess.on('exit', (code) => {
+    console.log(`[POS SERVER] Process çıktı, kod: ${code}`);
+    posServerProcess = null;
+  });
+
+  posServerProcess.on('error', (err) => {
+    console.error(`[POS SERVER] Başlatma hatası: ${err.message}`);
+    posServerProcess = null;
+  });
+
+  console.log('[POS SERVER] Başlatıldı ✓');
+}
+
+function stopPosServer(): void {
+  if (posServerProcess) {
+    try {
+      execSync('taskkill /F /IM PosServer.exe /T', { stdio: 'ignore' });
+    } catch { /* ignore */ }
+    posServerProcess = null;
+  }
 }
 
 function stopBridgeProcess(): void {

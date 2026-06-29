@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import path from 'path';
-import { registerPosIpcHandlers, cleanupBridge, startBridgeExe } from './posIpc';
+import { registerPosIpcHandlers, cleanupBridge, startBridgeExe, startPosServer, stopPosServer } from './posIpc';
 import { autoUpdater } from 'electron-updater';
 
 // GPU sorunlarını önle (RDP / VM ortamları için)
@@ -106,6 +106,10 @@ app.on('ready', () => {
       console.warn('[UPDATER] Başlatılamadı:', e);
     }
 
+  // PosServer.exe otomatik başlat
+  const posServerPath = path.join(process.resourcesPath, 'pos_server', 'PosServer.exe');
+  startPosServer(posServerPath);
+
   // pos_bridge EXE otomatik başlat
   const isDevEnv = !!process.env.VITE_DEV_SERVER_URL;
   const bridgePath = isDevEnv
@@ -124,8 +128,8 @@ app.on('ready', () => {
 });
 
 app.on('window-all-closed', () => {
-  // Bridge process'i temizle
   cleanupBridge();
+  stopPosServer();
   if (process.platform !== 'darwin') {
     app.quit();
   }
