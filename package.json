@@ -1,6 +1,6 @@
 {
   "name": "daily-report-system",
-  "version": "1.6.8",
+  "version": "1.6.7",
   "description": "Adrenalin Dünyası - Satış ve Yönetim Sistemi",
   "main": "dist/main.cjs",
   "type": "module",
@@ -61,10 +61,6 @@
       {
         "from": "build/pos_bridge.exe",
         "to": "pos_bridge.exe"
-      },
-      {
-        "from": "build/pos_server",
-        "to": "pos_server"
       }
     ],
     "directories": {
