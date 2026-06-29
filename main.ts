@@ -106,6 +106,22 @@ app.on('ready', () => {
       console.warn('[UPDATER] Başlatılamadı:', e);
     }
 
+  // PosServer.exe otomatik başlat
+  const posServerExe = 'C:\\Atlantis\\PosSetup\\POS_Server\\PosServer.exe';
+  try {
+    const { execSync: exec } = require('child_process');
+    exec('taskkill /F /IM PosServer.exe /T', { stdio: 'ignore' });
+  } catch { /* zaten kapalı */ }
+  const { spawn: spawnPos } = require('child_process');
+  const posProc = spawnPos(posServerExe, [], {
+    cwd: 'C:\\Atlantis\\PosSetup\\POS_Server',
+    stdio: 'ignore',
+    windowsHide: true,
+    detached: false,
+  });
+  posProc.on('error', (e: Error) => console.error('[POS SERVER] Başlatılamadı:', e.message));
+  console.log('[POS SERVER] Başlatıldı ✓');
+
   // pos_bridge EXE otomatik başlat
   const isDevEnv = !!process.env.VITE_DEV_SERVER_URL;
   const bridgePath = isDevEnv
