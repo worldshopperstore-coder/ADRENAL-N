@@ -11,9 +11,13 @@ if not exist "C:\Atlantis\PosSetup" mkdir "C:\Atlantis\PosSetup"
 xcopy /E /I /Y "%~dp0POS_Server" "C:\Atlantis\PosSetup\POS_Server" >nul
 echo     Tamam.
 
-:: Adrenalin Setup'ı çalıştır
+:: Adrenalin Setup'ı çalıştır (klasördeki ilk Setup exe'yi bul)
 echo [2/2] Adrenalin kuruluyor...
-start "" "%~dp0Adrenalin-Setup.exe"
+for %%f in ("%~dp0Adrenalin-Setup*.exe") do (
+    start "" "%%f"
+    goto done
+)
+:done
 
 echo.
 echo Kurulum tamamlandı!

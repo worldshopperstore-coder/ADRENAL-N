@@ -82,6 +82,14 @@ export function installConsoleIntercept() {
 
 export default function DebugLogTab() {
   const [logs, setLogs] = useState<LogEntry[]>(logBuffer);
+  const [lastPosResponse, setLastPosResponse] = useState<any>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('last_pos_response');
+      if (raw) setLastPosResponse(JSON.parse(raw));
+    } catch { /* ignore */ }
+  }, []);
   const [filter, setFilter] = useState('');
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [autoScroll, setAutoScroll] = useState(true);
@@ -129,6 +137,24 @@ export default function DebugLogTab() {
 
   return (
     <div className="space-y-4">
+      {/* Son POS Yanıtı */}
+      {lastPosResponse && (
+        <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold text-white">Son POS Yanıtı</h3>
+            <span className="text-xs text-gray-500">{new Date(lastPosResponse.ts).toLocaleString('tr-TR')}</span>
+          </div>
+          <div className="flex gap-4 mb-2">
+            <span className={`text-sm font-bold ${lastPosResponse.status === 0 ? 'text-green-400' : 'text-red-400'}`}>
+              TransactionStatus: {lastPosResponse.status}
+            </span>
+            <span className="text-sm text-gray-400">ErrorCode: {lastPosResponse.errorCode ?? 'null'}</span>
+          </div>
+          <pre className="text-xs text-gray-400 bg-black/40 rounded p-2 overflow-auto max-h-32">
+            {JSON.stringify(lastPosResponse.response, null, 2)}
+          </pre>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>

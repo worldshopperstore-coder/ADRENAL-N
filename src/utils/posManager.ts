@@ -150,6 +150,8 @@ export async function sendPosPayment(request: PosPaymentRequest): Promise<PosPay
 
       console.info(`[POS] Yanıt: TransactionStatus=${status} | ErrorCode=${errorCode} | Message=${response?.TransactionMessage || response?.StatusMessage || '-'}`);
       console.info(`[POS] Ham yanıt: ${JSON.stringify(response)}`);
+      // Son POS yanıtını localStorage'a kaydet — debug için
+      try { localStorage.setItem('last_pos_response', JSON.stringify({ ts: new Date().toISOString(), status, errorCode, response })); } catch { /* ignore */ }
 
       if (status === 0 && (errorCode === null || errorCode === undefined || errorCode === 0)) {
         console.info('[POS] İşlem başarılı ✓');
