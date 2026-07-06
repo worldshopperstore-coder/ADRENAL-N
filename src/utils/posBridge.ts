@@ -174,10 +174,10 @@ export async function submitPosPayment(transactionData: object): Promise<{
   error?: string;
 }> {
   try {
-    // POS timeout 65s, bridge timeout'u daha uzun tutuyoruz
+    // POS timeout 125s, bridge timeout'u daha uzun tutuyoruz
     const url = `${getBridgeUrl()}/pos-payment`;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 70_000); // 70s — POS 65s + margin
+    const timer = setTimeout(() => controller.abort(), 135_000); // 135s — POS 125s + margin
     
     try {
       const response = await fetch(url, {
@@ -194,7 +194,7 @@ export async function submitPosPayment(transactionData: object): Promise<{
     }
   } catch (err: any) {
     if (err.name === 'AbortError') {
-      return { success: false, error: 'POS Bridge bağlantı zaman aşımı (70s)' };
+      return { success: false, error: 'POS Bridge bağlantı zaman aşımı (135s)' };
     }
     return { success: false, error: `POS Bridge hatası: ${err.message}` };
   }

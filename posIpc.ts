@@ -24,7 +24,7 @@ function sendToPosServer(
   host: string,
   port: number,
   transactionData: object,
-  timeoutMs: number = 60_000
+  timeoutMs: number = 120_000
 ): Promise<object> {
   return new Promise((resolve, reject) => {
     const socket = new net.Socket();

@@ -274,23 +274,26 @@ async function tryPrintTickets(
  * Ödeme onaylanmazsa DB'ye hiçbir şey yazılmaz, bilet basılmaz.
  */
 export async function processActiveSale(request: ActiveSaleRequest): Promise<ActiveSaleResult> {
+  const saleTag = `[SATIŞ] ${request.packageName || request.packageId} | ${request.adultQty || 0}Y ${request.childQty || 0}Ç | ${request.paymentType} | ${request.currency}`;
+  console.info(`${saleTag} → Satış başlatıldı`);
+
   // 1) Contract mapping — önce sabit map, sonra dinamik
   const mapping = getContractMapping(request.packageId) || buildDynamicMapping(request.packageItem);
   if (!mapping) {
-    return {
-      success: false,
-      error: `Bu paket için DB kontrat eşlemesi bulunamadı: ${request.packageId}`,
-      failedAt: 'mapping',
-    };
+    const err = `Kontrat eşlemesi bulunamadı: paket=${request.packageId}`;
+    console.error(`${saleTag} ✗ ${err}`);
+    return { success: false, error: err, failedAt: 'mapping' };
   }
+  console.info(`${saleTag} [1/5] Kontrat eşlendi → ${mapping.contractHeaderName}`);
 
   // 2) SalePayload oluştur
   const payload = buildSalePayload(request, mapping);
+  console.info(`${saleTag} [2/5] Ödeme yükü oluşturuldu → toplam ${payload.totalAmount} ${request.currency}`);
 
   // 3) ÖNCE POS ödeme — onay gelmezse hiçbir şey yapma
   let posAmountTl = 0;
   let posPaymentType: 'credit_card' | 'cash' = 'cash';
-  
+
   if (request.splitPayments) {
     const sp = request.splitPayments;
     const cashTotalTl = (sp.cashTl || 0) + ((sp.cashUsd || 0) * (request.usdRate || 1)) + ((sp.cashEur || 0) * (request.eurRate || 1));
@@ -321,11 +324,12 @@ export async function processActiveSale(request: ActiveSaleRequest): Promise<Act
       posAmountTl = payload.totalAmount;
     }
   }
-  
+
   let posSuccess = true;
   let posMessage = 'POS devre dışı';
-  
+
   if (posAmountTl > 0) {
+    console.info(`${saleTag} [3/5] POS'a gönderiliyor → ${posPaymentType === 'credit_card' ? 'Kredi Kartı' : 'Nakit'} ${posAmountTl.toFixed(2)} TL`);
     const posResult = await sendPosPayment({
       transactionId: `TR-${Date.now()}`,
       items: [{
@@ -343,7 +347,7 @@ export async function processActiveSale(request: ActiveSaleRequest): Promise<Act
     posMessage = posResult.statusMessage || posResult.error || '';
 
     if (!posResult.success) {
-      // POS ödeme onaylanmadı — DB'ye hiçbir şey yazma, bilet basma
+      console.error(`${saleTag} [3/5] ✗ POS reddetti → status=${posResult.transactionStatus ?? '-'} | ${posMessage}`);
       return {
         success: false,
         posSuccess: false,
@@ -351,12 +355,17 @@ export async function processActiveSale(request: ActiveSaleRequest): Promise<Act
         failedAt: 'pos',
       };
     }
+    console.info(`${saleTag} [3/5] ✓ POS onayladı → ${posMessage}`);
+  } else {
+    console.info(`${saleTag} [3/5] POS atlandı (tutar=0)`);
   }
 
   // 4) Ödeme onaylandı → DB INSERT
+  console.info(`${saleTag} [4/5] DB'ye kaydediliyor...`);
   const bridgeResult: BridgeResponse = await submitSale(payload);
-  
+
   if (!bridgeResult.success) {
+    console.error(`${saleTag} [4/5] ✗ DB kayıt hatası → ${bridgeResult.error}`);
     return {
       success: false,
       error: `DB kayıt hatası: ${bridgeResult.error}`,
@@ -365,11 +374,19 @@ export async function processActiveSale(request: ActiveSaleRequest): Promise<Act
       failedAt: 'bridge',
     };
   }
+  console.info(`${saleTag} [4/5] ✓ DB kaydedildi → kayıt #${bridgeResult.terminalRecordId}`);
 
   // 5) Bilet Yazdırma
+  console.info(`${saleTag} [5/5] Bilet basılıyor...`);
   const printResult = await tryPrintTickets(bridgeResult, request, mapping);
+  if (printResult.errors && printResult.errors.length > 0) {
+    console.warn(`${saleTag} [5/5] ⚠ Bilet basma uyarısı → ${printResult.errors.join(' | ')}`);
+  } else {
+    console.info(`${saleTag} [5/5] ✓ ${printResult.printed} bilet basıldı`);
+  }
 
   // 6) Başarılı sonuç
+  console.info(`${saleTag} ✓ Satış tamamlandı`);
   return {
     success: true,
     terminalRecordId: bridgeResult.terminalRecordId,

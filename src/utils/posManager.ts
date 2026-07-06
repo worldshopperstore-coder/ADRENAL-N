@@ -137,7 +137,7 @@ export async function sendPosPayment(request: PosPaymentRequest): Promise<PosPay
         host: settings.pos.ip,
         port: settings.pos.port,
         data: transactionData,
-        timeout: 60_000,
+        timeout: 120_000,
       });
 
       if (!result.success) {
@@ -177,7 +177,7 @@ export async function sendPosPayment(request: PosPaymentRequest): Promise<PosPay
       ...transactionData,
       _host: settings.pos.ip,
       _port: settings.pos.port,
-      _timeout: 65,
+      _timeout: 125,
     };
     
     const result = await submitPosPayment(bridgePosData);

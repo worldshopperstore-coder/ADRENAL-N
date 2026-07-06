@@ -106,21 +106,33 @@ app.on('ready', () => {
       console.warn('[UPDATER] Başlatılamadı:', e);
     }
 
-  // PosServer.exe otomatik başlat
+  // PosServer.exe zaten çalışmıyorsa başlat — çalışan process'e dokunma
+  // (yeniden başlatmak, cihazla kurulmuş TCP eşleşmesini bozup POS onaylarının
+  //  uygulamaya ulaşmasını engelliyordu)
   const posServerExe = 'C:\\Atlantis\\PosSetup\\POS_Server\\PosServer.exe';
   try {
-    const { execSync: exec } = require('child_process');
-    exec('taskkill /F /IM PosServer.exe /T', { stdio: 'ignore' });
-  } catch { /* zaten kapalı */ }
-  const { spawn: spawnPos } = require('child_process');
-  const posProc = spawnPos(posServerExe, [], {
-    cwd: 'C:\\Atlantis\\PosSetup\\POS_Server',
-    stdio: 'ignore',
-    windowsHide: true,
-    detached: false,
-  });
-  posProc.on('error', (e: Error) => console.error('[POS SERVER] Başlatılamadı:', e.message));
-  console.log('[POS SERVER] Başlatıldı ✓');
+    const { execSync: exec, spawn: spawnPos } = require('child_process');
+    let alreadyRunning = false;
+    try {
+      const out = exec('tasklist /FI "IMAGENAME eq PosServer.exe"').toString();
+      alreadyRunning = out.toLowerCase().includes('posserver.exe');
+    } catch { /* tasklist başarısız olursa başlatmayı dene */ }
+
+    if (alreadyRunning) {
+      console.log('[POS SERVER] Zaten çalışıyor, dokunulmadı ✓');
+    } else {
+      const posProc = spawnPos(posServerExe, [], {
+        cwd: 'C:\\Atlantis\\PosSetup\\POS_Server',
+        stdio: 'ignore',
+        windowsHide: true,
+        detached: false,
+      });
+      posProc.on('error', (e: Error) => console.error('[POS SERVER] Başlatılamadı:', e.message));
+      console.log('[POS SERVER] Başlatıldı ✓');
+    }
+  } catch (e) {
+    console.error('[POS SERVER] Kontrol/başlatma hatası:', e);
+  }
 
   // pos_bridge EXE otomatik başlat
   const isDevEnv = !!process.env.VITE_DEV_SERVER_URL;
