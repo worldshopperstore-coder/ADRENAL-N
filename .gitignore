@@ -11,6 +11,7 @@ dist-electron
 
 # Build outputs - large binary files
 release/
+flash_kurulum/*.exe
 
 # Backup files
 *.bak
