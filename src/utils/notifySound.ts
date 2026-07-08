@@ -1,11 +1,36 @@
 let audioCtx: AudioContext | null = null;
 
+function getContext(): AudioContext {
+  if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  return audioCtx;
+}
+
+/**
+ * Tarayıcılar AudioContext'i ilk kullanıcı etkileşimine kadar "suspended"
+ * tutar — bildirim sesi kullanıcı hiçbir yere tıklamadan tetiklenirse
+ * (örn. karşı taraf mesaj atınca) sessiz kalır. Bu yüzden ilk tıklama/tuş/
+ * dokunma anında context'i önceden "unlock" edip hazır tutuyoruz.
+ */
+export function unlockNotifySound() {
+  const ctx = getContext();
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+}
+
+if (typeof window !== 'undefined') {
+  const unlockOnce = () => {
+    unlockNotifySound();
+    window.removeEventListener('pointerdown', unlockOnce);
+    window.removeEventListener('keydown', unlockOnce);
+  };
+  window.addEventListener('pointerdown', unlockOnce);
+  window.addEventListener('keydown', unlockOnce);
+}
+
 /** Kısa, iki notalı bildirim sesi çal (harici dosya gerekmez) */
 export function playNotifySound() {
   try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const ctx = audioCtx;
-    if (ctx.state === 'suspended') ctx.resume();
+    const ctx = getContext();
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
     const now = ctx.currentTime;
     const notes = [880, 1175]; // A5 -> D6
