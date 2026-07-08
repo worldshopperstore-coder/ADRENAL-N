@@ -5,6 +5,7 @@ import { loadExchangeRates, loadExchangeRatesFromSupabase, saveExchangeRates } f
 import { getKasaTheme } from '@/utils/kasaTheme';
 import { AdrenalinLogo } from '@/components/AdrenalinLogo';
 import CheckoutPopup from '@/components/CheckoutPopup';
+import KasaChatWidget from '@/components/KasaChatWidget';
 import { KasaInfo } from './LoginPage';
 import type { Personnel } from '@/types/personnel';
 
@@ -481,6 +482,11 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
             </div>
           </div>
         </div>
+      )}
+
+      {/* Kasa Sohbeti — 3 kasa arası canlı mesajlaşma */}
+      {session?.kasa?.id && (
+        <KasaChatWidget kasaId={session.kasa.id} senderName={session?.personnel?.fullName || 'Personel'} />
       )}
     </div>
   );

@@ -122,41 +122,44 @@ function buildSalePayload(
     }
   } else {
     // Normal kontrat — ADU ve/veya CHL
+    // Fiyat kaynağı: request.adultPrice/childPrice (admin panelden Supabase'e
+    // yazılan, satış ekranında görünen güncel fiyat) — mapping'deki sabit price
+    // sadece priceId/contractTicketTypeId eşlemesi için kullanılır, gerçek tutar
+    // için kullanılmaz (aksi halde admin panel fiyat güncellemesi POS'a yansımaz).
     if (request.adultQty > 0) {
-      const specs = mapping.products
-        .filter(p => p.prices.ADU)
-        .map(product => ({
-          contractProductId: product.contractProductId,
-          contractTicketTypeId: product.prices.ADU!.contractTicketTypeId,
-          priceId: product.prices.ADU!.priceId,
-          price: product.prices.ADU!.price,
-          productId: product.productId,
-          productName: product.productName,
-          gateId: product.gateId,
-          gateLocation: product.gateLocation,
-        }));
-      
+      const aduProducts = mapping.products.filter(p => p.prices.ADU);
+      const specs = aduProducts.map((product, idx) => ({
+        contractProductId: product.contractProductId,
+        contractTicketTypeId: product.prices.ADU!.contractTicketTypeId,
+        priceId: product.prices.ADU!.priceId,
+        // Combo'da esas tutar ilk üründe toplanır, diğerleri sembolik (mapping'deki) fiyatını korur
+        price: idx === 0 ? request.adultPrice : product.prices.ADU!.price,
+        productId: product.productId,
+        productName: product.productName,
+        gateId: product.gateId,
+        gateLocation: product.gateLocation,
+      }));
+
       tickets.push({
         ticketTypeLabel: 'ADU',
         quantity: request.adultQty,
         specs,
       });
     }
-    
+
     if (request.childQty > 0) {
-      const specs = mapping.products
-        .filter(p => p.prices.CHL)
-        .map(product => ({
-          contractProductId: product.contractProductId,
-          contractTicketTypeId: product.prices.CHL!.contractTicketTypeId,
-          priceId: product.prices.CHL!.priceId,
-          price: product.prices.CHL!.price,
-          productId: product.productId,
-          productName: product.productName,
-          gateId: product.gateId,
-          gateLocation: product.gateLocation,
-        }));
-      
+      const chlProducts = mapping.products.filter(p => p.prices.CHL);
+      const specs = chlProducts.map((product, idx) => ({
+        contractProductId: product.contractProductId,
+        contractTicketTypeId: product.prices.CHL!.contractTicketTypeId,
+        priceId: product.prices.CHL!.priceId,
+        price: idx === 0 ? request.childPrice : product.prices.CHL!.price,
+        productId: product.productId,
+        productName: product.productName,
+        gateId: product.gateId,
+        gateLocation: product.gateLocation,
+      }));
+
       tickets.push({
         ticketTypeLabel: 'CHL',
         quantity: request.childQty,
