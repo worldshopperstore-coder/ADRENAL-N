@@ -12,6 +12,7 @@ import {
 } from '@/utils/salesDB';
 import { getKasaSettings, loadAdvancesFromSupabase } from '@/utils/kasaSettingsDB';
 import { processActiveSale, processActiveRefund, checkIntegrationReady, hasContractMapping, type ActiveSaleRequest, type ActiveSaleResult } from '@/utils/saleFlow';
+import { getContractMapping } from '@/data/atlantisContracts';
 import { isIntegrationEnabled } from '@/utils/posManager';
 import { printTickets, buildTicketPrintData } from '@/utils/ticketPrinter';
 import { getWeeklyTarget, getWeeklyProgress, getCurrentWeekStart } from '@/utils/weeklyTargetsDB';
@@ -43,6 +44,8 @@ interface Sale {
   terminalRecordId?: number;
   ticketIds?: number[];
   ticketGroupMap?: Record<string, number[]>;
+  /** Çapraz satışlarda tüm ürün adları (ör. ['CINEMA ENTRANCE','WILDPARK ENTRANCE']) — tekrar basımda kullanılır */
+  products?: string[];
 }
 
 interface RefundInfo {
@@ -547,6 +550,8 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         terminalRecordId: result.terminalRecordId,
         ticketIds: result.ticketIds,
         ticketGroupMap: result.ticketGroupMap,
+        // Çapraz satışlarda tüm ürün adları — tekrar basımda kasa bazlı tahmin yerine gerçek listeyi kullan
+        products: getContractMapping(formData.packageId)?.products.map(p => p.productName),
       };
 
       if (formData.isCrossSale) {
@@ -589,6 +594,9 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     try {
       const pkg = kasaPackages.find(p => p.name === sale.packageName);
       const kasaLabel = currentKasaId === 'wildpark' ? 'WILDPARK ENTRANCE' : currentKasaId === 'sinema' ? 'CINEMA ENTRANCE' : 'FACE2FACE ENTRANCE';
+      // Çapraz satışlarda satış anında kaydedilen gerçek ürün listesi kullanılır;
+      // eski satışlarda (products alanı yoksa) kasa bazlı tek ürüne düşer.
+      const productsForPrint = sale.products && sale.products.length > 0 ? sale.products : [kasaLabel];
       const isFree = sale.total === 0 && sale.category === 'Ücretsiz';
       
       const printData = buildTicketPrintData(
@@ -604,7 +612,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
           adultQty: sale.adultQty,
           childQty: sale.childQty,
           infantQty: sale.infantQty,
-          products: [kasaLabel],
+          products: productsForPrint,
           adultPrice: pkg?.adultPrice || 0,
           childPrice: pkg?.childPrice || 0,
           currency: sale.currency === 'KK' ? 'TL' : sale.currency,
