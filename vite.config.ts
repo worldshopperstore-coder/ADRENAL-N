@@ -67,7 +67,10 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true,
+        // drop_console: true burada olsaydı tüm console.* çağrıları derleme
+        // zamanında silinirdi — main.tsx'teki installConsoleIntercept
+        // (Debug Log paneli + last_pos_response) hiçbir şeyi yakalayamazdı.
+        drop_console: false,
         drop_debugger: true,
       },
       format: {
