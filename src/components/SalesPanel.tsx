@@ -148,19 +148,14 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     return () => clearInterval(interval);
   }, [showAddForm]);
 
-  // Modal açıkken body scroll'u kilitle + navbar'ın da bulanıklaşması için class ekle
+  // Modal açıkken body scroll'u kilitle
   useEffect(() => {
     if (showAddForm) {
       document.body.style.overflow = 'hidden';
-      document.body.classList.add('sale-modal-open');
     } else {
       document.body.style.overflow = '';
-      document.body.classList.remove('sale-modal-open');
     }
-    return () => {
-      document.body.style.overflow = '';
-      document.body.classList.remove('sale-modal-open');
-    };
+    return () => { document.body.style.overflow = ''; };
   }, [showAddForm]);
   const [splitMode, setSplitMode] = useState(false);
   const [formData, setFormData] = useState<AddSaleForm>({
@@ -1683,10 +1678,10 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                           setWizardStep('package');
                         }}
                         disabled={pkgCount === 0}
-                        className={`relative flex flex-col items-center gap-2 px-3 py-4 rounded-xl border transition-all duration-200 min-h-[92px] ${
+                        className={`relative flex flex-col items-center gap-2 px-3 py-4 rounded-xl border transition-colors duration-150 min-h-[92px] ${
                           pkgCount === 0
                             ? 'opacity-30 cursor-not-allowed bg-gray-900 border-gray-800'
-                            : 'bg-gray-800/60 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600 active:scale-95'
+                            : 'bg-gray-800/60 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600'
                         }`}
                       >
                         <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${gcfg.bg} ${gcfg.border} border`}>
@@ -1731,7 +1726,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                                 const resolvedId = resolvePackageId(pkg.name, defaultCurrency, selectedCategory);
                                 setFormData({ ...formData, packageId: resolvedId, isCrossSale: isCross, selectedCurrency: defaultCurrency });
                               }}
-                              className={`px-3 py-3 rounded-xl border text-left transition-all min-h-[44px] ${
+                              className={`px-3 py-3 rounded-xl border text-left transition-colors duration-150 min-h-[44px] ${
                                 isSelected
                                   ? `${CATEGORY_CONFIG[selectedCategory].bg} ${CATEGORY_CONFIG[selectedCategory].border} ring-2 ${CATEGORY_CONFIG[selectedCategory].ring}`
                                   : 'bg-gray-800/60 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600'
@@ -1755,7 +1750,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                                 setFormData({ ...formData, packageId: pkg.id, isCrossSale: isCross ? true : false });
                                 setWizardStep('details');
                               }}
-                              className={`px-3 py-3 rounded-xl border text-left transition-all min-h-[44px] ${
+                              className={`px-3 py-3 rounded-xl border text-left transition-colors duration-150 min-h-[44px] ${
                                 isSelected
                                   ? `${CATEGORY_CONFIG[selectedCategory].bg} ${CATEGORY_CONFIG[selectedCategory].border} ring-2 ${CATEGORY_CONFIG[selectedCategory].ring}`
                                   : 'bg-gray-800/60 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600'
