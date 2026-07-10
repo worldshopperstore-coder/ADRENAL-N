@@ -98,22 +98,25 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
 
   useEffect(() => {
     const kasaId = session?.kasa?.id || 'sinema';
+    // Değer gerçekten değişmediyse setState çağırma — aksi halde her
+    // pollingde SalesPanel (satış modalı içeren büyük component) prop
+    // değişikliğiyle tamamen re-render oluyor, tıklama anına denk gelirse
+    // hissedilir bir donma yaratıyordu.
+    const applyRates = (rates: { usd: number; eur: number }) => {
+      setUsdRate(prev => (prev === rates.usd ? prev : rates.usd));
+      setEurRate(prev => (prev === rates.eur ? prev : rates.eur));
+    };
+
     if (kasaId !== 'genel') {
       loadAdvancesFromSupabase(kasaId).then(setKasaAdvances);
-      loadExchangeRatesFromSupabase().then((rates) => {
-        setUsdRate(rates.usd);
-        setEurRate(rates.eur);
-      });
+      loadExchangeRatesFromSupabase().then(applyRates);
     }
 
     // Admin avans/kur güncellemelerini görmek için 30 saniyede bir yenile
     if (kasaId !== 'genel') {
       const pollInterval = setInterval(() => {
         loadAdvancesFromSupabase(kasaId).then(setKasaAdvances);
-        loadExchangeRatesFromSupabase().then((rates) => {
-          setUsdRate(rates.usd);
-          setEurRate(rates.eur);
-        });
+        loadExchangeRatesFromSupabase().then(applyRates);
       }, 30_000);
       return () => clearInterval(pollInterval);
     }

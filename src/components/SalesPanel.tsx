@@ -133,18 +133,20 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
   const [showPosResultModal, setShowPosResultModal] = useState(false);
   const [showPosProcessingModal, setShowPosProcessingModal] = useState(false);
 
-  // Entegrasyon durumunu kontrol et
+  // Entegrasyon durumunu kontrol et — satış modalı açıkken durdurulur,
+  // aksi halde 10sn'de bir gelen network yanıtı tüm paneli re-render edip
+  // tam kategori/paket seçim anına denk gelirse donma hissi yaratabiliyordu.
   useEffect(() => {
+    if (showAddForm) return;
     const check = async () => {
       const status = await checkIntegrationReady();
       setIntegrationActive(status.enabled);
       setIntegrationReady(status.ready);
     };
     check();
-    // Periyodik kontrol
     const interval = setInterval(check, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [showAddForm]);
 
   // Modal açıkken body scroll'u kilitle + navbar'ın da bulanıklaşması için class ekle
   useEffect(() => {
@@ -515,7 +517,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
 
       // Adım 2: Bilet basma
       setPosProcessingStep('print');
-      await new Promise(r => setTimeout(r, 400));
 
       // Adım 3: Tamamlandı
       setPosProcessingStep('done');
@@ -587,7 +588,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       setTimeout(() => {
         setShowPosProcessingModal(false);
         setShowPosResultModal(true);
-      }, 800);
+      }, 250);
       
     } catch (err) {
       setPosProcessingError(`İşlem hatası: ${err instanceof Error ? err.message : String(err)}`);
@@ -1623,14 +1624,8 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-3 overscroll-contain" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
           <div className="bg-gradient-to-b from-gray-900 to-[#0c0c14] border border-gray-700/60 rounded-2xl w-full max-w-4xl shadow-2xl transition-all duration-300 max-h-[92vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="flex-shrink-0 bg-gradient-to-r from-gray-900/95 via-gray-900/98 to-gray-900/95 backdrop-blur-xl border-b border-gray-700/50 px-5 py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/25">
-                    <Plus className="w-5 h-5 text-white" />
-                  </div>
-                  <h3 className="text-base font-bold text-white">Yeni Satış</h3>
-                </div>
+            <div className="flex-shrink-0 bg-gray-900 border-b border-gray-700/50 px-5 py-3">
+              <div className="flex items-center justify-end">
                 <button onClick={closeModal} className="text-gray-500 hover:text-white w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-800 transition-colors">
                   <X className="w-5 h-5" />
                 </button>
@@ -1666,10 +1661,10 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               </div>
             </div>
 
-            <div className="flex-1 overflow-hidden flex flex-col sm:flex-row">
+            <div className="flex-1 overflow-hidden flex flex-col sm:flex-row gap-0 sm:gap-4 p-0 sm:p-4 sm:pt-3">
 
             {/* FORM PANEL — tek sütun, adım adım */}
-            <div ref={modalScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+            <div ref={modalScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-0 space-y-4">
               {/* ── ADIM 1: Kategori ── */}
               {wizardStep === 'category' && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -1942,9 +1937,9 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               )}
             </div>
 
-            {/* FİŞ / VOUCHER ÖZET PANELİ — sadece adım 3'te, Ödeme Al burada */}
+            {/* FİŞ / VOUCHER ÖZET PANELİ — sadece adım 3'te, Ödeme Al burada; ayrı bir kart gibi görünsün diye form panelinden bağımsız kenarlık/gölge */}
             {wizardStep === 'details' && (
-              <div className="flex-shrink-0 sm:w-72 border-t sm:border-t-0 sm:border-l border-gray-700/50 bg-gray-950/60 p-4 flex flex-col gap-3 overflow-y-auto">
+              <div className="flex-shrink-0 sm:w-72 mt-4 sm:mt-0 border sm:rounded-2xl border-gray-700/60 bg-gray-950/80 shadow-lg p-4 flex flex-col gap-3 overflow-y-auto">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded-md bg-orange-500/15 border border-orange-500/30 flex items-center justify-center flex-shrink-0">
                     <FileText className="w-3.5 h-3.5 text-orange-400" />
@@ -2426,7 +2421,11 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               </h3>
 
               <p className="text-sm text-gray-400">
-                {posProcessingStep === 'pos' && 'Lütfen müşterinin kartını okutunuz'}
+                {posProcessingStep === 'pos' && (
+                  (splitMode ? (parseFloat(formData.splitKkTl) || 0) > 0 : formData.paymentType === 'Kredi Kartı')
+                    ? 'Lütfen müşterinin kartını okutunuz'
+                    : 'Nakit ödeme onaylanıyor...'
+                )}
                 {posProcessingStep === 'print' && 'Yazıcıya gönderiliyor...'}
                 {posProcessingStep === 'done' && 'Satış başarıyla tamamlandı'}
                 {posProcessingStep === 'error' && <span className="text-red-300">{posProcessingError}</span>}
@@ -2477,11 +2476,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
             {/* Hata butonları */}
             {posProcessingStep === 'error' && (
               <>
-                <div className="bg-yellow-500/10 border border-yellow-500/25 rounded-xl px-3 py-2.5 mt-4 text-yellow-300 text-xs flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <span>Tekrar denemeden önce POS cihazının ekranını kontrol edin — işlem cihazda onaylanmış olabilir. Emin değilseniz tekrar denemeyin, kasa sorumlusuna danışın.</span>
-                </div>
-                <div className="flex gap-2 mt-3">
+                <div className="flex gap-2 mt-5">
                   <button
                     onClick={() => {
                       setPosProcessingStep('pos');
