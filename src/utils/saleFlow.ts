@@ -132,8 +132,11 @@ function buildSalePayload(
         contractProductId: product.contractProductId,
         contractTicketTypeId: product.prices.ADU!.contractTicketTypeId,
         priceId: product.prices.ADU!.priceId,
-        // Combo'da esas tutar ilk üründe toplanır, diğerleri sembolik (mapping'deki) fiyatını korur
-        price: idx === 0 ? request.adultPrice : product.prices.ADU!.price,
+        // Combo'da esas tutar ilk üründe toplanır; diğer ürünler DB kaydı/gate
+        // eşlemesi için satır olarak kalır ama fiyatı 0 — mapping'deki sembolik
+        // (ör. 1 TL) fiyat toplama girerse ekranda görünenle POS'a giden tutar
+        // arasında fark oluşur (idx>0 ürün sayısı × sembolik fiyat kadar).
+        price: idx === 0 ? request.adultPrice : 0,
         productId: product.productId,
         productName: product.productName,
         gateId: product.gateId,
@@ -153,7 +156,7 @@ function buildSalePayload(
         contractProductId: product.contractProductId,
         contractTicketTypeId: product.prices.CHL!.contractTicketTypeId,
         priceId: product.prices.CHL!.priceId,
-        price: idx === 0 ? request.childPrice : product.prices.CHL!.price,
+        price: idx === 0 ? request.childPrice : 0,
         productId: product.productId,
         productName: product.productName,
         gateId: product.gateId,

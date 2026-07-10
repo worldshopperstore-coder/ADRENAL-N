@@ -449,7 +449,7 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
               <div>
                 <label className="text-xs text-gray-400 mb-1.5 block font-medium">USD / TL</label>
                 <input
-                  type="number" step="0.01" value={usdDraft}
+                  type="number" step="any" value={usdDraft}
                   onChange={(e) => setUsdDraft(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && saveRateEdit()}
                   autoFocus
@@ -459,7 +459,7 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
               <div>
                 <label className="text-xs text-gray-400 mb-1.5 block font-medium">EUR / TL</label>
                 <input
-                  type="number" step="0.01" value={eurDraft}
+                  type="number" step="any" value={eurDraft}
                   onChange={(e) => setEurDraft(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && saveRateEdit()}
                   className="w-full px-3 py-2.5 bg-gray-800 border border-orange-500/40 rounded-xl font-bold text-orange-300 text-sm outline-none focus:border-orange-400"
