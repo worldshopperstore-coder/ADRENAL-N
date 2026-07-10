@@ -19,7 +19,7 @@ import signal
 import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 try:
     import pymssql
@@ -751,7 +751,73 @@ def get_today_sales() -> dict:
         ticket_count = cur.fetchone()[0]
         
         return {'success': True, 'recordCount': count, 'ticketCount': ticket_count}
-        
+
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+
+# TerminalAccountId -> kasaId (types/atlantis.ts TERMINAL_ACCOUNTS ile birebir aynı)
+TERMINAL_ACCOUNT_TO_KASA = {1: 'wildpark', 2: 'sinema', 3: 'face2face'}
+# ProductId -> mekan adı (kısa etiket)
+PRODUCT_TO_VENUE = {1004: 'wildpark', 1005: 'sinema', 1008: 'face2face'}
+
+
+def get_today_ticket_status(kasa_id: str) -> dict:
+    """Bugün belirtilen kasadan satılan biletlerin turnike geçiş durumunu döndürür.
+    Sadece o kasanın kendi sattığı satışları içerir (TerminalAccountId ile filtrelenir)."""
+    account_id = {'wildpark': 1, 'sinema': 2, 'face2face': 3}.get(kasa_id)
+    if not account_id:
+        return {'success': False, 'error': f'Geçersiz kasaId: {kasa_id}'}
+
+    try:
+        db = get_connection()
+        cur = db.cursor()
+        today = datetime.date.today().strftime('%Y-%m-%d')
+
+        # Tickets.ProductId aslında ContractProducts.Id'ye işaret eder —
+        # gerçek mekan (WildPark/Sinema/Face2Face) ContractProducts.ProductId'de.
+        cur.execute("""
+            SELECT
+                tr.Id AS TerminalRecordId,
+                tr.CreatedBy,
+                tr.CreateDate AS SaleDate,
+                t.Id AS TicketId,
+                cp.ProductId AS VenueProductId,
+                t.IsUsed,
+                t.UseDate,
+                t.TicketTypeId
+            FROM TerminalRecords tr
+            JOIN Tickets t ON t.TerminalRecordId = tr.Id
+            LEFT JOIN ContractProducts cp ON cp.Id = t.ProductId
+            WHERE tr.TerminalAccountId = %s
+              AND CAST(tr.CreateDate AS DATE) = %s
+              AND tr.IsDeleted = 0
+              AND t.IsDeleted = 0
+            ORDER BY tr.CreateDate DESC, t.Id ASC
+        """, (account_id, today))
+
+        rows = cur.fetchall()
+
+        # TerminalRecordId bazında grupla — bir satış birden fazla ürün/bilet içerebilir (çapraz satış)
+        groups: dict = {}
+        for row in rows:
+            trid, created_by, sale_date, ticket_id, product_id, is_used, use_date, ticket_type_id = row
+            if trid not in groups:
+                groups[trid] = {
+                    'terminalRecordId': trid,
+                    'createdBy': created_by,
+                    'saleDate': sale_date.isoformat() if sale_date else None,
+                    'tickets': [],
+                }
+            groups[trid]['tickets'].append({
+                'ticketId': ticket_id,
+                'venue': PRODUCT_TO_VENUE.get(product_id, str(product_id)),
+                'isUsed': bool(is_used),
+                'useDate': use_date.isoformat() if use_date else None,
+            })
+
+        return {'success': True, 'sales': list(groups.values())}
+
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
@@ -784,8 +850,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.end_headers()
     
     def do_GET(self):
-        path = urlparse(self.path).path
-        
+        parsed = urlparse(self.path)
+        path = parsed.path
+        query = parse_qs(parsed.query)
+
         if path == '/health':
             try:
                 db = get_connection()
@@ -799,7 +867,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
         elif path == '/today-sales':
             result = get_today_sales()
             self._send_json(200 if result['success'] else 500, result)
-        
+
+        elif path == '/ticket-status':
+            kasa_id = (query.get('kasaId') or [''])[0]
+            result = get_today_ticket_status(kasa_id)
+            self._send_json(200 if result['success'] else 500, result)
+
         else:
             self._send_json(404, {'error': 'Not found'})
     

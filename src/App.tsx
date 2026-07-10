@@ -6,6 +6,7 @@ import DashboardTab from '@/components/DashboardTab';
 import PackagesTab from '@/components/PackagesTab';
 import AquariumTab from '@/components/AquariumTab';
 import TeamTab from '@/components/TeamTab';
+import TicketTrackTab from '@/components/TicketTrackTab';
 import AdminPanel from '@/components/AdminPanel';
 import LoginPage, { KasaInfo } from '@/components/LoginPage';
 import AttendanceGate from '@/components/AttendanceGate';
@@ -13,7 +14,7 @@ import { initializePersonnelDB } from '@/utils/personnelDB';
 import { setPersonnelOnline, setPersonnelOffline } from '@/utils/personnelSupabaseDB';
 import type { Personnel } from '@/types/personnel';
 
-type TabType = 'dashboard' | 'packages' | 'aquarium' | 'team' | 'admin-overview' | 'admin-personnel' | 'admin-shifts' | 'admin-advances' | 'admin-packages' | 'admin-performance' | 'admin-reports' | 'admin-crossaccounting' | 'admin-integration';
+type TabType = 'dashboard' | 'packages' | 'aquarium' | 'team' | 'tickettrack' | 'admin-overview' | 'admin-personnel' | 'admin-shifts' | 'admin-advances' | 'admin-packages' | 'admin-performance' | 'admin-reports' | 'admin-crossaccounting' | 'admin-integration';
 
 interface UserSession {
   kasa: KasaInfo;
@@ -225,6 +226,8 @@ export default function App() {
         return <AquariumTab />;
       case 'team':
         return <TeamTab />;
+      case 'tickettrack':
+        return <TicketTrackTab />;
       default:
         return <DashboardTab />;
     }

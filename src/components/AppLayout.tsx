@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { LogOut, Package, Droplets, Share2, LayoutDashboard, Briefcase, User, Menu, X, Shield, BarChart3, Users, Wallet, TrendingUp, FileText, ChevronLeft, Settings, Bug, Minus, Copy, Wifi, WifiOff, Loader2, Pencil, Check } from 'lucide-react';
+import { LogOut, Package, Droplets, Share2, LayoutDashboard, Briefcase, User, Menu, X, Shield, BarChart3, Users, Wallet, TrendingUp, FileText, ChevronLeft, Settings, Bug, Minus, Copy, Wifi, WifiOff, Loader2, Pencil, Check, Ticket } from 'lucide-react';
 import { loadAdvancesFromSupabase } from '@/utils/kasaSettingsDB';
 import { loadExchangeRates, loadExchangeRatesFromSupabase, saveExchangeRates } from '@/utils/dailyData';
 import { getKasaTheme } from '@/utils/kasaTheme';
@@ -26,6 +26,7 @@ const REGULAR_TABS = [
   { id: 'dashboard', label: 'Panolar', icon: LayoutDashboard, hideForPersonel: false },
   { id: 'packages', label: 'Paketler', icon: Package, hideForPersonel: true },
   { id: 'aquarium', label: 'Rapor', icon: Droplets, hideForPersonel: false },
+  { id: 'tickettrack', label: 'Bilet Takip', icon: Ticket, hideForPersonel: false },
   { id: 'team', label: 'Ekibim', icon: Users, hideForPersonel: false },
 ];
 

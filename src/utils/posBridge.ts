@@ -92,6 +92,29 @@ export async function getTodaySales(): Promise<{ success: boolean; recordCount?:
   }
 }
 
+export interface TicketStatusEntry {
+  ticketId: number;
+  venue: 'wildpark' | 'sinema' | 'face2face';
+  isUsed: boolean;
+  useDate: string | null;
+}
+
+export interface TicketStatusSale {
+  terminalRecordId: number;
+  createdBy: string;
+  saleDate: string | null;
+  tickets: TicketStatusEntry[];
+}
+
+/** Bugün bu kasadan satılan biletlerin turnike geçiş durumu (sadece kendi satışları) */
+export async function getTodayTicketStatus(kasaId: string): Promise<{ success: boolean; sales?: TicketStatusSale[]; error?: string }> {
+  try {
+    return await bridgeFetch(`/ticket-status?kasaId=${encodeURIComponent(kasaId)}`);
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 /** Bridge erişilebilir mi? (hızlı boolean) */
 export async function isBridgeAvailable(): Promise<boolean> {
   try {

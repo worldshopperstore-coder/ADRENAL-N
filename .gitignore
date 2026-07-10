@@ -25,3 +25,4 @@ mingit.zip
 
 build/pos_bridge/
 pos_bridge.spec
+__pycache__/
