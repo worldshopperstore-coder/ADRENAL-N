@@ -1,17 +1,21 @@
-import { useState, useEffect } from 'react';
-import { Share2, FileSpreadsheet, Trash2, Printer, FileText } from 'lucide-react';
-import { getUserSession } from '@/utils/session';
-import { 
-  loadCrossSalesFromFirebase, 
-  saveCrossSalesToFirebase, 
-  subscribeCrossSales 
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { Share2, FileSpreadsheet, Trash2, Printer, FileText, X } from 'lucide-react';
+import { getUserSession, getPersonnelId, getPersonnelName } from '@/utils/session';
+import {
+  loadCrossSalesFromFirebase,
+  saveCrossSalesToFirebase,
+  subscribeCrossSales
 } from '@/utils/salesDB';
+import { processActiveRefund, checkIntegrationReady } from '@/utils/saleFlow';
+import { printTickets, buildTicketPrintData } from '@/utils/ticketPrinter';
 
 interface CrossSale {
   id: string;
   packageName: string;
+  category?: string;
   adultQty: number;
   childQty: number;
+  infantQty?: number;
   currency: string;
   paymentType: string;
   total: number;
@@ -24,13 +28,36 @@ interface CrossSale {
   refundOfSaleId?: string;
   refundReason?: string;
   kkRefundTxId?: string;
+  personnelId?: string;
+  personnelName?: string;
+  // Atlantis DB referansları (aktif mod)
+  terminalRecordId?: number;
+  ticketIds?: number[];
+  ticketGroupMap?: Record<string, number[]>;
+  products?: string[];
 }
 
-export default function CrossSalesTab() {
+export interface CrossSalesTabHandle {
+  exportReport: () => void;
+}
+
+const CrossSalesTab = forwardRef<CrossSalesTabHandle>(function CrossSalesTab(_props, ref) {
   const [crossSales, setCrossSales] = useState<CrossSale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
+
+  // İade
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [refundTargetSale, setRefundTargetSale] = useState<CrossSale | null>(null);
+  const [refundInfo, setRefundInfo] = useState<{ reason: string; refundPaymentType: 'Nakit' | 'Kredi Kartı'; kkRefundTxId: string }>({ reason: '', refundPaymentType: 'Nakit', kkRefundTxId: '' });
+  const [refundProcessing, setRefundProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [integrationActive, setIntegrationActive] = useState(false);
+
+  useEffect(() => {
+    checkIntegrationReady().then(status => setIntegrationActive(status.enabled));
+  }, []);
 
   // Firebase'den çapraz satışları yükle
   useEffect(() => {
@@ -59,6 +86,237 @@ export default function CrossSalesTab() {
 
   const handleDelete = (id: string) => {
     setCrossSales(crossSales.filter(s => s.id !== id));
+  };
+
+  const getRates = () => {
+    const session = getUserSession();
+    const kasaSettings = JSON.parse(localStorage.getItem(`kasaSettings_${session.kasa?.id}`) || '{}');
+    return { usdRate: kasaSettings.usdRate || 30, eurRate: kasaSettings.eurRate || 50.4877 };
+  };
+
+  const calculateSaleDistribution = (
+    amount: number,
+    currency: string,
+    paymentType: string,
+    usdRate: number,
+    eurRate: number,
+  ) => {
+    let kkTl = 0, cashTl = 0, cashUsd = 0, cashEur = 0;
+    if (paymentType === 'Nakit') {
+      if (currency === 'USD') cashUsd = amount;
+      else if (currency === 'EUR') cashEur = amount;
+      else cashTl = amount;
+    } else if (paymentType === 'Kredi Kartı') {
+      if (currency === 'USD') kkTl = amount * usdRate;
+      else if (currency === 'EUR') kkTl = amount * eurRate;
+      else kkTl = amount;
+    }
+    return { kkTl, cashTl, cashUsd, cashEur };
+  };
+
+  // Bilet tekrar basma
+  const handleReprintTicket = async (sale: CrossSale) => {
+    if (!sale.terminalRecordId || !sale.ticketIds || sale.ticketIds.length === 0) {
+      alert('⚠️ Bu satışta bilet bilgisi bulunamadı.');
+      return;
+    }
+    try {
+      const session = getUserSession();
+      const kasaId = session.kasa?.id || 'sinema';
+      const kasaLabel = kasaId === 'wildpark' ? 'WILDPARK ENTRANCE' : kasaId === 'sinema' ? 'CINEMA ENTRANCE' : 'FACE2FACE ENTRANCE';
+      const productsForPrint = sale.products && sale.products.length > 0 ? sale.products : [kasaLabel];
+      const isFree = sale.total === 0 && sale.category === 'Ücretsiz';
+
+      const printData = buildTicketPrintData(
+        {
+          terminalRecordId: sale.terminalRecordId,
+          ticketIds: sale.ticketIds,
+          ticketGroupMap: sale.ticketGroupMap,
+        },
+        {
+          packageName: sale.packageName,
+          kasaId: kasaId as any,
+          personnelName: sale.personnelName || getPersonnelName(),
+          adultQty: sale.adultQty,
+          childQty: sale.childQty,
+          infantQty: sale.infantQty,
+          products: productsForPrint,
+          adultPrice: 0,
+          childPrice: 0,
+          currency: sale.currency === 'KK' ? 'TL' : (sale.currency as any),
+          isFree,
+        },
+      );
+
+      const pResult = await printTickets(printData);
+      if (pResult.success) {
+        alert(`✅ ${pResult.printed} bilet tekrar basıldı!`);
+      } else {
+        alert(`⚠️ Yazdırma: ${pResult.printed} basıldı, ${pResult.failed} başarısız\n${pResult.errors.join('\n')}`);
+      }
+    } catch (err: any) {
+      alert(`❌ Yazdırma hatası: ${err.message}`);
+    }
+  };
+
+  // İade işlemi
+  const handleRefund = async () => {
+    if (!refundTargetSale || !refundInfo.reason.trim()) {
+      setErrorMessage('Lütfen iade nedenini yazınız');
+      return;
+    }
+    if (refundInfo.refundPaymentType === 'Kredi Kartı' && !refundInfo.kkRefundTxId.trim()) {
+      setErrorMessage('Kredi kartı iadelerinde işlem numarası zorunludur');
+      return;
+    }
+    setErrorMessage('');
+    setRefundProcessing(true);
+
+    const sale = refundTargetSale;
+    const { usdRate, eurRate } = getRates();
+
+    // ── Atlantis DB İade (aktif mod satışı ise) ──────────
+    let atlantisRefundOk = false;
+    let atlantisRefundError = '';
+    if (integrationActive && sale.terminalRecordId) {
+      try {
+        const refundResult = await processActiveRefund(sale.terminalRecordId, getPersonnelName());
+        if (refundResult.success) {
+          atlantisRefundOk = true;
+        } else {
+          atlantisRefundError = refundResult.error || 'Bilinmeyen DB iade hatası';
+        }
+      } catch (err) {
+        atlantisRefundError = err instanceof Error ? err.message : String(err);
+      }
+    }
+
+    let refundKkTl: number, refundCashTl: number, refundCashUsd: number, refundCashEur: number;
+    if (sale.paymentType === 'Çoklu') {
+      refundKkTl = -Math.abs(sale.kkTl);
+      refundCashTl = -Math.abs(sale.cashTl);
+      refundCashUsd = -Math.abs(sale.cashUsd);
+      refundCashEur = -Math.abs(sale.cashEur);
+    } else {
+      const refundDist = calculateSaleDistribution(Math.abs(sale.total), sale.currency, refundInfo.refundPaymentType, usdRate, eurRate);
+      refundKkTl = -refundDist.kkTl;
+      refundCashTl = -refundDist.cashTl;
+      refundCashUsd = -refundDist.cashUsd;
+      refundCashEur = -refundDist.cashEur;
+    }
+
+    const refundSale: CrossSale = {
+      id: Date.now().toString(),
+      packageName: sale.packageName,
+      category: sale.category,
+      adultQty: sale.adultQty,
+      childQty: sale.childQty,
+      currency: sale.currency,
+      paymentType: sale.paymentType === 'Çoklu' ? 'Çoklu' : refundInfo.refundPaymentType,
+      total: -Math.abs(sale.total),
+      kkTl: refundKkTl,
+      cashTl: refundCashTl,
+      cashUsd: refundCashUsd,
+      cashEur: refundCashEur,
+      timestamp: new Date().toISOString(),
+      isRefund: true,
+      refundOfSaleId: sale.id,
+      refundReason: refundInfo.reason.trim(),
+      kkRefundTxId: refundInfo.refundPaymentType === 'Kredi Kartı' || sale.paymentType === 'Çoklu' ? refundInfo.kkRefundTxId.trim() || undefined : undefined,
+      personnelId: getPersonnelId(),
+      personnelName: getPersonnelName(),
+    };
+
+    setCrossSales((prev) => [...prev, refundSale]);
+    generateRefundReport(sale, refundSale, refundInfo.reason, refundInfo.refundPaymentType === 'Kredi Kartı' ? refundInfo.kkRefundTxId : '', atlantisRefundOk, atlantisRefundError);
+    setRefundProcessing(false);
+    setShowRefundModal(false);
+    setRefundTargetSale(null);
+    setRefundInfo({ reason: '', refundPaymentType: 'Nakit', kkRefundTxId: '' });
+  };
+
+  // İade tutanağı HTML/PDF
+  const generateRefundReport = (originalSale: CrossSale, refundSale: CrossSale, reason: string, kkTxId: string = '', atlantisOk: boolean = false, atlantisError: string = '') => {
+    const session = getUserSession();
+    const userName = session.personnel?.fullName || 'Kullanıcı';
+    const kasaName = session.kasa?.name || 'Kasa';
+    const currentDate = new Date().toLocaleDateString('tr-TR');
+    const currentTime = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+
+    const atlantisRows = originalSale.terminalRecordId ? `
+    <tr><td>Kayıt No</td><td style="font-weight:700">#${originalSale.terminalRecordId}</td></tr>
+    <tr><td>Sistem İade</td><td style="color:${atlantisOk ? '#2e7d32' : atlantisError ? '#c00' : '#888'};font-weight:700">${atlantisOk ? '✅ Başarılı' : atlantisError ? '❌ Hata: ' + atlantisError : '— Yapılmadı'}</td></tr>` : '';
+
+    const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
+<title>Çapraz Satış İade Tutanağı - ${currentDate}</title>
+<style>
+  @page { size: A4; margin: 20mm; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .no-print { display: none !important; } }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #222; background: #fff; padding: 30px; max-width: 700px; margin: 0 auto; }
+  .header { text-align: center; border-bottom: 3px solid #c00; padding-bottom: 15px; margin-bottom: 25px; }
+  .header h1 { font-size: 22px; color: #c00; margin-bottom: 5px; }
+  .header .meta { font-size: 12px; color: #666; }
+  .section { margin-bottom: 20px; }
+  .section h2 { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; color: #444; }
+  .info-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+  .info-table td { padding: 8px 12px; border: 1px solid #ddd; font-size: 12px; }
+  .info-table td:first-child { background: #f5f5f5; font-weight: 600; width: 40%; color: #555; }
+  .reason-box { background: #fff8f8; border: 2px solid #e0c0c0; border-radius: 8px; padding: 15px; margin: 15px 0; }
+  .reason-box h3 { font-size: 12px; color: #c00; margin-bottom: 8px; text-transform: uppercase; }
+  .reason-box p { font-size: 13px; line-height: 1.6; color: #333; }
+  .signatures { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 15px; }
+  .sig-box { text-align: center; width: 45%; }
+  .sig-box .line { border-top: 1px solid #999; margin-top: 40px; padding-top: 5px; font-size: 11px; color: #666; }
+  .footer { margin-top: 30px; text-align: center; font-size: 9px; color: #aaa; border-top: 1px solid #eee; padding-top: 10px; }
+  .print-btn { display: block; margin: 25px auto; padding: 12px 40px; background: #c00; color: #fff; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+  .print-btn:hover { background: #a00; }
+  .stamp { text-align: center; margin: 15px 0; }
+  .stamp span { display: inline-block; border: 2px solid #c00; color: #c00; padding: 5px 20px; border-radius: 4px; font-weight: 700; font-size: 14px; transform: rotate(-5deg); }
+</style></head><body>
+<div class="header">
+  <div style="font-size:24px;font-weight:900;font-style:italic;margin-bottom:4px"><span style="color:#f97316">adrenalin</span><span style="color:#fb923c">.</span></div>
+  <h1>İADE TUTANAĞI (Çapraz Satış)</h1>
+  <div class="meta"><strong>${kasaName}</strong> — Tarih: ${currentDate} — Saat: ${currentTime}</div>
+</div>
+<div class="stamp"><span>İADE</span></div>
+<div class="section">
+  <h2>Orijinal Satış Bilgileri</h2>
+  <table class="info-table">
+    <tr><td>Paket Adı</td><td>${originalSale.packageName}</td></tr>
+    <tr><td>Kategori</td><td>${originalSale.category || '-'}</td></tr>
+    <tr><td>Yetişkin / Çocuk</td><td>${originalSale.adultQty} Yetişkin / ${originalSale.childQty} Çocuk</td></tr>
+    <tr><td>Para Birimi</td><td>${originalSale.currency}</td></tr>
+    <tr><td>Ödeme Tipi (Orijinal)</td><td>${originalSale.paymentType}</td></tr>
+    <tr><td>Toplam Tutar</td><td><strong>${Math.abs(originalSale.total).toFixed(2)} ${originalSale.currency === 'TL' || originalSale.currency === 'KK' ? '₺' : originalSale.currency === 'USD' ? '$' : '€'}</strong></td></tr>
+    <tr><td>Satış Tarihi</td><td>${new Date(originalSale.timestamp).toLocaleString('tr-TR')}</td></tr>
+  </table>
+</div>
+<div class="section">
+  <h2>İade Bilgileri</h2>
+  <table class="info-table">
+    <tr><td>İade Ödeme Şekli</td><td><strong>${refundSale.paymentType}</strong></td></tr>
+    ${kkTxId ? `<tr><td>Kredi Kartı İade İşlem No</td><td style="font-weight:700;color:#1565c0">${kkTxId}</td></tr>` : ''}
+    <tr><td>İade Tutarı</td><td style="color:#c00;font-weight:700">${Math.abs(refundSale.total).toFixed(2)} ${originalSale.currency === 'TL' || originalSale.currency === 'KK' ? '₺' : originalSale.currency === 'USD' ? '$' : '€'}</td></tr>
+    <tr><td>İşlemi Yapan (Kasa Personeli)</td><td>${userName} — ${kasaName}</td></tr>
+    <tr><td>İşlem Tarihi / Saati</td><td>${currentDate} - ${currentTime}</td></tr>
+    ${atlantisRows}
+  </table>
+</div>
+<div class="reason-box">
+  <h3>İade Nedeni</h3>
+  <p>${reason}</p>
+</div>
+<div class="signatures">
+  <div class="sig-box"><div class="line">İşletme Müdür / Emre Ozan</div></div>
+  <div class="sig-box"><div class="line">Kasa Personeli / ${userName} (${kasaName})</div></div>
+</div>
+<button class="print-btn no-print" onclick="window.print()">🖨️ Yazdır / PDF Kaydet</button>
+<div class="footer">Adrenalin Satış Sistemi — Çapraz Satış İade Tutanağı — ${kasaName} — ${currentDate}</div>
+</body></html>`;
+
+    const w = window.open('', 'reportWindow', 'width=850,height=700,scrollbars=yes,resizable=yes');
+    if (w) { w.document.write(html); w.document.close(); }
   };
 
   // ==================== ŞİRKET TESPİT FONKSİYONU ====================
@@ -239,10 +497,10 @@ export default function CrossSalesTab() {
     <th style="width:30px">#</th>
     <th style="text-align:left">Paket</th>
     <th>Y</th><th>Ç</th><th>Ödeme</th>
-    <th style="text-align:right">Kredi Kartı (₺)</th>
-    <th style="text-align:right">Nakit (₺)</th>
-    <th style="text-align:right">Nakit ($)</th>
-    <th style="text-align:right">Nakit (€)</th>
+    <th style="text-align:right">Kredi Kartı</th>
+    <th style="text-align:right">TL</th>
+    <th style="text-align:right">USD</th>
+    <th style="text-align:right">EUR</th>
   </tr></thead>
   <tbody>${salesRows}</tbody>
   <tfoot><tr class="totals-row">
@@ -699,6 +957,10 @@ export default function CrossSalesTab() {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [totalPages, currentPage]);
 
+  useImperativeHandle(ref, () => ({
+    exportReport: generateHTMLReport,
+  }));
+
   return (
     <div className="p-3 sm:p-4 space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -730,11 +992,9 @@ export default function CrossSalesTab() {
                   <th className="px-3 py-3 text-left text-gray-400 font-bold uppercase tracking-wider text-[11px]">Paket</th>
                   <th className="px-3 py-3 text-center text-gray-400 font-bold uppercase tracking-wider text-[11px]">Yetişkin</th>
                   <th className="px-3 py-3 text-center text-gray-400 font-bold uppercase tracking-wider text-[11px]">Çocuk</th>
-                  <th className="px-3 py-3 text-center text-gray-400 font-bold uppercase tracking-wider text-[11px]">Para</th>
                   <th className="px-3 py-3 text-center text-gray-400 font-bold uppercase tracking-wider text-[11px]">Ödeme</th>
-                  <th className="px-3 py-3 text-right text-gray-400 font-bold uppercase tracking-wider text-[11px]">Toplam</th>
-                  <th className="px-3 py-3 text-right text-emerald-400 font-bold uppercase tracking-wider text-[11px]">Kredi Kartı (₺)</th>
-                  <th className="px-3 py-3 text-right text-blue-400 font-bold uppercase tracking-wider text-[11px]">Nakit (₺)</th>
+                  <th className="px-3 py-3 text-right text-emerald-400 font-bold uppercase tracking-wider text-[11px]">Kredi Kartı</th>
+                  <th className="px-3 py-3 text-right text-blue-400 font-bold uppercase tracking-wider text-[11px]">TL</th>
                   <th className="px-3 py-3 text-right text-amber-400 font-bold uppercase tracking-wider text-[11px]">USD</th>
                   <th className="px-3 py-3 text-right text-violet-400 font-bold uppercase tracking-wider text-[11px]">EUR</th>
                   <th className="px-3 py-3 text-center text-gray-400 font-bold uppercase tracking-wider text-[11px]">İşlem</th>
@@ -763,7 +1023,6 @@ export default function CrossSalesTab() {
                       </td>
                       <td className={`px-3 py-2.5 text-center ${isRefunded ? 'text-gray-500 line-through' : 'text-gray-300'}`}>{sale.adultQty}</td>
                       <td className={`px-3 py-2.5 text-center ${isRefunded ? 'text-gray-500 line-through' : 'text-gray-300'}`}>{sale.childQty}</td>
-                      <td className="px-3 py-2.5 text-center text-gray-400">{sale.currency}</td>
                       <td className="px-3 py-2.5 text-center">
                         <span className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-full font-semibold ${
                           sale.paymentType === 'Kredi Kartı'
@@ -773,13 +1032,34 @@ export default function CrossSalesTab() {
                           {sale.paymentType === 'Kredi Kartı' ? 'Kredi Kartı' : 'Nakit'}
                         </span>
                       </td>
-                      <td className={`px-3 py-2.5 text-right font-medium ${isRefunded ? 'text-gray-500 line-through' : 'text-gray-200'}`}>{sale.total.toFixed(2)}</td>
                       <td className={`px-3 py-2.5 text-right font-medium ${isRefunded ? 'text-gray-500 line-through' : 'text-emerald-400'}`}>{sale.kkTl !== 0 ? sale.kkTl.toFixed(2) : <span className="text-gray-600">—</span>}</td>
                       <td className={`px-3 py-2.5 text-right font-medium ${isRefunded ? 'text-gray-500 line-through' : 'text-blue-400'}`}>{sale.cashTl !== 0 ? sale.cashTl.toFixed(2) : <span className="text-gray-600">—</span>}</td>
                       <td className={`px-3 py-2.5 text-right font-medium ${isRefunded ? 'text-gray-500 line-through' : 'text-amber-400'}`}>{sale.cashUsd !== 0 ? sale.cashUsd.toFixed(2) : <span className="text-gray-600">—</span>}</td>
                       <td className={`px-3 py-2.5 text-right font-medium ${isRefunded ? 'text-gray-500 line-through' : 'text-violet-400'}`}>{sale.cashEur !== 0 ? sale.cashEur.toFixed(2) : <span className="text-gray-600">—</span>}</td>
                       <td className="px-3 py-2.5 text-center">
                         <div className="flex items-center justify-center gap-1.5">
+                          {!isRefunded && (
+                            <button
+                              onClick={() => {
+                                setRefundTargetSale(sale);
+                                setRefundInfo({ reason: '', refundPaymentType: sale.paymentType === 'Çoklu' ? 'Nakit' : (sale.paymentType as 'Nakit' | 'Kredi Kartı'), kkRefundTxId: '' });
+                                setShowRefundModal(true);
+                              }}
+                              title="İade Et"
+                              className="text-orange-400 hover:text-orange-300 text-xs font-bold bg-orange-500/15 hover:bg-orange-500/25 px-2 py-1 rounded-lg border border-orange-500/30 transition-colors"
+                            >
+                              ↩
+                            </button>
+                          )}
+                          {sale.ticketIds && sale.ticketIds.length > 0 && (
+                            <button
+                              onClick={() => handleReprintTicket(sale)}
+                              title="Bilet Tekrar Bas"
+                              className="text-indigo-400 hover:text-indigo-300 p-1 rounded-lg transition-colors hover:bg-indigo-500/15"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDelete(sale.id)}
                             title="Sil"
@@ -799,8 +1079,6 @@ export default function CrossSalesTab() {
                   <td className="px-3 py-3 text-center text-white font-bold text-xs">{totals.totalAdult}</td>
                   <td className="px-3 py-3 text-center text-white font-bold text-xs">{totals.totalChild}</td>
                   <td className="px-3 py-3 text-center text-gray-400 text-xs font-medium">{tableCrossSales.length} satış</td>
-                  <td className="px-3 py-3"></td>
-                  <td className="px-3 py-3 text-right text-white font-black text-xs">{(totals.kkTl + totals.cashTl).toFixed(2)}</td>
                   <td className="px-3 py-3 text-right text-emerald-400 font-bold text-xs">{totals.kkTl.toFixed(2)}</td>
                   <td className="px-3 py-3 text-right text-blue-400 font-bold text-xs">{totals.cashTl.toFixed(2)}</td>
                   <td className="px-3 py-3 text-right text-amber-400 font-bold text-xs">{totals.cashUsd.toFixed(2)}</td>
@@ -836,24 +1114,116 @@ export default function CrossSalesTab() {
         </div>
       )}
 
-      {/* ── EXPORT BUTTONS ── */}
-      {crossSales.length > 0 && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gradient-to-r from-gray-900 to-gray-950 rounded-xl border border-gray-700/50 p-3 sm:p-4 shadow-lg">
-          <div className="text-xs text-gray-400">
-            <span className="font-bold text-white">{crossSales.length}</span> çapraz satış kaydı · Genel Toplam: <span className="font-black text-orange-400">{grandTotal.toFixed(2)} ₺</span>
-          </div>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <button
-              onClick={generateHTMLReport}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white rounded-xl transition-all text-xs font-bold shadow-lg shadow-orange-500/20"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              Rapor
-            </button>
+      {/* ── REFUND MODAL ── */}
+      {showRefundModal && refundTargetSale && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-boltify-lg">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-red-400 flex items-center gap-2">
+                <span className="w-8 h-8 bg-red-500/10 rounded-xl flex items-center justify-center text-base border border-red-500/20">↩</span>
+                Çapraz Satış İadesi
+              </h3>
+              <button
+                onClick={() => { setShowRefundModal(false); setRefundTargetSale(null); setRefundProcessing(false); }}
+                disabled={refundProcessing}
+                className="text-gray-500 hover:text-white w-7 h-7 flex items-center justify-center rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="bg-gray-800 rounded-xl p-4 mb-4 border border-gray-700">
+              <p className="text-[11px] text-gray-500 mb-3 font-semibold uppercase tracking-wider">Orijinal Satış</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><span className="text-gray-500">Paket:</span> <span className="text-white font-semibold">{refundTargetSale.packageName}</span></div>
+                <div><span className="text-gray-500">Tutar:</span> <span className="text-white font-semibold">{refundTargetSale.total.toFixed(2)} {refundTargetSale.currency === 'TL' || refundTargetSale.currency === 'KK' ? '₺' : refundTargetSale.currency === 'USD' ? '$' : '€'}</span></div>
+                <div><span className="text-gray-500">Yetişkin:</span> <span className="text-gray-200">{refundTargetSale.adultQty}</span></div>
+                <div><span className="text-gray-500">Çocuk:</span> <span className="text-gray-200">{refundTargetSale.childQty}</span></div>
+                <div><span className="text-gray-500">Ödeme:</span> <span className="text-gray-200">{refundTargetSale.paymentType}</span></div>
+                <div><span className="text-gray-500">Para Birimi:</span> <span className="text-gray-200">{refundTargetSale.currency}</span></div>
+                {refundTargetSale.terminalRecordId && (
+                  <div className="col-span-2"><span className="text-gray-500">Atlantis Kayıt:</span> <span className="text-blue-400 font-bold">#{refundTargetSale.terminalRecordId}</span></div>
+                )}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs text-gray-400 mb-1.5 font-semibold uppercase tracking-wider">İade Ödeme Şekli</label>
+              <select
+                value={refundInfo.refundPaymentType}
+                onChange={(e) => setRefundInfo({ ...refundInfo, refundPaymentType: e.target.value as any })}
+                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-600/80 rounded-lg text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
+              >
+                <option value="Nakit">Nakit</option>
+                <option value="Kredi Kartı">Kredi Kartı</option>
+              </select>
+            </div>
+
+            {refundInfo.refundPaymentType === 'Kredi Kartı' && (
+              <div className="mb-4">
+                <label className="block text-xs text-gray-400 mb-1.5 font-semibold uppercase tracking-wider">Kredi Kartı İade İşlem Numarası <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={refundInfo.kkRefundTxId}
+                  onChange={(e) => setRefundInfo({ ...refundInfo, kkRefundTxId: e.target.value })}
+                  placeholder="POS cihazındaki iade işlem numarası..."
+                  className="w-full px-3 py-2.5 bg-gray-800 border border-gray-600/80 rounded-lg text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
+                />
+              </div>
+            )}
+
+            <div className="mb-5">
+              <label className="block text-xs text-gray-400 mb-1.5 font-semibold uppercase tracking-wider">İade Nedeni <span className="text-red-500">*</span></label>
+              <textarea
+                value={refundInfo.reason}
+                onChange={(e) => setRefundInfo({ ...refundInfo, reason: e.target.value })}
+                placeholder="Müşterinin iade nedenini yazınız..."
+                rows={3}
+                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-600/80 rounded-lg text-white text-sm resize-none focus:outline-none focus:border-red-500 transition-colors"
+              />
+            </div>
+
+            {errorMessage && (
+              <div className="bg-red-900/40 text-red-300 text-sm px-3 py-2.5 rounded-lg mb-3 border border-red-700/40 flex items-center gap-2">
+                <span>⚠</span> {errorMessage}
+              </div>
+            )}
+
+            {integrationActive && refundTargetSale?.terminalRecordId && (
+              <div className="bg-blue-900/20 text-blue-300 text-xs px-3 py-2 rounded-lg mb-3 border border-blue-700/30 flex items-center gap-2">
+                <span>🗄️</span> Sistem kaydı da silinecek (Kayıt No: #{refundTargetSale.terminalRecordId})
+              </div>
+            )}
+
+            <div className="flex gap-2.5">
+              <button
+                onClick={handleRefund}
+                disabled={refundProcessing || !refundInfo.reason.trim() || (refundInfo.refundPaymentType === 'Kredi Kartı' && !refundInfo.kkRefundTxId.trim())}
+                className="flex-1 bg-red-700 hover:bg-red-600 disabled:bg-gray-700 disabled:text-gray-500 text-white py-2.5 rounded-xl font-semibold transition-colors text-sm flex items-center justify-center gap-2"
+              >
+                {refundProcessing ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                    İade İşleniyor...
+                  </>
+                ) : (
+                  'İadeyi Onayla & Tutanak Yazdır'
+                )}
+              </button>
+              <button
+                onClick={() => { setShowRefundModal(false); setRefundTargetSale(null); setRefundProcessing(false); }}
+                disabled={refundProcessing}
+                className="px-4 bg-gray-700/80 hover:bg-gray-700 disabled:opacity-50 text-gray-300 hover:text-white py-2.5 rounded-xl transition-colors text-sm"
+              >
+                İptal
+              </button>
+            </div>
           </div>
         </div>
       )}
 
     </div>
   );
-}
+});
+
+export default CrossSalesTab;

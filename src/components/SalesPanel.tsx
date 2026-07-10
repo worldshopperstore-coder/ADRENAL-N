@@ -71,7 +71,7 @@ interface AddSaleForm {
   payInTl: boolean;
 }
 
-export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpdate }: { usdRate: number; eurRate: number; onSalesUpdate?: (sales: Sale[]) => void }) {
+export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpdate, onExportCrossReport }: { usdRate: number; eurRate: number; onSalesUpdate?: (sales: Sale[]) => void; onExportCrossReport?: () => void }) {
   const currentKasaId = getKasaId('sinema');
   const [kasaPackages, setKasaPackages] = useState<PackageItem[]>(
     INITIAL_PACKAGES.filter(p => p.kasaId === currentKasaId)
@@ -1415,10 +1415,10 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     <th style="width:30px">#</th>
     <th style="text-align:left">Paket</th>
     <th>Yetişkin</th><th>Çocuk</th><th>Ödeme</th>
-    <th style="text-align:right">Kredi Kartı (₺)</th>
-    <th style="text-align:right">Nakit (₺)</th>
-    <th style="text-align:right">Nakit ($)</th>
-    <th style="text-align:right">Nakit (€)</th>
+    <th style="text-align:right">Kredi Kartı</th>
+    <th style="text-align:right">TL</th>
+    <th style="text-align:right">USD</th>
+    <th style="text-align:right">EUR</th>
   </tr></thead>
   <tbody>${salesRows}</tbody>
   <tfoot><tr class="totals-row">
@@ -1503,12 +1503,30 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-orange-500/20 transition-all duration-200 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white w-full sm:w-auto justify-center"
-        >
-          <Plus className="w-4 h-4" /> Satış Ekle
-        </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {onExportCrossReport && (
+            <button
+              onClick={onExportCrossReport}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs shadow-lg transition-all duration-200 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200"
+            >
+              <FileText className="w-3.5 h-3.5" /> Çapraz Rapor
+            </button>
+          )}
+          {sales.length > 0 && (
+            <button
+              onClick={exportToHTML}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs shadow-lg transition-all duration-200 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200"
+            >
+              <FileText className="w-3.5 h-3.5" /> Rapor
+            </button>
+          )}
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="flex-1 sm:flex-none flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-orange-500/20 transition-all duration-200 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white justify-center"
+          >
+            <Plus className="w-4 h-4" /> Satış Ekle
+          </button>
+        </div>
       </div>
 
       {/* ── SUMMARY CARDS ── */}
@@ -2193,9 +2211,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                         )}
                       </div>
                     </div>
-                    <div className="text-right ml-2">
-                      <p className={`text-sm font-bold ${isRefunded ? 'line-through text-gray-600' : 'text-white'}`}>{sale.total.toFixed(2)} {sale.currency === 'TL' || sale.currency === 'KK' ? '₺' : sale.currency === 'USD' ? '$' : '€'}</p>
-                    </div>
                   </div>
                   <div className="flex items-center gap-2 pt-1 border-t border-gray-800/50">
                     <div className="flex-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
@@ -2231,11 +2246,9 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                     <th className="px-3 py-3 text-left text-gray-400 font-bold uppercase tracking-wider text-[11px]">Paket</th>
                     <th className="px-3 py-3 text-center text-gray-400 font-bold uppercase tracking-wider text-[11px]">Yetişkin</th>
                     <th className="px-3 py-3 text-center text-gray-400 font-bold uppercase tracking-wider text-[11px]">Çocuk</th>
-                    <th className="px-3 py-3 text-center text-gray-400 font-bold uppercase tracking-wider text-[11px]">Para</th>
                     <th className="px-3 py-3 text-center text-gray-400 font-bold uppercase tracking-wider text-[11px]">Ödeme</th>
-                    <th className="px-3 py-3 text-right text-gray-400 font-bold uppercase tracking-wider text-[11px]">Toplam</th>
-                    <th className="px-3 py-3 text-right text-emerald-400 font-bold uppercase tracking-wider text-[11px]">Kredi Kartı (₺)</th>
-                    <th className="px-3 py-3 text-right text-blue-400 font-bold uppercase tracking-wider text-[11px]">Nakit (₺)</th>
+                    <th className="px-3 py-3 text-right text-emerald-400 font-bold uppercase tracking-wider text-[11px]">Kredi Kartı</th>
+                    <th className="px-3 py-3 text-right text-blue-400 font-bold uppercase tracking-wider text-[11px]">TL</th>
                     <th className="px-3 py-3 text-right text-amber-400 font-bold uppercase tracking-wider text-[11px]">USD</th>
                     <th className="px-3 py-3 text-right text-violet-400 font-bold uppercase tracking-wider text-[11px]">EUR</th>
                     <th className="px-3 py-3 text-center text-gray-400 font-bold uppercase tracking-wider text-[11px]">İşlem</th>
@@ -2267,7 +2280,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                     </td>
                     <td className={`px-3 py-2.5 text-center ${isRefunded ? 'text-gray-600 line-through' : 'text-gray-200'}`}>{sale.adultQty}</td>
                     <td className={`px-3 py-2.5 text-center ${isRefunded ? 'text-gray-600 line-through' : 'text-gray-200'}`}>{sale.childQty}</td>
-                    <td className="px-3 py-2.5 text-center text-gray-300 font-medium">{sale.currency}</td>
                     <td className="px-3 py-2.5 text-center">
                       <span className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-lg font-bold ${
                         sale.paymentType === 'Çoklu'
@@ -2279,7 +2291,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                         {sale.paymentType === 'Kredi Kartı' ? 'Kredi Kartı' : sale.paymentType === 'Çoklu' ? 'Çoklu' : 'Nakit'}
                       </span>
                     </td>
-                    <td className={`px-3 py-2.5 text-right font-bold ${isRefunded ? 'text-gray-600 line-through' : 'text-white'}`}>{sale.total.toFixed(2)}</td>
                     <td className={`px-3 py-2.5 text-right font-bold ${isRefunded ? 'text-gray-600 line-through' : 'text-emerald-400'}`}>{sale.kkTl !== 0 ? sale.kkTl.toFixed(2) : <span className="text-gray-700">—</span>}</td>
                     <td className={`px-3 py-2.5 text-right font-bold ${isRefunded ? 'text-gray-600 line-through' : 'text-blue-400'}`}>{sale.cashTl !== 0 ? sale.cashTl.toFixed(2) : <span className="text-gray-700">—</span>}</td>
                     <td className={`px-3 py-2.5 text-right font-bold ${isRefunded ? 'text-gray-600 line-through' : 'text-amber-400'}`}>{sale.cashUsd !== 0 ? sale.cashUsd.toFixed(2) : <span className="text-gray-700">—</span>}</td>
@@ -2320,8 +2331,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                   <td className="px-3 py-3 text-center text-white font-bold text-xs">{totalAdultCount}</td>
                   <td className="px-3 py-3 text-center text-white font-bold text-xs">{totalChildCount}</td>
                   <td className="px-3 py-3 text-center text-gray-400 text-xs font-medium">{tableSales.length} satış</td>
-                  <td className="px-3 py-3"></td>
-                  <td className="px-3 py-3 text-right text-white font-black text-xs">{(totals.kkTl + totals.cashTl + (totals.cashUsd * usdRate) + (totals.cashEur * eurRate)).toFixed(2)}</td>
                   <td className="px-3 py-3 text-right text-emerald-400 font-black text-xs">{totals.kkTl.toFixed(2)}</td>
                   <td className="px-3 py-3 text-right text-blue-400 font-black text-xs">{totals.cashTl.toFixed(2)}</td>
                   <td className="px-3 py-3 text-right text-amber-400 font-black text-xs">{totals.cashUsd.toFixed(2)}</td>
@@ -2356,24 +2365,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
             </div>
           )}
         </>
-      )}
-
-      {/* ── EXPORT BUTTONS (sadece satış varsa) ── */}
-      {sales.length > 0 && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-gradient-to-r from-gray-900 to-gray-950 rounded-xl border border-gray-700/50 p-3 sm:p-4 shadow-boltify-card gap-3">
-          <div className="text-xs text-gray-400">
-            <span className="font-bold text-white">{sales.length}</span> satış kaydı · Genel Toplam: <span className="font-black text-emerald-400">{grandTotal.toFixed(2)} ₺</span>
-          </div>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <button
-              onClick={exportToHTML}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white rounded-xl transition-all text-xs font-bold shadow-boltify-glow"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              Rapor
-            </button>
-          </div>
-        </div>
       )}
 
       {/* ── REFUND MODAL ── */}

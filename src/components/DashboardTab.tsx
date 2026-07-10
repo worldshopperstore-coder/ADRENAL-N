@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import SalesPanel from './SalesPanel';
-import CrossSalesTab from './CrossSalesTab';
+import CrossSalesTab, { type CrossSalesTabHandle } from './CrossSalesTab';
 import { initializeKasaSettings } from '@/utils/kasaSettingsDB';
 import { loadExchangeRates, loadExchangeRatesFromSupabase } from '@/utils/dailyData';
 
@@ -21,6 +21,7 @@ function SalesSkeleton() {
 export default function DashboardTab() {
   const [userRole, setUserRole] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const crossSalesRef = useRef<CrossSalesTabHandle>(null);
   
   // Kur değerlerini localStorage'dan yükle
   const savedRates = loadExchangeRates();
@@ -65,10 +66,14 @@ export default function DashboardTab() {
 
   return (
     <div className="p-2 sm:p-4 space-y-6">
-      {/* Satış Panosu (Tam genişlik) */}
-      <SalesPanel usdRate={usdRate} eurRate={eurRate} />
-      {/* Çapraz Satışlar — ayrı tablo, ayrı rapor butonu */}
-      <CrossSalesTab />
+      {/* Satış Panosu (Tam genişlik) — Rapor/Çapraz Rapor butonları header'da */}
+      <SalesPanel
+        usdRate={usdRate}
+        eurRate={eurRate}
+        onExportCrossReport={() => crossSalesRef.current?.exportReport()}
+      />
+      {/* Çapraz Satışlar — ayrı tablo, rapor butonu yukarıdaki header'a taşındı */}
+      <CrossSalesTab ref={crossSalesRef} />
     </div>
   );
 }
