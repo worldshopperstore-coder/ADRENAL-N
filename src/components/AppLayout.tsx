@@ -165,7 +165,7 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
   return (
     <div className="min-h-screen bg-gray-950 flex">
       {/* Electron titlebar drag region — only over main content area */}
-      <div className={`electron-drag fixed top-0 right-0 h-9 bg-gray-950/80 z-[60] select-none transition-all duration-300 ${sidebarCollapsed ? 'md:left-16' : 'md:left-64'} left-0 flex items-center justify-end`}>
+      <div className={`app-titlebar electron-drag fixed top-0 right-0 h-9 bg-gray-950/80 z-[60] select-none transition-all duration-300 ${sidebarCollapsed ? 'md:left-16' : 'md:left-64'} left-0 flex items-center justify-end`}>
         {/* Custom window controls */}
         <div className="flex items-center electron-no-drag">
           <button
@@ -224,7 +224,7 @@ export default function AppLayout({ activeTab, onTabChange, children, session, o
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className={`
-          fixed top-0 flex flex-col h-screen z-40 overflow-hidden
+          app-sidebar fixed top-0 flex flex-col h-screen z-40 overflow-hidden
           bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 border-r border-gray-700/50 shadow-boltify-lg
           transition-all duration-300 ease-in-out
           ${sidebarCollapsed ? 'md:w-16' : 'md:w-64'}

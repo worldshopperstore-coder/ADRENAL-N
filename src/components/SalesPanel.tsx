@@ -111,6 +111,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
   const [refundProcessing, setRefundProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
+  const [wizardStep, setWizardStep] = useState<'category' | 'package' | 'details'>('category');
   const CATEGORY_GROUPS = ['Münferit', 'Visitor', 'Çapraz Münferit', 'Çapraz Visitor', 'Acenta', 'Ücretsiz'] as const;
   const CATEGORY_CONFIG: Record<string, { icon: typeof Tag; color: string; bg: string; border: string; ring: string; badge: string; desc: string }> = {
     'Münferit': { icon: Tag, color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', ring: 'ring-emerald-500/20', badge: 'from-emerald-500 to-emerald-600', desc: 'Bireysel TL satışlar' },
@@ -145,14 +146,19 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     return () => clearInterval(interval);
   }, []);
 
-  // Modal açıkken body scroll'u kilitle
+  // Modal açıkken body scroll'u kilitle + navbar'ın da bulanıklaşması için class ekle
   useEffect(() => {
     if (showAddForm) {
       document.body.style.overflow = 'hidden';
+      document.body.classList.add('sale-modal-open');
     } else {
       document.body.style.overflow = '';
+      document.body.classList.remove('sale-modal-open');
     }
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+      document.body.classList.remove('sale-modal-open');
+    };
   }, [showAddForm]);
   const [splitMode, setSplitMode] = useState(false);
   const [formData, setFormData] = useState<AddSaleForm>({
@@ -385,6 +391,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     setSplitMode(false);
     setSelectedCategory('');
     setShowAddForm(false);
+    setWizardStep('category');
   };
 
   // ── AKTİF MOD SATIŞ ────────────────────────────────────
@@ -570,7 +577,8 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
       setSplitMode(false);
       setSelectedCategory('');
       setShowAddForm(false);
-      
+      setWizardStep('category');
+
       // İşlem modalını kapat, sonuç modalını göster
       setPosProcessing(false);
       setPosResult(result);
@@ -1521,7 +1529,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
             </button>
           )}
           <button
-            onClick={() => setShowAddForm(true)}
+            onClick={() => { setWizardStep('category'); setShowAddForm(true); }}
             className="flex-1 sm:flex-none flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-orange-500/20 transition-all duration-200 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white justify-center"
           >
             <Plus className="w-4 h-4" /> Satış Ekle
@@ -1577,10 +1585,43 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         </div>
       )}
 
-      {/* ── ADD SALE MODAL ── */}
-      {showAddForm && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-3 overscroll-contain" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddForm(false); setSelectedCategory(''); setErrorMessage(''); setSplitMode(false); } }}>
-          <div className="bg-gradient-to-b from-gray-900 to-[#0c0c14] border border-gray-700/60 rounded-2xl w-full max-w-5xl shadow-2xl transition-all duration-300 max-h-[92vh] flex flex-col">
+      {/* ── ADD SALE MODAL (3 adımlı sihirbaz) ── */}
+      {showAddForm && (() => {
+        const closeModal = () => { setShowAddForm(false); setSelectedCategory(''); setErrorMessage(''); setSplitMode(false); setWizardStep('category'); };
+        const goToCategory = () => { setWizardStep('category'); setFormData({ ...formData, packageId: '', adultQty: '0', childQty: '0', infantQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', selectedCurrency: '', payInTl: false }); setSplitMode(false); setErrorMessage(''); };
+        const goToPackage = () => { setWizardStep('package'); setFormData({ ...formData, packageId: '', adultQty: '0', childQty: '0', infantQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', selectedCurrency: '', payInTl: false }); setSplitMode(false); setErrorMessage(''); };
+
+        const selectedPkg = kasaPackages.find(p => p.id === formData.packageId);
+        const adultQ = parseInt(formData.adultQty) || 0;
+        const childQ = parseInt(formData.childQty) || 0;
+        const infantQ = parseInt(formData.infantQty) || 0;
+        const hasAnyQty = adultQ > 0 || childQ > 0;
+        const cfg = selectedCategory ? CATEGORY_CONFIG[selectedCategory] : null;
+        const currSymbol = selectedPkg?.currency === 'USD' ? '$' : selectedPkg?.currency === 'EUR' ? '€' : '₺';
+        const rate = selectedPkg?.currency === 'USD' ? usdRate : selectedPkg?.currency === 'EUR' ? eurRate : 0;
+        const total = selectedPkg ? adultQ * selectedPkg.adultPrice + childQ * selectedPkg.childPrice : 0;
+        const totalTl = selectedPkg?.currency === 'TL' || !selectedPkg ? total : total * rate;
+        const isFree = !!selectedPkg && selectedPkg.adultPrice === 0 && selectedPkg.childPrice === 0;
+        const showActiveMode = integrationActive;
+        const hasMappingForPkg = formData.packageId ? hasContractMapping(formData.packageId) : false;
+
+        // Çoklu ödeme hesapları
+        const splitKk = parseFloat(formData.splitKkTl) || 0;
+        const splitTl = parseFloat(formData.splitCashTl) || 0;
+        const splitUsd = parseFloat(formData.splitCashUsd) || 0;
+        const splitEur = parseFloat(formData.splitCashEur) || 0;
+        const splitKkInTl = selectedPkg?.currency === 'USD' ? splitKk * usdRate : selectedPkg?.currency === 'EUR' ? splitKk * eurRate : splitKk;
+        const paidTl = splitKkInTl + splitTl + (splitUsd * usdRate) + (splitEur * eurRate);
+        const remaining = totalTl - paidTl;
+        const remainingInCurrency = selectedPkg?.currency === 'USD' ? remaining / usdRate : selectedPkg?.currency === 'EUR' ? remaining / eurRate : remaining;
+        const kkLabel = selectedPkg?.currency === 'USD' ? 'KK $' : selectedPkg?.currency === 'EUR' ? 'KK €' : 'KK ₺';
+
+        const canSubmit = splitMode ? Math.abs(remaining) < 0.99 : (!!formData.paymentType || isFree);
+        const submitHandler = showActiveMode ? handleActiveSale : handleAddSale;
+
+        return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-3 overscroll-contain" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div className="bg-gradient-to-b from-gray-900 to-[#0c0c14] border border-gray-700/60 rounded-2xl w-full max-w-2xl shadow-2xl transition-all duration-300 max-h-[92vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex-shrink-0 bg-gradient-to-r from-gray-900/95 via-gray-900/98 to-gray-900/95 backdrop-blur-xl border-b border-gray-700/50 px-5 py-3 rounded-t-2xl">
               <div className="flex items-center justify-between">
@@ -1588,558 +1629,364 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                   <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/25">
                     <Plus className="w-5 h-5 text-white" />
                   </div>
-                  <div>
-                    <h3 className="text-base font-bold text-white">Yeni Satış</h3>
-                    {selectedCategory && (
-                      <p className={`text-[11px] font-medium ${CATEGORY_CONFIG[selectedCategory]?.color || 'text-gray-500'}`}>
-                        {selectedCategory}
-                      </p>
-                    )}
-                  </div>
+                  <h3 className="text-base font-bold text-white">Yeni Satış</h3>
                 </div>
-                <button
-                  onClick={() => { setShowAddForm(false); setSelectedCategory(''); setErrorMessage(''); setSplitMode(false); }}
-                  className="text-gray-500 hover:text-white w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-800 transition-colors"
-                >
+                <button onClick={closeModal} className="text-gray-500 hover:text-white w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-800 transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
+
+              {/* Breadcrumb / özet çubuğu — seçilen adımlar tıklanınca geri döner */}
+              <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                {selectedCategory ? (
+                  <button
+                    onClick={goToCategory}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${cfg?.bg} ${cfg?.border} ${cfg?.color} hover:opacity-80`}
+                  >
+                    {selectedCategory} <X className="w-3 h-3 opacity-60" />
+                  </button>
+                ) : (
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-gray-800/60 border border-gray-700/50 text-gray-400">Kategori seçin</span>
+                )}
+                {selectedCategory && (
+                  <>
+                    <span className="text-gray-600 text-xs">→</span>
+                    {formData.packageId ? (
+                      <button
+                        onClick={goToPackage}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border bg-gray-800 border-gray-600 text-white hover:opacity-80 transition-colors"
+                      >
+                        {selectedPkg?.name}{formData.selectedCurrency ? ` (${formData.selectedCurrency})` : ''} <X className="w-3 h-3 opacity-60" />
+                      </button>
+                    ) : (
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-gray-800/40 border border-gray-700/40 text-gray-500">Paket seçin</span>
+                    )}
+                  </>
+                )}
+                {formData.packageId && hasAnyQty && (
+                  <>
+                    <span className="text-gray-600 text-xs">→</span>
+                    <span className="text-xs font-black px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+                      {total.toFixed(2)} {currSymbol}
+                      {selectedPkg?.currency !== 'TL' && <span className="opacity-70 font-normal"> ≈{totalTl.toFixed(0)}₺</span>}
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* ── SIDE-BY-SIDE LAYOUT: Sol=Kategori, Orta=Form, Sağ=Çoklu Ödeme ── */}
-            <div className="flex-1 overflow-hidden flex flex-col sm:flex-row">
-              {/* SOL PANEL: Kategori Seçimi (splitMode'da gizlenir) */}
-              {!splitMode && (
-              <div className="flex-shrink-0 sm:w-56 sm:border-r border-b sm:border-b-0 border-gray-700/40 p-3 sm:p-4 overflow-y-auto">
-                <>
-                <label className="block text-[10px] text-gray-500 mb-2 font-bold uppercase tracking-widest">Kategori</label>
-                <div className="flex sm:flex-col gap-1.5 overflow-x-auto sm:overflow-x-visible pb-1 sm:pb-0">
+            {/* FORM PANEL — tek sütun, adım adım */}
+            <div ref={modalScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+              {/* ── ADIM 1: Kategori ── */}
+              {wizardStep === 'category' && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {CATEGORY_GROUPS.map((group) => {
-                    const cfg = CATEGORY_CONFIG[group];
-                    const Icon = cfg.icon;
-                    const isActive = selectedCategory === group;
+                    const gcfg = CATEGORY_CONFIG[group];
+                    const Icon = gcfg.icon;
                     const pkgCount = kasaPackages.filter(p => p.category === group).length;
                     return (
                       <button
                         key={group}
+                        type="button"
                         onClick={() => {
                           setSelectedCategory(group);
                           setFormData({ ...formData, packageId: '', adultQty: '0', childQty: '0', infantQty: '0', paymentType: '', splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '', isCrossSale: group.startsWith('Çapraz'), selectedCurrency: '', payInTl: false });
                           setSplitMode(false);
+                          setWizardStep('package');
                         }}
                         disabled={pkgCount === 0}
-                        className={`relative flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all duration-200 text-left whitespace-nowrap sm:whitespace-normal sm:w-full flex-shrink-0 ${
+                        className={`relative flex flex-col items-center gap-2 px-3 py-4 rounded-xl border transition-all duration-200 min-h-[92px] ${
                           pkgCount === 0
                             ? 'opacity-30 cursor-not-allowed bg-gray-900 border-gray-800'
-                            : isActive
-                              ? `${cfg.bg} ${cfg.border} ring-2 ${cfg.ring} shadow-lg`
-                              : 'bg-gray-800/60 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600'
+                            : 'bg-gray-800/60 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600 active:scale-95'
                         }`}
                       >
-                        {isActive && (
-                          <div className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-gradient-to-br ${cfg.badge} flex items-center justify-center`}>
-                            <Check className="w-2.5 h-2.5 text-white" />
-                          </div>
-                        )}
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${isActive ? cfg.bg : 'bg-gray-700/50'} ${isActive ? cfg.border : 'border-gray-600/30'} border`}>
-                          <Icon className={`w-3.5 h-3.5 ${isActive ? cfg.color : 'text-gray-500'}`} />
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${gcfg.bg} ${gcfg.border} border`}>
+                          <Icon className={`w-4 h-4 ${gcfg.color}`} />
                         </div>
-                        <div className="min-w-0 pr-4">
-                          <p className={`text-xs font-bold truncate ${isActive ? cfg.color : 'text-gray-300'}`}>{group}</p>
-                          <p className={`text-[9px] truncate ${isActive ? 'text-gray-400' : 'text-gray-600'}`}>{cfg.desc}</p>
+                        <div className="text-center">
+                          <p className={`text-xs font-bold ${gcfg.color}`}>{group}</p>
+                          <p className="text-[9px] text-gray-500 mt-0.5">{gcfg.desc}</p>
                         </div>
                       </button>
                     );
                   })}
                 </div>
-                  </>
-              </div>
               )}
 
-              {/* FORM PANEL */}
-              <div ref={modalScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-5">
-                {/* Geri butonu - splitMode'da kategorilere dönmek için */}
-                {splitMode && (
+              {/* ── ADIM 2: Paket (+ döviz varsa) ── */}
+              {wizardStep === 'package' && selectedCategory && (
+                <div className="space-y-4">
                   <button
                     type="button"
-                    onClick={() => setSplitMode(false)}
-                    className="flex items-center gap-1.5 mb-3 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white bg-gray-800/60 border border-gray-700/50 hover:bg-gray-700 transition-all"
+                    onClick={goToCategory}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white bg-gray-800/60 border border-gray-700/50 hover:bg-gray-700 transition-all"
                   >
-                    <span>←</span> Kategorilere Dön
+                    ← Kategorilere Dön
                   </button>
-                )}
-                {!selectedCategory ? (
-                  <div className="text-center py-12 border border-dashed border-gray-700/50 rounded-xl bg-gray-800/20 h-full flex flex-col items-center justify-center">
-                    <Package className="w-10 h-10 text-gray-700 mx-auto mb-3" />
-                    <p className="text-sm text-gray-500 font-medium">Devam etmek için kategori seçin</p>
-                    <p className="text-[11px] text-gray-600 mt-1">Soldan bir satış kategorisi belirleyin</p>
+
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Paket</label>
+                    {isDualCurrencyCategory(selectedCategory) ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {getUniquePackageNames(selectedCategory).map((pkg) => {
+                          const selectedName = formData.packageId ? (kasaPackages.find(p => p.id === formData.packageId)?.name || '') : '';
+                          const baseSelectedName = selectedName ? cleanPkgName(selectedName) : '';
+                          const isSelected = baseSelectedName === pkg.name;
+                          return (
+                            <button
+                              key={pkg.name}
+                              type="button"
+                              onClick={() => {
+                                const isCross = selectedCategory.startsWith('Çapraz');
+                                const defaultCurrency: 'USD' | 'EUR' = 'USD';
+                                const resolvedId = resolvePackageId(pkg.name, defaultCurrency, selectedCategory);
+                                setFormData({ ...formData, packageId: resolvedId, isCrossSale: isCross, selectedCurrency: defaultCurrency });
+                              }}
+                              className={`px-3 py-3 rounded-xl border text-left transition-all min-h-[44px] ${
+                                isSelected
+                                  ? `${CATEGORY_CONFIG[selectedCategory].bg} ${CATEGORY_CONFIG[selectedCategory].border} ring-2 ${CATEGORY_CONFIG[selectedCategory].ring}`
+                                  : 'bg-gray-800/60 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600'
+                              }`}
+                            >
+                              <span className={`text-xs font-bold block truncate ${isSelected ? CATEGORY_CONFIG[selectedCategory].color : 'text-gray-300'}`}>{pkg.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {kasaPackages.filter(pkg => pkg.category === selectedCategory).map((pkg) => {
+                          const isSelected = formData.packageId === pkg.id;
+                          return (
+                            <button
+                              key={pkg.id}
+                              type="button"
+                              onClick={() => {
+                                const isCross = pkg.category?.startsWith('Çapraz');
+                                setFormData({ ...formData, packageId: pkg.id, isCrossSale: isCross ? true : false });
+                              }}
+                              className={`px-3 py-3 rounded-xl border text-left transition-all min-h-[44px] ${
+                                isSelected
+                                  ? `${CATEGORY_CONFIG[selectedCategory].bg} ${CATEGORY_CONFIG[selectedCategory].border} ring-2 ${CATEGORY_CONFIG[selectedCategory].ring}`
+                                  : 'bg-gray-800/60 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600'
+                              }`}
+                            >
+                              <span className={`text-xs font-bold block truncate ${isSelected ? CATEGORY_CONFIG[selectedCategory].color : 'text-gray-300'}`}>{pkg.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {/* ── ADIM 1: Paket Seçimi ── */}
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Paket</label>
-                      {isDualCurrencyCategory(selectedCategory) ? (
-                        /* Dövizli kategoriler: dokunmatik dostu kart listesi (benzersiz isim) */
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-0.5">
-                          {getUniquePackageNames(selectedCategory).map((pkg) => {
-                            const selectedName = formData.packageId ? (kasaPackages.find(p => p.id === formData.packageId)?.name || '') : '';
-                            const baseSelectedName = selectedName ? cleanPkgName(selectedName) : '';
-                            const isSelected = baseSelectedName === pkg.name;
-                            return (
-                              <button
-                                key={pkg.name}
-                                type="button"
-                                onClick={() => {
-                                  const isCross = selectedCategory.startsWith('Çapraz');
-                                  const defaultCurrency: 'USD' | 'EUR' = 'USD';
-                                  const resolvedId = resolvePackageId(pkg.name, defaultCurrency, selectedCategory);
-                                  setFormData({ ...formData, packageId: resolvedId, isCrossSale: isCross, selectedCurrency: defaultCurrency });
-                                }}
-                                className={`px-3 py-3 rounded-xl border text-left transition-all min-h-[44px] ${
-                                  isSelected
-                                    ? `${CATEGORY_CONFIG[selectedCategory].bg} ${CATEGORY_CONFIG[selectedCategory].border} ring-2 ${CATEGORY_CONFIG[selectedCategory].ring}`
-                                    : 'bg-gray-800/60 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600'
-                                }`}
-                              >
-                                <span className={`text-xs font-bold block truncate ${isSelected ? CATEGORY_CONFIG[selectedCategory].color : 'text-gray-300'}`}>{pkg.name}</span>
-                              </button>
-                            );
-                          })}
+
+                  {isDualCurrencyCategory(selectedCategory) && formData.packageId && (() => {
+                    const selectedPkgName = kasaPackages.find(p => p.id === formData.packageId)?.name || '';
+                    const usdPkg = kasaPackages.find(p => p.category === selectedCategory && p.name === selectedPkgName && p.currency === 'USD');
+                    const eurPkg = kasaPackages.find(p => p.category === selectedCategory && p.name === selectedPkgName && p.currency === 'EUR');
+                    return (
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Para Birimi</label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { if (usdPkg) setFormData({ ...formData, packageId: usdPkg.id, selectedCurrency: 'USD' }); }}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg border transition-all text-sm font-bold ${
+                              formData.selectedCurrency === 'USD' ? 'bg-amber-500/20 border-amber-400/60 text-amber-300' : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
+                            }`}
+                          >
+                            <DollarSign className="w-4 h-4" /> USD
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { if (eurPkg) setFormData({ ...formData, packageId: eurPkg.id, selectedCurrency: 'EUR' }); }}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg border transition-all text-sm font-bold ${
+                              formData.selectedCurrency === 'EUR' ? 'bg-blue-500/20 border-blue-400/60 text-blue-300' : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
+                            }`}
+                          >
+                            <Euro className="w-4 h-4" /> EUR
+                          </button>
                         </div>
-                      ) : (
-                        /* TL kategoriler: dokunmatik dostu kart listesi */
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-0.5">
-                          {kasaPackages.filter(pkg => pkg.category === selectedCategory).map((pkg) => {
-                            const isSelected = formData.packageId === pkg.id;
-                            return (
-                              <button
-                                key={pkg.id}
-                                type="button"
-                                onClick={() => {
-                                  const isCross = pkg.category?.startsWith('Çapraz');
-                                  setFormData({ ...formData, packageId: pkg.id, isCrossSale: isCross ? true : false });
-                                }}
-                                className={`px-3 py-3 rounded-xl border text-left transition-all min-h-[44px] ${
-                                  isSelected
-                                    ? `${CATEGORY_CONFIG[selectedCategory].bg} ${CATEGORY_CONFIG[selectedCategory].border} ring-2 ${CATEGORY_CONFIG[selectedCategory].ring}`
-                                    : 'bg-gray-800/60 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600'
-                                }`}
-                              >
-                                <span className={`text-xs font-bold block truncate ${isSelected ? CATEGORY_CONFIG[selectedCategory].color : 'text-gray-300'}`}>{pkg.name}</span>
-                              </button>
-                            );
-                          })}
+                      </div>
+                    );
+                  })()}
+
+                  {formData.packageId && (!isDualCurrencyCategory(selectedCategory) || formData.selectedCurrency) && (
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep('details')}
+                      className={`w-full bg-gradient-to-r ${cfg?.badge} hover:opacity-90 text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2`}
+                    >
+                      Devam Et <span aria-hidden>→</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* ── ADIM 3: Kişi Sayısı + Ödeme + Açıklama ── */}
+              {wizardStep === 'details' && selectedCategory && formData.packageId && (
+                <div className="space-y-4">
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep('package')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white bg-gray-800/60 border border-gray-700/50 hover:bg-gray-700 transition-all"
+                  >
+                    ← Paketlere Dön
+                  </button>
+
+                  {/* Kişi Sayısı */}
+                  <div className={`grid gap-2.5 ${hasAnyQty ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                    <QtyStepper label="Yetişkin" value={formData.adultQty} onChange={(v) => setFormData({ ...formData, adultQty: v })} accentColor="emerald" />
+                    <QtyStepper label="Çocuk" value={formData.childQty} onChange={(v) => setFormData({ ...formData, childQty: v })} accentColor="emerald" />
+                    {hasAnyQty && (
+                      <QtyStepper label="INF (ücretsiz)" value={formData.infantQty} onChange={(v) => setFormData({ ...formData, infantQty: v })} accentColor="sky" />
+                    )}
+                  </div>
+
+                  {/* Ödeme Yöntemi — sadece kişi seçilince */}
+                  {hasAnyQty && (
+                    <div className="space-y-2">
+                      {!splitMode && (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, paymentType: 'Nakit' })}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border transition-all text-sm font-bold ${
+                              formData.paymentType === 'Nakit' ? 'bg-blue-500/20 border-blue-400/60 text-blue-300' : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
+                            }`}
+                          >
+                            <Banknote className="w-4 h-4" /> Nakit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, paymentType: 'Kredi Kartı', payInTl: false })}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border transition-all text-sm font-bold ${
+                              formData.paymentType === 'Kredi Kartı' ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300' : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
+                            }`}
+                          >
+                            <CreditCard className="w-4 h-4" /> Kredi Kartı
+                          </button>
                         </div>
                       )}
-                    </div>
-
-                    {/* ── ADIM 2: DOLAR / EURO Seçimi (sadece dövizli kategorilerde) ── */}
-                    {isDualCurrencyCategory(selectedCategory) && formData.packageId && (() => {
-                      const selectedPkgName = kasaPackages.find(p => p.id === formData.packageId)?.name || '';
-                      const usdPkg = kasaPackages.find(p => p.category === selectedCategory && p.name === selectedPkgName && p.currency === 'USD');
-                      const eurPkg = kasaPackages.find(p => p.category === selectedCategory && p.name === selectedPkgName && p.currency === 'EUR');
-                      return (
-                        <div>
-                          <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Para Birimi</label>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => { if (usdPkg) setFormData({ ...formData, packageId: usdPkg.id, selectedCurrency: 'USD' }); }}
-                              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all text-sm font-bold ${
-                                formData.selectedCurrency === 'USD'
-                                  ? 'bg-amber-500/20 border-amber-400/60 text-amber-300'
-                                  : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
-                              }`}
-                            >
-                              <DollarSign className="w-4 h-4" /> USD
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => { if (eurPkg) setFormData({ ...formData, packageId: eurPkg.id, selectedCurrency: 'EUR' }); }}
-                              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all text-sm font-bold ${
-                                formData.selectedCurrency === 'EUR'
-                                  ? 'bg-blue-500/20 border-blue-400/60 text-blue-300'
-                                  : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
-                              }`}
-                            >
-                              <Euro className="w-4 h-4" /> EUR
-                            </button>
+                      {!splitMode && formData.paymentType === 'Nakit' && isDualCurrencyCategory(selectedCategory) && (
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, payInTl: !formData.payInTl })}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all text-sm ${
+                            formData.payInTl ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300' : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300 hover:border-gray-600'
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded flex-shrink-0 border flex items-center justify-center transition-all ${formData.payInTl ? 'bg-emerald-500 border-emerald-400' : 'bg-transparent border-gray-600'}`}>
+                            {formData.payInTl && <span className="text-white text-[10px] font-black leading-none">✓</span>}
                           </div>
-                        </div>
-                      );
-                    })()}
+                          <span className="font-semibold">TL Karşılığında Öde</span>
+                        </button>
+                      )}
 
-                    {/* ── ADIM 3: Kişi Sayısı ── */}
-                    {(() => {
-                      const pkgSelected = !!formData.packageId;
-                      const hasAny = (parseInt(formData.adultQty) || 0) > 0 || (parseInt(formData.childQty) || 0) > 0;
-                      return (
-                        <div className={`grid gap-2.5 ${hasAny && pkgSelected ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                          <QtyStepper
-                            label="Yetişkin"
-                            value={formData.adultQty}
-                            disabled={!pkgSelected}
-                            onChange={(v) => setFormData({ ...formData, adultQty: v })}
-                            accentColor="emerald"
-                          />
-                          <QtyStepper
-                            label="Çocuk"
-                            value={formData.childQty}
-                            disabled={!pkgSelected}
-                            onChange={(v) => setFormData({ ...formData, childQty: v })}
-                            accentColor="emerald"
-                          />
-                          {hasAny && pkgSelected && (
-                            <QtyStepper
-                              label="INF (ücretsiz)"
-                              value={formData.infantQty}
-                              onChange={(v) => setFormData({ ...formData, infantQty: v })}
-                              accentColor="sky"
-                            />
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {/* ── ADIM 4: Ödeme Yöntemi (buton ile aç/kapat) ── */}
-                    {(() => {
-                      const hasAny = (parseInt(formData.adultQty) || 0) > 0 || (parseInt(formData.childQty) || 0) > 0;
-                      if (!formData.packageId || !hasAny) return null;
-                      return (
-                        <div>
-                          {!splitMode && (
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setFormData({ ...formData, paymentType: 'Nakit' })}
-                                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border transition-all text-sm font-bold ${
-                                  formData.paymentType === 'Nakit'
-                                    ? 'bg-blue-500/20 border-blue-400/60 text-blue-300'
-                                    : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
-                                }`}
-                              >
-                                <Banknote className="w-4 h-4" /> Nakit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setFormData({ ...formData, paymentType: 'Kredi Kartı', payInTl: false })}
-                                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border transition-all text-sm font-bold ${
-                                  formData.paymentType === 'Kredi Kartı'
-                                    ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300'
-                                    : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
-                                }`}
-                              >
-                                <CreditCard className="w-4 h-4" /> Kredi Kartı
-                              </button>
-                            </div>
-                          )}
-                          {splitMode && (
-                            <div className="w-full px-3 py-2.5 bg-orange-900/20 border border-orange-500/30 rounded-xl text-orange-300 text-sm text-center font-semibold">
-                              Çoklu Ödeme
-                            </div>
-                          )}
-                          {/* TL Karşılığında Öde — sadece nakit + dövizli kategoride */}
-                          {!splitMode && formData.paymentType === 'Nakit' && isDualCurrencyCategory(selectedCategory) && formData.packageId && (
-                            <button
-                              type="button"
-                              onClick={() => setFormData({ ...formData, payInTl: !formData.payInTl })}
-                              className={`mt-2 w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all text-sm ${
-                                formData.payInTl
-                                  ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
-                                  : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300 hover:border-gray-600'
-                              }`}
-                            >
-                              <div className={`w-4 h-4 rounded flex-shrink-0 border flex items-center justify-center transition-all ${
-                                formData.payInTl
-                                  ? 'bg-emerald-500 border-emerald-400'
-                                  : 'bg-transparent border-gray-600'
-                              }`}>
-                                {formData.payInTl && <span className="text-white text-[10px] font-black leading-none">✓</span>}
-                              </div>
-                              <span className="font-semibold">TL Karşılığında Öde</span>
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {/* ── Açıklama (Comment) — opsiyonel, aktif modda DB'ye kaydedilir ── */}
-                    {integrationActive && (
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Açıklama <span className="text-gray-600 normal-case">(opsiyonel)</span></label>
-                        <input
-                          type="text"
-                          placeholder="Tur şirketi, rehber adı vb."
-                          value={formData.comment}
-                          onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
-                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-gray-600"
-                          maxLength={200}
-                        />
-                      </div>
-                    )}
-
-                    {/* Çapraz Satış badge */}
-                    {formData.isCrossSale && (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs bg-orange-500/10 border-orange-500/25 text-orange-400">
-                        <ArrowLeftRight className="w-3.5 h-3.5" />
-                        <span className="font-semibold">Çapraz Satış</span>
-                      </div>
-                    )}
-
-                    {/* ── Çoklu Ödeme Toggle ── */}
-                    {formData.packageId && ((parseInt(formData.adultQty) || 0) > 0 || (parseInt(formData.childQty) || 0) > 0) && (
                       <button
                         type="button"
                         onClick={() => {
                           setSplitMode(!splitMode);
-                          if (!splitMode) {
-                            setFormData({ ...formData, splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '' });
-                          }
+                          if (!splitMode) setFormData({ ...formData, splitKkTl: '', splitCashTl: '', splitCashUsd: '', splitCashEur: '' });
                         }}
                         className={`w-full py-2 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
-                          splitMode
-                            ? 'bg-orange-500/15 text-orange-300 border-orange-500/30'
-                            : 'bg-gray-800/60 text-gray-400 border-gray-700/50 hover:text-gray-200'
+                          splitMode ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' : 'bg-gray-800/60 text-gray-400 border-gray-700/50 hover:text-gray-200'
                         }`}
                       >
                         <Coins className="w-3 h-3" />
                         {splitMode ? 'Çoklu Ödemeyi Kapat' : 'Çoklu Ödeme'}
                       </button>
-                    )}
-                  </div>
-                )}
-              </div>
 
-              {/* SAĞ PANEL: Özet (paket + kişi girilince görünür) */}
-              {(() => {
-                const pkg = kasaPackages.find(p => p.id === formData.packageId);
-                const adultQ = parseInt(formData.adultQty) || 0;
-                const childQ = parseInt(formData.childQty) || 0;
-                const infantQ = parseInt(formData.infantQty) || 0;
-                const hasAny = adultQ > 0 || childQ > 0;
-                if (!pkg || !hasAny || splitMode) return null;
-                const currSymbol = pkg.currency === 'USD' ? '$' : pkg.currency === 'EUR' ? '€' : '₺';
-                const rate = pkg.currency === 'USD' ? usdRate : pkg.currency === 'EUR' ? eurRate : 0;
-                const total = adultQ * pkg.adultPrice + childQ * pkg.childPrice;
-                const totalTl = pkg.currency === 'TL' ? total : total * rate;
-                const isFree = pkg.adultPrice === 0 && pkg.childPrice === 0;
-                const cfg = CATEGORY_CONFIG[selectedCategory];
-                const showActiveMode = integrationActive;
-                const hasMappingForPkg = hasContractMapping(formData.packageId);
-                return (
-                  <div className="flex-shrink-0 sm:w-64 sm:border-l border-t sm:border-t-0 border-gray-700/40 p-3 sm:p-4 flex flex-col gap-3">
-                    <label className="block text-[10px] text-gray-400 font-bold uppercase tracking-widest">Özet</label>
-                    <div className="space-y-1.5">
-                      <div className="bg-gray-800/60 rounded-xl px-3 py-2">
-                        <p className="text-[10px] text-gray-500 mb-0.5">Paket</p>
-                        <p className="text-sm font-bold text-white truncate">{pkg.name}</p>
-                        {formData.selectedCurrency && <p className="text-[10px] text-gray-500">{formData.selectedCurrency}</p>}
-                      </div>
-                      {adultQ > 0 && (
-                        <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/40">
-                          <span className="text-xs text-gray-400">Yetişkin × {adultQ}</span>
-                          <span className="text-xs font-bold text-white">{(adultQ * pkg.adultPrice).toFixed(2)} {currSymbol}</span>
-                        </div>
-                      )}
-                      {childQ > 0 && (
-                        <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/40">
-                          <span className="text-xs text-gray-400">Çocuk × {childQ}</span>
-                          <span className="text-xs font-bold text-white">{(childQ * pkg.childPrice).toFixed(2)} {currSymbol}</span>
-                        </div>
-                      )}
-                      {infantQ > 0 && (
-                        <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/40">
-                          <span className="text-xs text-gray-400">INF × {infantQ}</span>
-                          <span className="text-xs font-bold text-sky-400">Ücretsiz</span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-900 border border-gray-700/50 mt-1">
-                        <span className="text-xs font-bold text-gray-300">Toplam</span>
-                        <div className="text-right">
-                          <p className="text-base font-black text-white">{total.toFixed(2)} <span className={`text-sm ${pkg.currency === 'USD' ? 'text-amber-400' : pkg.currency === 'EUR' ? 'text-blue-400' : 'text-emerald-400'}`}>{currSymbol}</span></p>
-                          {pkg.currency !== 'TL' && (
-                            formData.payInTl
-                              ? <p className="text-[10px] text-emerald-400 font-bold">= {totalTl.toFixed(2)} ₺ nakit</p>
-                              : <p className="text-[10px] text-gray-500">≈{totalTl.toFixed(0)} ₺</p>
-                          )}
-                        </div>
-                      </div>
-                      {formData.paymentType && (
-                        <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/40">
-                          <span className="text-xs text-gray-400">Ödeme</span>
-                          <span className={`text-xs font-bold ${formData.paymentType === 'Kredi Kartı' ? 'text-emerald-400' : 'text-blue-400'}`}>
-                            {formData.paymentType}{formData.payInTl && formData.paymentType === 'Nakit' ? ' (₺)' : ''}
-                          </span>
+                      {/* Çoklu Ödeme detay girişleri */}
+                      {splitMode && (
+                        <div className="bg-gray-800/40 border border-orange-500/20 rounded-xl p-3 space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { label: kkLabel, value: formData.splitKkTl, key: 'splitKkTl', placeholder: remainingInCurrency > 0.01 ? remainingInCurrency.toFixed(2) : '0', borderColor: 'border-emerald-600/50 focus:border-emerald-500' },
+                              { label: 'Nakit ₺', value: formData.splitCashTl, key: 'splitCashTl', placeholder: remaining > 0.01 ? remaining.toFixed(2) : '0', borderColor: 'border-blue-600/50 focus:border-blue-500' },
+                              { label: 'Nakit $', value: formData.splitCashUsd, key: 'splitCashUsd', placeholder: remaining > 0.01 ? (remaining / usdRate).toFixed(2) : '0', borderColor: 'border-amber-600/50 focus:border-amber-500' },
+                              { label: 'Nakit €', value: formData.splitCashEur, key: 'splitCashEur', placeholder: remaining > 0.01 ? (remaining / eurRate).toFixed(2) : '0', borderColor: 'border-violet-600/50 focus:border-violet-500' },
+                            ].map(({ label, value, key, placeholder, borderColor }) => (
+                              <div key={key}>
+                                <label className="block text-[9px] text-gray-400 mb-0.5 font-semibold">{label}</label>
+                                <input
+                                  type="number" min="0" step="0.01" value={value}
+                                  onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
+                                  placeholder={placeholder}
+                                  className={`w-full px-2 py-1.5 bg-gray-800/80 border ${borderColor} rounded-lg text-gray-200 text-xs focus:outline-none placeholder-gray-600 transition-colors`}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <div className={`text-[10px] font-bold text-center py-1.5 rounded-md border ${
+                            Math.abs(remaining) < 0.01 ? 'bg-emerald-900/30 text-emerald-400 border-emerald-700/40' : remaining > 0 ? 'bg-amber-900/30 text-amber-400 border-amber-700/40' : 'bg-red-900/30 text-red-400 border-red-700/40'
+                          }`}>
+                            {Math.abs(remaining) < 0.01 ? '✓ Tamamlandı' : remaining > 0 ? `Kalan: ${remainingInCurrency.toFixed(2)} ${currSymbol}` : `Fazla: ${Math.abs(remainingInCurrency).toFixed(2)} ${currSymbol}`}
+                          </div>
                         </div>
                       )}
                     </div>
-                    {showActiveMode && (
-                      <div className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] border ${integrationReady ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' : 'bg-yellow-500/10 border-yellow-500/25 text-yellow-400'}`}>
-                        <Database className="w-3 h-3" />
-                        <span className="font-semibold">{integrationReady ? 'Bağlantı Aktif' : 'Bağlantı Yok'}</span>
-                        {!hasMappingForPkg && <span className="text-yellow-400 ml-auto">⚠ eşleme yok</span>}
-                      </div>
-                    )}
-                    {errorMessage && (
-                      <div className="bg-red-500/10 text-red-300 text-xs px-3 py-2 rounded-xl border border-red-500/25">
-                        ⚠ {errorMessage}
-                      </div>
-                    )}
-                    <div className="mt-auto space-y-2">
-                      {showActiveMode ? (
-                        <button
-                          onClick={handleActiveSale}
-                          disabled={posProcessing || (!splitMode && !formData.paymentType && !isFree)}
-                          className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
-                        >
-                          <Zap className="w-4 h-4" /> {isFree ? 'Bilet Bas' : 'Ödeme Al'}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={handleAddSale}
-                          disabled={posProcessing || (!splitMode && !formData.paymentType && !isFree)}
-                          className={`w-full bg-gradient-to-r ${cfg.badge} hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2`}
-                        >
-                          <Check className="w-4 h-4" /> Satışı Kaydet
-                        </button>
-                      )}
-                      <button
-                        onClick={() => { setShowAddForm(false); setSelectedCategory(''); setErrorMessage(''); setSplitMode(false); }}
-                        className="w-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white py-2 rounded-xl transition-colors text-sm border border-gray-700 font-medium"
-                      >
-                        İptal
-                      </button>
+                  )}
+
+                  {/* Açıklama */}
+                  {integrationActive && (
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Açıklama <span className="text-gray-600 normal-case">(opsiyonel)</span></label>
+                      <input
+                        type="text"
+                        placeholder="Tur şirketi, rehber adı vb."
+                        value={formData.comment}
+                        onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-gray-600"
+                        maxLength={200}
+                      />
                     </div>
-                  </div>
-                );
-              })()}
+                  )}
 
-              {/* SAĞ PANEL: Çoklu Ödeme (splitMode aktifken görünür) */}
-              {splitMode && (
-              <div className="flex-shrink-0 sm:w-64 sm:border-l border-t sm:border-t-0 border-gray-700/40 p-3 sm:p-4 overflow-y-auto">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[10px] text-orange-400 font-bold uppercase tracking-widest">Çoklu Ödeme</label>
-                    {integrationActive && (
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${integrationReady ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' : 'bg-yellow-500/10 border-yellow-500/25 text-yellow-400'}`}>
-                        {integrationReady ? '● Aktif' : '● Bağlantı Yok'}
-                      </span>
-                    )}
-                  </div>
-                  {(() => {
-                    const selectedPkg = kasaPackages.find(p => p.id === formData.packageId);
-                    const adultQ = parseInt(formData.adultQty) || 0;
-                    const childQ = parseInt(formData.childQty) || 0;
-                    const saleTotal = selectedPkg ? (adultQ * selectedPkg.adultPrice + childQ * selectedPkg.childPrice) : 0;
-                    const saleCurrency = selectedPkg?.currency || 'TL';
-                    const totalInTl = saleCurrency === 'USD' ? saleTotal * usdRate : saleCurrency === 'EUR' ? saleTotal * eurRate : saleTotal;
-                    const splitKk = parseFloat(formData.splitKkTl) || 0;
-                    const splitTl = parseFloat(formData.splitCashTl) || 0;
-                    const splitUsd = parseFloat(formData.splitCashUsd) || 0;
-                    const splitEur = parseFloat(formData.splitCashEur) || 0;
-                    // KK dövizli pakette döviz cinsinden girilir
-                    const splitKkInTl = saleCurrency === 'USD' ? splitKk * usdRate : saleCurrency === 'EUR' ? splitKk * eurRate : splitKk;
-                    const paidTl = splitKkInTl + splitTl + (splitUsd * usdRate) + (splitEur * eurRate);
-                    const remaining = totalInTl - paidTl;
-                    const remainingInCurrency = saleCurrency === 'USD' ? remaining / usdRate : saleCurrency === 'EUR' ? remaining / eurRate : remaining;
-                    const currSym = saleCurrency === 'USD' ? '$' : saleCurrency === 'EUR' ? '€' : '₺';
-                    const kkLabel = saleCurrency === 'USD' ? 'KK $' : saleCurrency === 'EUR' ? 'KK €' : 'KK ₺';
+                  {formData.isCrossSale && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs bg-orange-500/10 border-orange-500/25 text-orange-400">
+                      <ArrowLeftRight className="w-3.5 h-3.5" />
+                      <span className="font-semibold">Çapraz Satış</span>
+                    </div>
+                  )}
 
-                    return saleTotal > 0 ? (
-                      <div className="space-y-2">
-                        {/* Özet */}
-                        <div className="bg-gray-800/60 rounded-xl px-3 py-2 space-y-1">
-                          <p className="text-xs font-bold text-white truncate">{selectedPkg?.name}</p>
-                          <div className="flex items-center justify-between text-[10px] text-gray-400">
-                            <span>
-                              {adultQ > 0 && `${adultQ} Yetişkin`}
-                              {adultQ > 0 && childQ > 0 && ' + '}
-                              {childQ > 0 && `${childQ} Çocuk`}
-                            </span>
-                            <span className="font-black text-white">
-                              {saleTotal.toFixed(2)} {currSym}
-                              {saleCurrency !== 'TL' && <span className="text-gray-500 font-normal"> ≈{totalInTl.toFixed(0)}₺</span>}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="space-y-1.5">
-                          {[
-                            { label: kkLabel, value: formData.splitKkTl, key: 'splitKkTl', placeholder: remainingInCurrency > 0.01 ? remainingInCurrency.toFixed(2) : '0', borderColor: 'border-emerald-600/50 focus:border-emerald-500' },
-                            { label: 'Nakit ₺', value: formData.splitCashTl, key: 'splitCashTl', placeholder: remaining > 0.01 ? remaining.toFixed(2) : '0', borderColor: 'border-blue-600/50 focus:border-blue-500' },
-                            { label: 'Nakit $', value: formData.splitCashUsd, key: 'splitCashUsd', placeholder: remaining > 0.01 ? (remaining / usdRate).toFixed(2) : '0', borderColor: 'border-amber-600/50 focus:border-amber-500' },
-                            { label: 'Nakit €', value: formData.splitCashEur, key: 'splitCashEur', placeholder: remaining > 0.01 ? (remaining / eurRate).toFixed(2) : '0', borderColor: 'border-violet-600/50 focus:border-violet-500' },
-                          ].map(({ label, value, key, placeholder, borderColor }) => (
-                            <div key={key}>
-                              <label className="block text-[9px] text-gray-400 mb-0.5 font-semibold">{label}</label>
-                              <input
-                                type="number" min="0" step="0.01" value={value}
-                                onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
-                                placeholder={placeholder}
-                                className={`w-full px-2 py-1.5 bg-gray-800/80 border ${borderColor} rounded-lg text-gray-200 text-xs focus:outline-none placeholder-gray-600 transition-colors`}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                        <div className={`text-[10px] font-bold text-center py-1.5 rounded-md border ${
-                          Math.abs(remaining) < 0.01
-                            ? 'bg-emerald-900/30 text-emerald-400 border-emerald-700/40'
-                            : remaining > 0
-                              ? 'bg-amber-900/30 text-amber-400 border-amber-700/40'
-                              : 'bg-red-900/30 text-red-400 border-red-700/40'
-                        }`}>
-                          {Math.abs(remaining) < 0.01
-                            ? '✓ Tamamlandı'
-                            : remaining > 0
-                              ? `Kalan: ${remainingInCurrency.toFixed(2)} ${currSym}`
-                              : `Fazla: ${Math.abs(remainingInCurrency).toFixed(2)} ${currSym}`
-                          }
-                        </div>
-                        {/* Satışı Kaydet / Ödeme Al butonu */}
-                        {errorMessage && (
-                          <div className="bg-red-500/10 text-red-300 text-xs px-3 py-2 rounded-xl border border-red-500/25">
-                            ⚠ {errorMessage}
-                          </div>
-                        )}
-                        <div className="space-y-2 pt-1">
-                          {integrationActive ? (
-                            <button
-                              onClick={handleActiveSale}
-                              disabled={posProcessing || Math.abs(remaining) > 0.99}
-                              className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
-                            >
-                              <Zap className="w-4 h-4" /> Ödeme Al
-                            </button>
-                          ) : (
-                            <button
-                              onClick={handleAddSale}
-                              disabled={posProcessing || Math.abs(remaining) > 0.99}
-                              className={`w-full bg-gradient-to-r ${CATEGORY_CONFIG[selectedCategory]?.badge || 'from-orange-600 to-orange-700'} hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2`}
-                            >
-                              <Check className="w-4 h-4" /> Satışı Kaydet
-                            </button>
-                          )}
-                          <button
-                            onClick={() => setSplitMode(false)}
-                            className="w-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white py-2 rounded-xl transition-colors text-sm border border-gray-700 font-medium"
-                          >
-                            İptal
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-gray-800/40 border border-orange-500/20 rounded-lg p-2.5 flex items-center justify-center text-xs text-gray-500">
-                        Paket ve miktar seçin
-                      </div>
-                    );
-                  })()}
+                  {showActiveMode && (
+                    <div className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] border ${integrationReady ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' : 'bg-yellow-500/10 border-yellow-500/25 text-yellow-400'}`}>
+                      <Database className="w-3 h-3" />
+                      <span className="font-semibold">{integrationReady ? 'Bağlantı Aktif' : 'Bağlantı Yok'}</span>
+                      {!hasMappingForPkg && <span className="text-yellow-400 ml-auto">⚠ eşleme yok</span>}
+                    </div>
+                  )}
+
+                  {errorMessage && (
+                    <div className="bg-red-500/10 text-red-300 text-xs px-3 py-2 rounded-xl border border-red-500/25">⚠ {errorMessage}</div>
+                  )}
                 </div>
-              </div>
               )}
             </div>
+
+            {/* Alt sabit buton çubuğu — sadece adım 3'te ödeme al/kaydet + iptal */}
+            {wizardStep === 'details' && (
+              <div className="flex-shrink-0 border-t border-gray-700/50 p-4 flex gap-2.5">
+                <button
+                  onClick={submitHandler}
+                  disabled={posProcessing || !hasAnyQty || !canSubmit}
+                  className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-4 h-4" /> {isFree ? 'Bilet Bas' : 'Ödeme Al'}
+                </button>
+                <button
+                  onClick={closeModal}
+                  className="px-6 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white py-3 rounded-xl transition-colors text-sm border border-gray-700 font-medium"
+                >
+                  İptal
+                </button>
+              </div>
+            )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── HAFTALIK HEDEF PROGRESS BAR ── */}
       {weeklyTarget > 0 && (
@@ -2584,28 +2431,34 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
 
             {/* Hata butonları */}
             {posProcessingStep === 'error' && (
-              <div className="flex gap-2 mt-5">
-                <button
-                  onClick={() => {
-                    setPosProcessingStep('pos');
-                    setPosProcessingError('');
-                    handleActiveSale();
-                  }}
-                  className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white py-2.5 rounded-xl font-bold text-sm transition-all"
-                >
-                  Tekrar Dene
-                </button>
-                <button
-                  onClick={() => {
-                    setShowPosProcessingModal(false);
-                    setPosProcessingStep('pos');
-                    setPosProcessingError('');
-                  }}
-                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white py-2.5 rounded-xl text-sm border border-gray-700 font-medium transition-all"
-                >
-                  İptal
-                </button>
-              </div>
+              <>
+                <div className="bg-yellow-500/10 border border-yellow-500/25 rounded-xl px-3 py-2.5 mt-4 text-yellow-300 text-xs flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>Tekrar denemeden önce POS cihazının ekranını kontrol edin — işlem cihazda onaylanmış olabilir. Emin değilseniz tekrar denemeyin, kasa sorumlusuna danışın.</span>
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => {
+                      setPosProcessingStep('pos');
+                      setPosProcessingError('');
+                      handleActiveSale();
+                    }}
+                    className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white py-2.5 rounded-xl font-bold text-sm transition-all"
+                  >
+                    Tekrar Dene
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowPosProcessingModal(false);
+                      setPosProcessingStep('pos');
+                      setPosProcessingError('');
+                    }}
+                    className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white py-2.5 rounded-xl text-sm border border-gray-700 font-medium transition-all"
+                  >
+                    Kapat
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>
