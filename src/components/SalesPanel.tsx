@@ -1621,9 +1621,9 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
 
         return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-3 overscroll-contain" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
-          <div className="bg-gradient-to-b from-gray-900 to-[#0c0c14] border border-gray-700/60 rounded-2xl w-full max-w-2xl shadow-2xl transition-all duration-300 max-h-[92vh] flex flex-col">
+          <div className="bg-gradient-to-b from-gray-900 to-[#0c0c14] border border-gray-700/60 rounded-2xl w-full max-w-4xl shadow-2xl transition-all duration-300 max-h-[92vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="flex-shrink-0 bg-gradient-to-r from-gray-900/95 via-gray-900/98 to-gray-900/95 backdrop-blur-xl border-b border-gray-700/50 px-5 py-3 rounded-t-2xl">
+            <div className="flex-shrink-0 bg-gradient-to-r from-gray-900/95 via-gray-900/98 to-gray-900/95 backdrop-blur-xl border-b border-gray-700/50 px-5 py-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/25">
@@ -1636,7 +1636,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                 </button>
               </div>
 
-              {/* Breadcrumb / özet çubuğu — seçilen adımlar tıklanınca geri döner */}
+              {/* Breadcrumb — seçilen adımlar tıklanınca geri döner */}
               <div className="flex items-center gap-1.5 mt-3 flex-wrap">
                 {selectedCategory ? (
                   <button
@@ -1663,17 +1663,10 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                     )}
                   </>
                 )}
-                {formData.packageId && hasAnyQty && (
-                  <>
-                    <span className="text-gray-600 text-xs">→</span>
-                    <span className="text-xs font-black px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
-                      {total.toFixed(2)} {currSymbol}
-                      {selectedPkg?.currency !== 'TL' && <span className="opacity-70 font-normal"> ≈{totalTl.toFixed(0)}₺</span>}
-                    </span>
-                  </>
-                )}
               </div>
             </div>
+
+            <div className="flex-1 overflow-hidden flex flex-col sm:flex-row">
 
             {/* FORM PANEL — tek sütun, adım adım */}
             <div ref={modalScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
@@ -1765,6 +1758,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                               onClick={() => {
                                 const isCross = pkg.category?.startsWith('Çapraz');
                                 setFormData({ ...formData, packageId: pkg.id, isCrossSale: isCross ? true : false });
+                                setWizardStep('details');
                               }}
                               className={`px-3 py-3 rounded-xl border text-left transition-all min-h-[44px] ${
                                 isSelected
@@ -1790,7 +1784,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => { if (usdPkg) setFormData({ ...formData, packageId: usdPkg.id, selectedCurrency: 'USD' }); }}
+                            onClick={() => { if (usdPkg) { setFormData({ ...formData, packageId: usdPkg.id, selectedCurrency: 'USD' }); setWizardStep('details'); } }}
                             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg border transition-all text-sm font-bold ${
                               formData.selectedCurrency === 'USD' ? 'bg-amber-500/20 border-amber-400/60 text-amber-300' : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
                             }`}
@@ -1799,7 +1793,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                           </button>
                           <button
                             type="button"
-                            onClick={() => { if (eurPkg) setFormData({ ...formData, packageId: eurPkg.id, selectedCurrency: 'EUR' }); }}
+                            onClick={() => { if (eurPkg) { setFormData({ ...formData, packageId: eurPkg.id, selectedCurrency: 'EUR' }); setWizardStep('details'); } }}
                             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg border transition-all text-sm font-bold ${
                               formData.selectedCurrency === 'EUR' ? 'bg-blue-500/20 border-blue-400/60 text-blue-300' : 'bg-gray-800/60 border-gray-700/50 text-gray-500 hover:text-gray-300'
                             }`}
@@ -1810,16 +1804,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                       </div>
                     );
                   })()}
-
-                  {formData.packageId && (!isDualCurrencyCategory(selectedCategory) || formData.selectedCurrency) && (
-                    <button
-                      type="button"
-                      onClick={() => setWizardStep('details')}
-                      className={`w-full bg-gradient-to-r ${cfg?.badge} hover:opacity-90 text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2`}
-                    >
-                      Devam Et <span aria-hidden>→</span>
-                    </button>
-                  )}
                 </div>
               )}
 
@@ -1943,13 +1927,6 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                     </div>
                   )}
 
-                  {formData.isCrossSale && (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs bg-orange-500/10 border-orange-500/25 text-orange-400">
-                      <ArrowLeftRight className="w-3.5 h-3.5" />
-                      <span className="font-semibold">Çapraz Satış</span>
-                    </div>
-                  )}
-
                   {showActiveMode && (
                     <div className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] border ${integrationReady ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' : 'bg-yellow-500/10 border-yellow-500/25 text-yellow-400'}`}>
                       <Database className="w-3 h-3" />
@@ -1965,24 +1942,92 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               )}
             </div>
 
-            {/* Alt sabit buton çubuğu — sadece adım 3'te ödeme al/kaydet + iptal */}
+            {/* FİŞ / VOUCHER ÖZET PANELİ — sadece adım 3'te, Ödeme Al burada */}
             {wizardStep === 'details' && (
-              <div className="flex-shrink-0 border-t border-gray-700/50 p-4 flex gap-2.5">
-                <button
-                  onClick={submitHandler}
-                  disabled={posProcessing || !hasAnyQty || !canSubmit}
-                  className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
-                >
-                  <Zap className="w-4 h-4" /> {isFree ? 'Bilet Bas' : 'Ödeme Al'}
-                </button>
-                <button
-                  onClick={closeModal}
-                  className="px-6 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white py-3 rounded-xl transition-colors text-sm border border-gray-700 font-medium"
-                >
-                  İptal
-                </button>
+              <div className="flex-shrink-0 sm:w-72 border-t sm:border-t-0 sm:border-l border-gray-700/50 bg-gray-950/60 p-4 flex flex-col gap-3 overflow-y-auto">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-md bg-orange-500/15 border border-orange-500/30 flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-3.5 h-3.5 text-orange-400" />
+                  </div>
+                  <p className="text-xs font-bold text-gray-300 uppercase tracking-widest">Sipariş Özeti</p>
+                </div>
+
+                <div className="bg-gray-900 border border-dashed border-gray-700 rounded-xl p-3.5 space-y-2.5">
+                  <div className="pb-2.5 border-b border-dashed border-gray-700">
+                    <p className="text-[10px] text-gray-500">Kategori</p>
+                    <p className="text-sm font-bold text-white">{selectedCategory}</p>
+                  </div>
+                  <div className="pb-2.5 border-b border-dashed border-gray-700">
+                    <p className="text-[10px] text-gray-500">Paket</p>
+                    <p className="text-sm font-bold text-white truncate">{selectedPkg?.name}{formData.selectedCurrency ? ` (${formData.selectedCurrency})` : ''}</p>
+                  </div>
+
+                  {hasAnyQty && (
+                    <div className="pb-2.5 border-b border-dashed border-gray-700 space-y-1">
+                      {adultQ > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-400">Yetişkin × {adultQ}</span>
+                          <span className="font-bold text-white">{(adultQ * (selectedPkg?.adultPrice || 0)).toFixed(2)} {currSymbol}</span>
+                        </div>
+                      )}
+                      {childQ > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-400">Çocuk × {childQ}</span>
+                          <span className="font-bold text-white">{(childQ * (selectedPkg?.childPrice || 0)).toFixed(2)} {currSymbol}</span>
+                        </div>
+                      )}
+                      {infantQ > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-400">INF × {infantQ}</span>
+                          <span className="font-bold text-sky-400">Ücretsiz</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {(formData.paymentType || splitMode) && (
+                    <div className="pb-2.5 border-b border-dashed border-gray-700">
+                      <p className="text-[10px] text-gray-500">Ödeme</p>
+                      <p className={`text-sm font-bold ${splitMode ? 'text-orange-300' : formData.paymentType === 'Kredi Kartı' ? 'text-emerald-400' : 'text-blue-400'}`}>
+                        {splitMode ? 'Çoklu Ödeme' : formData.paymentType}{formData.payInTl && formData.paymentType === 'Nakit' ? ' (₺)' : ''}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Toplam</span>
+                    <div className="text-right">
+                      <p className="text-lg font-black text-white">{total.toFixed(2)} <span className="text-sm text-emerald-400">{currSymbol}</span></p>
+                      {selectedPkg?.currency !== 'TL' && <p className="text-[10px] text-gray-500">≈{totalTl.toFixed(0)} ₺</p>}
+                    </div>
+                  </div>
+                </div>
+
+                {showActiveMode && !integrationReady && (
+                  <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] border bg-yellow-500/10 border-yellow-500/25 text-yellow-400">
+                    <Database className="w-3 h-3" />
+                    <span className="font-semibold">Sistem bağlantısı yok</span>
+                  </div>
+                )}
+
+                <div className="mt-auto space-y-2 pt-2">
+                  <button
+                    onClick={submitHandler}
+                    disabled={posProcessing || !hasAnyQty || !canSubmit}
+                    className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
+                  >
+                    <Zap className="w-4 h-4" /> {isFree ? 'Bilet Bas' : 'Ödeme Al'}
+                  </button>
+                  <button
+                    onClick={closeModal}
+                    className="w-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white py-2 rounded-xl transition-colors text-sm border border-gray-700 font-medium"
+                  >
+                    İptal
+                  </button>
+                </div>
               </div>
             )}
+            </div>
           </div>
         </div>
         );
