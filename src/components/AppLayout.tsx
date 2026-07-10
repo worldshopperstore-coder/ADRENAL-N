@@ -26,7 +26,6 @@ const REGULAR_TABS = [
   { id: 'dashboard', label: 'Panolar', icon: LayoutDashboard, hideForPersonel: false },
   { id: 'packages', label: 'Paketler', icon: Package, hideForPersonel: true },
   { id: 'aquarium', label: 'Rapor', icon: Droplets, hideForPersonel: false },
-  { id: 'crosssales', label: 'Çapraz Satış', icon: Share2, hideForPersonel: false },
   { id: 'team', label: 'Ekibim', icon: Users, hideForPersonel: false },
 ];
 

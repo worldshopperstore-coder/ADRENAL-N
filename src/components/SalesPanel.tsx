@@ -13,6 +13,7 @@ import {
 import { getKasaSettings, loadAdvancesFromSupabase } from '@/utils/kasaSettingsDB';
 import { processActiveSale, processActiveRefund, checkIntegrationReady, hasContractMapping, type ActiveSaleRequest, type ActiveSaleResult } from '@/utils/saleFlow';
 import { getContractMapping } from '@/data/atlantisContracts';
+import QtyStepper from './QtyStepper';
 import { isIntegrationEnabled } from '@/utils/posManager';
 import { printTickets, buildTicketPrintData } from '@/utils/ticketPrinter';
 import { getWeeklyTarget, getWeeklyProgress, getCurrentWeekStart } from '@/utils/weeklyTargetsDB';
@@ -108,6 +109,8 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
   const [refundTargetSale, setRefundTargetSale] = useState<Sale | null>(null);
   const [refundInfo, setRefundInfo] = useState<RefundInfo>({ reason: '', refundPaymentType: 'Nakit', kkRefundTxId: '' });
   const [refundProcessing, setRefundProcessing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
   const CATEGORY_GROUPS = ['Münferit', 'Visitor', 'Çapraz Münferit', 'Çapraz Visitor', 'Acenta', 'Ücretsiz'] as const;
   const CATEGORY_CONFIG: Record<string, { icon: typeof Tag; color: string; bg: string; border: string; ring: string; badge: string; desc: string }> = {
     'Münferit': { icon: Tag, color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', ring: 'ring-emerald-500/20', badge: 'from-emerald-500 to-emerald-600', desc: 'Bireysel TL satışlar' },
@@ -1446,6 +1449,22 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
     cashEur: sales.reduce((sum, s) => sum + s.cashEur, 0),
   }), [sales]);
 
+  // Tablo görünümü: çapraz satışlar hariç (kendi ayrı tablosunda gösterilir),
+  // iade edilmiş/ücretsiz satışlar hariç — özet kartlardaki toplamlar (yukarıda)
+  // buna bağlı değil, kasadaki gerçek parayı yansıtmaya devam eder.
+  const tableSales = useMemo(
+    () => sales.filter(s => !s.isRefund && s.category !== 'Ücretsiz' && !s.isCrossSale),
+    [sales]
+  );
+  const totalPages = Math.max(1, Math.ceil(tableSales.length / PAGE_SIZE));
+  const pagedSales = useMemo(
+    () => tableSales.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [tableSales, currentPage]
+  );
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages, currentPage]);
+
   const totalAdultCount = sales.reduce((sum, s) => sum + s.adultQty, 0);
   const totalChildCount = sales.reduce((sum, s) => sum + s.childQty, 0);
   const refundCount = sales.filter(s => s.isRefund).length;
@@ -1643,48 +1662,56 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                     <div>
                       <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Paket</label>
                       {isDualCurrencyCategory(selectedCategory) ? (
-                        /* Dövizli kategoriler: Benzersiz isim listesi */
-                        <div className="relative">
-                          <select
-                            value={formData.packageId ? (kasaPackages.find(p => p.id === formData.packageId)?.name || '') : ''}
-                            onChange={(e) => {
-                              const pkgName = e.target.value;
-                              const isCross = selectedCategory.startsWith('Çapraz');
-                              if (!pkgName) {
-                                setFormData({ ...formData, packageId: '', isCrossSale: isCross, selectedCurrency: '' });
-                              } else {
-                                const defaultCurrency: 'USD' | 'EUR' = 'USD';
-                                const resolvedId = resolvePackageId(pkgName, defaultCurrency, selectedCategory);
-                                setFormData({ ...formData, packageId: resolvedId, isCrossSale: isCross, selectedCurrency: defaultCurrency });
-                              }
-                            }}
-                            className={`w-full px-3 py-2.5 bg-gray-800 border rounded-xl text-white text-sm focus:outline-none transition-colors appearance-none pr-8 ${CATEGORY_CONFIG[selectedCategory].border}`}
-                          >
-                            <option value="">Paket Seçiniz...</option>
-                            {getUniquePackageNames(selectedCategory).map((pkg) => (
-                              <option key={pkg.name} value={pkg.name}>{pkg.name}</option>
-                            ))}
-                          </select>
-                          <ChevronRight className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none" />
+                        /* Dövizli kategoriler: dokunmatik dostu kart listesi (benzersiz isim) */
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-0.5">
+                          {getUniquePackageNames(selectedCategory).map((pkg) => {
+                            const selectedName = formData.packageId ? (kasaPackages.find(p => p.id === formData.packageId)?.name || '') : '';
+                            const baseSelectedName = selectedName ? cleanPkgName(selectedName) : '';
+                            const isSelected = baseSelectedName === pkg.name;
+                            return (
+                              <button
+                                key={pkg.name}
+                                type="button"
+                                onClick={() => {
+                                  const isCross = selectedCategory.startsWith('Çapraz');
+                                  const defaultCurrency: 'USD' | 'EUR' = 'USD';
+                                  const resolvedId = resolvePackageId(pkg.name, defaultCurrency, selectedCategory);
+                                  setFormData({ ...formData, packageId: resolvedId, isCrossSale: isCross, selectedCurrency: defaultCurrency });
+                                }}
+                                className={`px-3 py-3 rounded-xl border text-left transition-all min-h-[44px] ${
+                                  isSelected
+                                    ? `${CATEGORY_CONFIG[selectedCategory].bg} ${CATEGORY_CONFIG[selectedCategory].border} ring-2 ${CATEGORY_CONFIG[selectedCategory].ring}`
+                                    : 'bg-gray-800/60 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600'
+                                }`}
+                              >
+                                <span className={`text-xs font-bold block truncate ${isSelected ? CATEGORY_CONFIG[selectedCategory].color : 'text-gray-300'}`}>{pkg.name}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       ) : (
-                        /* TL kategoriler: Normal paket listesi */
-                        <div className="relative">
-                          <select
-                            value={formData.packageId}
-                            onChange={(e) => {
-                              const selectedPkg = kasaPackages.find(p => p.id === e.target.value);
-                              const isCross = selectedPkg?.category?.startsWith('Çapraz');
-                              setFormData({ ...formData, packageId: e.target.value, isCrossSale: isCross ? true : false });
-                            }}
-                            className={`w-full px-3 py-2.5 bg-gray-800 border rounded-xl text-white text-sm focus:outline-none transition-colors appearance-none pr-8 ${CATEGORY_CONFIG[selectedCategory].border}`}
-                          >
-                            <option value="">Paket Seçiniz...</option>
-                            {kasaPackages.filter(pkg => pkg.category === selectedCategory).map((pkg) => (
-                              <option key={pkg.id} value={pkg.id}>{pkg.name}</option>
-                            ))}
-                          </select>
-                          <ChevronRight className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none" />
+                        /* TL kategoriler: dokunmatik dostu kart listesi */
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-0.5">
+                          {kasaPackages.filter(pkg => pkg.category === selectedCategory).map((pkg) => {
+                            const isSelected = formData.packageId === pkg.id;
+                            return (
+                              <button
+                                key={pkg.id}
+                                type="button"
+                                onClick={() => {
+                                  const isCross = pkg.category?.startsWith('Çapraz');
+                                  setFormData({ ...formData, packageId: pkg.id, isCrossSale: isCross ? true : false });
+                                }}
+                                className={`px-3 py-3 rounded-xl border text-left transition-all min-h-[44px] ${
+                                  isSelected
+                                    ? `${CATEGORY_CONFIG[selectedCategory].bg} ${CATEGORY_CONFIG[selectedCategory].border} ring-2 ${CATEGORY_CONFIG[selectedCategory].ring}`
+                                    : 'bg-gray-800/60 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600'
+                                }`}
+                              >
+                                <span className={`text-xs font-bold block truncate ${isSelected ? CATEGORY_CONFIG[selectedCategory].color : 'text-gray-300'}`}>{pkg.name}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -1731,33 +1758,27 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                       const hasAny = (parseInt(formData.adultQty) || 0) > 0 || (parseInt(formData.childQty) || 0) > 0;
                       return (
                         <div className={`grid gap-2.5 ${hasAny && pkgSelected ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                          <div>
-                            <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Yetişkin</label>
-                            <input
-                              type="number" min="0" value={formData.adultQty}
-                              disabled={!pkgSelected}
-                              onChange={(e) => setFormData({ ...formData, adultQty: e.target.value })}
-                              className={`w-full px-3 py-2.5 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm text-center focus:outline-none focus:border-emerald-500 transition-colors ${!pkgSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">Çocuk</label>
-                            <input
-                              type="number" min="0" value={formData.childQty}
-                              disabled={!pkgSelected}
-                              onChange={(e) => setFormData({ ...formData, childQty: e.target.value })}
-                              className={`w-full px-3 py-2.5 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm text-center focus:outline-none focus:border-emerald-500 transition-colors ${!pkgSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
-                            />
-                          </div>
+                          <QtyStepper
+                            label="Yetişkin"
+                            value={formData.adultQty}
+                            disabled={!pkgSelected}
+                            onChange={(v) => setFormData({ ...formData, adultQty: v })}
+                            accentColor="emerald"
+                          />
+                          <QtyStepper
+                            label="Çocuk"
+                            value={formData.childQty}
+                            disabled={!pkgSelected}
+                            onChange={(v) => setFormData({ ...formData, childQty: v })}
+                            accentColor="emerald"
+                          />
                           {hasAny && pkgSelected && (
-                            <div>
-                              <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wider">INF <span className="text-gray-600 normal-case">(ücretsiz)</span></label>
-                              <input
-                                type="number" min="0" value={formData.infantQty}
-                                onChange={(e) => setFormData({ ...formData, infantQty: e.target.value })}
-                                className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700/80 rounded-xl text-white text-sm text-center focus:outline-none focus:border-sky-500 transition-colors"
-                              />
-                            </div>
+                            <QtyStepper
+                              label="INF (ücretsiz)"
+                              value={formData.infantQty}
+                              onChange={(v) => setFormData({ ...formData, infantQty: v })}
+                              accentColor="sky"
+                            />
                           )}
                         </div>
                       );
@@ -2149,7 +2170,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         <>
           {/* Mobile Card View */}
           <div className="sm:hidden space-y-2">
-            {sales.filter(s => !s.isRefund && s.category !== 'Ücretsiz').map((sale) => {
+            {pagedSales.map((sale) => {
               const refundEntry = sales.find(s => s.isRefund && s.refundOfSaleId === sale.id);
               const isRefunded = !!refundEntry;
               return (
@@ -2221,7 +2242,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                   </tr>
                 </thead>
               <tbody className="divide-y divide-gray-800/50">
-                {sales.filter(s => !s.isRefund && s.category !== 'Ücretsiz').map((sale, idx) => {
+                {pagedSales.map((sale, idx) => {
                   const refundEntry = sales.find(s => s.isRefund && s.refundOfSaleId === sale.id);
                   const isRefunded = !!refundEntry;
                   return (
@@ -2298,7 +2319,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
                   <td className="px-3 py-3 text-white font-black text-xs">TOPLAM</td>
                   <td className="px-3 py-3 text-center text-white font-bold text-xs">{totalAdultCount}</td>
                   <td className="px-3 py-3 text-center text-white font-bold text-xs">{totalChildCount}</td>
-                  <td className="px-3 py-3 text-center text-gray-400 text-xs font-medium">{sales.filter(s => !s.isRefund).length} satış</td>
+                  <td className="px-3 py-3 text-center text-gray-400 text-xs font-medium">{tableSales.length} satış</td>
                   <td className="px-3 py-3"></td>
                   <td className="px-3 py-3 text-right text-white font-black text-xs">{(totals.kkTl + totals.cashTl + (totals.cashUsd * usdRate) + (totals.cashEur * eurRate)).toFixed(2)}</td>
                   <td className="px-3 py-3 text-right text-emerald-400 font-black text-xs">{totals.kkTl.toFixed(2)}</td>
@@ -2311,6 +2332,29 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
             </table>
           </div>
         </div>
+
+          {/* Sayfalama */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-2 rounded-lg text-xs font-bold bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 border border-gray-700 transition-colors"
+              >
+                ← Önceki
+              </button>
+              <span className="text-xs text-gray-400 font-medium px-2">
+                Sayfa <span className="text-white font-bold">{currentPage}</span> / {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 rounded-lg text-xs font-bold bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 border border-gray-700 transition-colors"
+              >
+                Sonraki →
+              </button>
+            </div>
+          )}
         </>
       )}
 

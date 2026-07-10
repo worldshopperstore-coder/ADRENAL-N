@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import SalesPanel from './SalesPanel';
+import CrossSalesTab from './CrossSalesTab';
 import { initializeKasaSettings } from '@/utils/kasaSettingsDB';
 import { loadExchangeRates, loadExchangeRatesFromSupabase } from '@/utils/dailyData';
 
@@ -63,9 +64,11 @@ export default function DashboardTab() {
   }
 
   return (
-    <div className="p-2 sm:p-4 space-y-4">
+    <div className="p-2 sm:p-4 space-y-6">
       {/* Satış Panosu (Tam genişlik) */}
       <SalesPanel usdRate={usdRate} eurRate={eurRate} />
+      {/* Çapraz Satışlar — ayrı tablo, ayrı rapor butonu */}
+      <CrossSalesTab />
     </div>
   );
 }

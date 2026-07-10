@@ -29,6 +29,8 @@ interface CrossSale {
 export default function CrossSalesTab() {
   const [crossSales, setCrossSales] = useState<CrossSale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   // Firebase'den çapraz satışları yükle
   useEffect(() => {
@@ -690,6 +692,13 @@ export default function CrossSalesTab() {
   const eurRateComp = kasaSettings.eurRate || 50.4877;
   const grandTotal = totals.kkTl + totals.cashTl + (totals.cashUsd * usdRateComp) + (totals.cashEur * eurRateComp);
 
+  const tableCrossSales = crossSales.filter(s => !s.isRefund);
+  const totalPages = Math.max(1, Math.ceil(tableCrossSales.length / PAGE_SIZE));
+  const pagedCrossSales = tableCrossSales.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages, currentPage]);
+
   return (
     <div className="p-3 sm:p-4 space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -732,7 +741,7 @@ export default function CrossSalesTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700/30">
-                {crossSales.filter(s => !s.isRefund).map((sale, idx) => {
+                {pagedCrossSales.map((sale, idx) => {
                   const refundEntry = crossSales.find(s => s.isRefund && s.refundOfSaleId === sale.id);
                   const isRefunded = !!refundEntry;
                   return (
@@ -789,7 +798,7 @@ export default function CrossSalesTab() {
                   <td className="px-3 py-3 text-white font-black text-xs">TOPLAM</td>
                   <td className="px-3 py-3 text-center text-white font-bold text-xs">{totals.totalAdult}</td>
                   <td className="px-3 py-3 text-center text-white font-bold text-xs">{totals.totalChild}</td>
-                  <td className="px-3 py-3 text-center text-gray-400 text-xs font-medium">{crossSales.filter(s => !s.isRefund).length} satış</td>
+                  <td className="px-3 py-3 text-center text-gray-400 text-xs font-medium">{tableCrossSales.length} satış</td>
                   <td className="px-3 py-3"></td>
                   <td className="px-3 py-3 text-right text-white font-black text-xs">{(totals.kkTl + totals.cashTl).toFixed(2)}</td>
                   <td className="px-3 py-3 text-right text-emerald-400 font-bold text-xs">{totals.kkTl.toFixed(2)}</td>
@@ -801,6 +810,29 @@ export default function CrossSalesTab() {
               </tfoot>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Sayfalama */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-1">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-2 rounded-lg text-xs font-bold bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 border border-gray-700 transition-colors"
+          >
+            ← Önceki
+          </button>
+          <span className="text-xs text-gray-400 font-medium px-2">
+            Sayfa <span className="text-white font-bold">{currentPage}</span> / {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-2 rounded-lg text-xs font-bold bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 border border-gray-700 transition-colors"
+          >
+            Sonraki →
+          </button>
         </div>
       )}
 
