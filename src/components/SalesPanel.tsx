@@ -1661,10 +1661,10 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               </div>
             </div>
 
-            <div className="flex-1 overflow-hidden flex flex-col sm:flex-row gap-0 sm:gap-4 p-0 sm:p-4 sm:pt-3">
+            <div className="flex-1 overflow-hidden flex flex-col sm:flex-row">
 
             {/* FORM PANEL — tek sütun, adım adım */}
-            <div ref={modalScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-0 space-y-4">
+            <div ref={modalScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
               {/* ── ADIM 1: Kategori ── */}
               {wizardStep === 'category' && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -1937,9 +1937,9 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
               )}
             </div>
 
-            {/* FİŞ / VOUCHER ÖZET PANELİ — sadece adım 3'te, Ödeme Al burada; ayrı bir kart gibi görünsün diye form panelinden bağımsız kenarlık/gölge */}
+            {/* FİŞ / VOUCHER ÖZET PANELİ — sadece adım 3'te, Ödeme Al burada */}
             {wizardStep === 'details' && (
-              <div className="flex-shrink-0 sm:w-72 mt-4 sm:mt-0 border sm:rounded-2xl border-gray-700/60 bg-gray-950/80 shadow-lg p-4 flex flex-col gap-3 overflow-y-auto">
+              <div className="flex-shrink-0 sm:w-72 border-t sm:border-t-0 sm:border-l border-gray-700/50 bg-gray-950/60 p-4 flex flex-col gap-3 overflow-y-auto">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded-md bg-orange-500/15 border border-orange-500/30 flex items-center justify-center flex-shrink-0">
                     <FileText className="w-3.5 h-3.5 text-orange-400" />
