@@ -11,6 +11,7 @@ import {
 } from '@/utils/performanceDB';
 import { getAllPersonnelFromFirebase } from '@/utils/personnelSupabaseDB';
 import { getTodayRate } from '@/utils/dailyData';
+import { getCurrentWeekStart, getWeekEnd } from '@/utils/weeklyTargetsDB';
 import { INITIAL_PACKAGES } from '@/data/packages';
 import type { Personnel } from '@/types/personnel';
 
@@ -60,8 +61,13 @@ function getDateRange(period: Period): { start: string; end: string } {
   const today = new Date();
   const fmt = (d: Date) => d.toISOString().split('T')[0];
   if (period === 'week') {
-    const s = new Date(today); s.setDate(s.getDate() - 6);
-    return { start: fmt(s), end: fmt(today) };
+    // Satış Panosu/Haftalık Hedef ile aynı tanım: Pazartesi-Pazar takvim haftası
+    // (önceden burada "son 7 gün" kayan pencere kullanılıyordu, iki ekran farklı
+    // "bu hafta" gösteriyordu). Bitiş bugünü geçmesin diye min() alınıyor.
+    const weekStart = getCurrentWeekStart();
+    const weekEnd = getWeekEnd(weekStart);
+    const end = weekEnd < fmt(today) ? weekEnd : fmt(today);
+    return { start: weekStart, end };
   }
   if (period === 'month') {
     return { start: fmt(new Date(today.getFullYear(), today.getMonth(), 1)), end: fmt(today) };

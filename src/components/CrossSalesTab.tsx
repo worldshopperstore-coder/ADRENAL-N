@@ -85,6 +85,7 @@ const CrossSalesTab = forwardRef<CrossSalesTabHandle>(function CrossSalesTab(_pr
   }, [crossSales, isLoading]);
 
   const handleDelete = (id: string) => {
+    if (!window.confirm('Bu çapraz satış kaydını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
     setCrossSales(crossSales.filter(s => s.id !== id));
   };
 
