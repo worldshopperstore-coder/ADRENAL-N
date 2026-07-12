@@ -85,6 +85,10 @@ const CrossSalesTab = forwardRef<CrossSalesTabHandle>(function CrossSalesTab(_pr
   }, [crossSales, isLoading]);
 
   const handleDelete = (id: string) => {
+    // Aktif modda satış zaten Atlantis DB'ye yazılmış/bilet basılmış olabilir —
+    // silme değil İade Et akışı kullanılmalı. Buton zaten integrationActive
+    // iken gizleniyor, burası ek güvenlik.
+    if (integrationActive) return;
     if (!window.confirm('Bu çapraz satış kaydını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
     setCrossSales(crossSales.filter(s => s.id !== id));
   };
@@ -1061,13 +1065,15 @@ const CrossSalesTab = forwardRef<CrossSalesTabHandle>(function CrossSalesTab(_pr
                               <Printer className="w-3.5 h-3.5" />
                             </button>
                           )}
-                          <button
-                            onClick={() => handleDelete(sale.id)}
-                            title="Sil"
-                            className="text-gray-500 hover:text-red-400 p-1.5 sm:p-0.5 rounded transition-colors hover:bg-red-500/10"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {!integrationActive && (
+                            <button
+                              onClick={() => handleDelete(sale.id)}
+                              title="Sil"
+                              className="text-gray-500 hover:text-red-400 p-1.5 sm:p-0.5 rounded transition-colors hover:bg-red-500/10"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
