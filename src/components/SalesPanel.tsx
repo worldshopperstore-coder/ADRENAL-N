@@ -1616,43 +1616,41 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         const submitHandler = showActiveMode ? handleActiveSale : handleAddSale;
 
         return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-3 overscroll-contain" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+        <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-50 p-3 overscroll-contain" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
           <div className="bg-gradient-to-b from-gray-900 to-[#0c0c14] border border-gray-700/60 rounded-2xl w-full max-w-4xl shadow-2xl transition-all duration-300 max-h-[92vh] flex flex-col overflow-hidden">
-            {/* Modal Header */}
+            {/* Modal Header — breadcrumb ve kapatma tek satırda */}
             <div className="flex-shrink-0 bg-gray-900 border-b border-gray-700/50 px-5 py-3">
-              <div className="flex items-center justify-end">
-                <button onClick={closeModal} className="text-gray-500 hover:text-white w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-800 transition-colors">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                  {selectedCategory ? (
+                    <button
+                      onClick={goToCategory}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${cfg?.bg} ${cfg?.border} ${cfg?.color} hover:opacity-80`}
+                    >
+                      {selectedCategory} <X className="w-3 h-3 opacity-60" />
+                    </button>
+                  ) : (
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-gray-800/60 border border-gray-700/50 text-gray-400">Kategori seçin</span>
+                  )}
+                  {selectedCategory && (
+                    <>
+                      <span className="text-gray-600 text-xs">→</span>
+                      {formData.packageId ? (
+                        <button
+                          onClick={goToPackage}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border bg-gray-800 border-gray-600 text-white hover:opacity-80 transition-colors"
+                        >
+                          {selectedPkg?.name}{formData.selectedCurrency ? ` (${formData.selectedCurrency})` : ''} <X className="w-3 h-3 opacity-60" />
+                        </button>
+                      ) : (
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-gray-800/40 border border-gray-700/40 text-gray-500">Paket seçin</span>
+                      )}
+                    </>
+                  )}
+                </div>
+                <button onClick={closeModal} className="flex-shrink-0 text-gray-500 hover:text-white w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-800 transition-colors">
                   <X className="w-5 h-5" />
                 </button>
-              </div>
-
-              {/* Breadcrumb — seçilen adımlar tıklanınca geri döner */}
-              <div className="flex items-center gap-1.5 mt-3 flex-wrap">
-                {selectedCategory ? (
-                  <button
-                    onClick={goToCategory}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${cfg?.bg} ${cfg?.border} ${cfg?.color} hover:opacity-80`}
-                  >
-                    {selectedCategory} <X className="w-3 h-3 opacity-60" />
-                  </button>
-                ) : (
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-gray-800/60 border border-gray-700/50 text-gray-400">Kategori seçin</span>
-                )}
-                {selectedCategory && (
-                  <>
-                    <span className="text-gray-600 text-xs">→</span>
-                    {formData.packageId ? (
-                      <button
-                        onClick={goToPackage}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border bg-gray-800 border-gray-600 text-white hover:opacity-80 transition-colors"
-                      >
-                        {selectedPkg?.name}{formData.selectedCurrency ? ` (${formData.selectedCurrency})` : ''} <X className="w-3 h-3 opacity-60" />
-                      </button>
-                    ) : (
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-gray-800/40 border border-gray-700/40 text-gray-500">Paket seçin</span>
-                    )}
-                  </>
-                )}
               </div>
             </div>
 
