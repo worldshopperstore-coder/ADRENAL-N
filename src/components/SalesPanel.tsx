@@ -526,7 +526,7 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         cashUsd = splitPayments.cashUsd || 0;
         cashEur = splitPayments.cashEur || 0;
       } else {
-        const distribution = calculateSaleDistribution(total, selectedPackage.currency, formData.paymentType, usdRate, eurRate);
+        const distribution = calculateSaleDistribution(total, selectedPackage.currency, formData.paymentType, usdRate, eurRate, formData.payInTl);
         kkTl = distribution.kkTl;
         cashTl = distribution.cashTl;
         cashUsd = distribution.cashUsd;

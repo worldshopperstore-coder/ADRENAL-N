@@ -1,4 +1,5 @@
 import { supabase } from '@/config/supabase';
+import { getTodayRate } from '@/utils/dailyData';
 
 export interface WeeklyTarget {
   kasaId: string;
@@ -100,26 +101,9 @@ export async function getWeeklyProgress(kasaId: string, weekStart?: string): Pro
     if (error) throw error;
     if (!data || data.length === 0) return { totalTl: 0, personnelBreakdown: [] };
 
-    let usdRate = 0, eurRate = 0;
-    try {
-      // Tüm kasa localStorage key'lerini dene
-      const kasaKeys = ['wildpark', 'sinema', 'face2face', 'xd-sinema', 'xd'];
-      for (const kid of kasaKeys) {
-        const r = JSON.parse(localStorage.getItem(`exchange_rates_${kid}`) || 'null');
-        if (r?.usd && r?.eur) { usdRate = Number(r.usd); eurRate = Number(r.eur); break; }
-      }
-      if (!usdRate || !eurRate) {
-        const r = JSON.parse(localStorage.getItem('exchange_rates') || '{}');
-        usdRate = Number(r.usd) || 0;
-        eurRate = Number(r.eur) || 0;
-      }
-      // Supabase'den dene
-      if ((!usdRate || !eurRate) && supabase) {
-        const { data: kr } = await supabase.from('kasa_rates').select('usd, eur').limit(1);
-        if (kr?.[0]) { usdRate = Number(kr[0].usd); eurRate = Number(kr[0].eur); }
-      }
-    } catch { /* default */ }
-    // Kur yoksa dövizli satışları 0 sayarak devam et (TL satışları yine hesaplanır)
+    // Sidebar'dan girilen kur, günlük tarihli — bugün girilmediyse en son
+    // girilen (dünkü/önceki) kur otomatik kullanılır (bkz. dailyData.ts).
+    const { usd: usdRate, eur: eurRate } = await getTodayRate();
 
     let totalTl = 0;
     const personnelMap: Record<string, { name: string; totalTl: number }> = {};

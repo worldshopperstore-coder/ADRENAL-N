@@ -10,7 +10,7 @@ import {
   type DatedSale,
 } from '@/utils/performanceDB';
 import { getAllPersonnelFromFirebase } from '@/utils/personnelSupabaseDB';
-import { loadExchangeRatesFromSupabase } from '@/utils/dailyData';
+import { getTodayRate } from '@/utils/dailyData';
 import { INITIAL_PACKAGES } from '@/data/packages';
 import type { Personnel } from '@/types/personnel';
 
@@ -122,6 +122,10 @@ function KasaOzetiView({ sales, crossSales, rates }: {
       const catMap: Record<string, { count: number; revenue: number }> = {};
       for (const s of ks) {
         const cat = guessCategory(s.packageName, s.category);
+        // Ücretsiz satışlar PAX (kişi) sayımına giriyor (revenue/kasaData
+        // toplamları yukarıda tüm ks üzerinden hesaplanıyor) ama kategori
+        // kırılım tablosunda ayrı bir satır olarak gösterilmiyor.
+        if (cat === 'Ücretsiz') continue;
         if (!catMap[cat]) catMap[cat] = { count: 0, revenue: 0 };
         catMap[cat].count += (s.adultQty || 0) + (s.childQty || 0);
         catMap[cat].revenue += toTL(s, rates.usd, rates.eur);
@@ -135,11 +139,15 @@ function KasaOzetiView({ sales, crossSales, rates }: {
       const dailyMap: Record<string, number> = {};
       for (const s of ks) dailyMap[s.date] = (dailyMap[s.date] || 0) + toTL(s, rates.usd, rates.eur);
 
+      // PAX (kişi sayısı) — Ücretsiz satışlar da dahil, tüm ks üzerinden
+      const persons = ks.reduce((acc, s) => acc + (s.adultQty || 0) + (s.childQty || 0), 0);
+
       return {
         kasaId,
         revenue,
         crossCount: kc.length,
         saleCount: ks.length,
+        persons,
         catMap,
         topPkg: topPkg ? topPkg[0] : null,
         dailyMap,
@@ -193,6 +201,7 @@ function KasaOzetiView({ sales, crossSales, rates }: {
 
               <div className="flex flex-wrap gap-3 text-xs">
                 <span className="text-gray-400">{k.saleCount} satış</span>
+                <span className="text-sky-400 font-medium">{k.persons} kişi</span>
                 <span className="text-orange-400 font-medium">{k.crossCount} çapraz</span>
                 {k.topPkg && <span className={`${info.text} font-semibold`}><Star className="w-3 h-3 inline" /> {k.topPkg}</span>}
               </div>
@@ -670,7 +679,9 @@ export default function PerformanceTab() {
   const [rates, setRates]         = useState({ usd: 30, eur: 50.4877 });
 
   useEffect(() => {
-    loadExchangeRatesFromSupabase().then(setRates);
+    // Sidebar'dan girilen kur, günlük tarihli — bugün girilmediyse
+    // en son girilen (dünkü/önceki) kur otomatik kullanılır.
+    getTodayRate().then(setRates);
   }, []);
 
   useEffect(() => {
@@ -681,8 +692,11 @@ export default function PerformanceTab() {
       getAllCrossSalesForDateRange(start, end),
       getAllPersonnelFromFirebase(),
     ]).then(([s, cs, p]) => {
-      setSales(s);
-      setCross(cs);
+      // İadeler ciro/PAX hesabına hiç girmemeli — SalesPanel/CrossSalesTab
+      // zaten iadeleri filtreliyor, Performans'ın da aynı gerçek veriyi
+      // göstermesi için burada tek merkezden filtreleniyor.
+      setSales(s.filter(x => !x.isRefund));
+      setCross(cs.filter(x => !x.isRefund));
       setPersonnel(p);
       setLoading(false);
     }).catch(err => {

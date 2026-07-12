@@ -151,6 +151,62 @@ export async function loadExchangeRatesFromSupabase(): Promise<{ usd: number; eu
 }
 
 /**
+ * Sistem genelinde TEK DOĞRU kur kaynağı: sidebar'dan (Ayarlar > Günlük Kurlar)
+ * girilen kur, günlük tarihli olarak (daily_rates tablosu) saklanır.
+ * Bugün için kur girilmediyse, en son girilmiş önceki günün kuru kullanılır
+ * (carry-forward). Hiç kayıt yoksa kasa_rates'teki (kasa bazlı "son kur")
+ * değere, o da yoksa varsayılana (30 / 50.4877) düşer.
+ *
+ * Performans, haftalık hedef, çapraz mutabakat gibi kur kullanan TÜM
+ * modüller bu fonksiyonu çağırmalı — aksi halde her modül kendi
+ * varsayılanını (bazısı 30, bazısı 0) kullanıp birbirinden farklı ciro
+ * gösterir.
+ */
+export async function getRateForDate(dateStr: string): Promise<{ usd: number; eur: number }> {
+  try {
+    const { supabase } = await import('@/config/supabase');
+    if (!supabase) throw new Error('offline');
+
+    // 1) O günün kaydı var mı?
+    const { data: exact } = await supabase
+      .from('daily_rates')
+      .select('usd, eur')
+      .eq('date', dateStr)
+      .maybeSingle();
+    if (exact) {
+      return { usd: Number(exact.usd) || 30, eur: Number(exact.eur) || 50.4877 };
+    }
+
+    // 2) Yoksa o günden önceki en son girilen kur (carry-forward)
+    const { data: prev } = await supabase
+      .from('daily_rates')
+      .select('usd, eur')
+      .lt('date', dateStr)
+      .order('date', { ascending: false })
+      .limit(1);
+    if (prev && prev[0]) {
+      return { usd: Number(prev[0].usd) || 30, eur: Number(prev[0].eur) || 50.4877 };
+    }
+
+    // 3) daily_rates hiç kayıt içermiyorsa kasa_rates'teki (son girilen) kura düş
+    const { data: kasaRate } = await supabase
+      .from('kasa_rates')
+      .select('usd, eur')
+      .limit(1);
+    if (kasaRate && kasaRate[0]) {
+      return { usd: Number(kasaRate[0].usd) || 30, eur: Number(kasaRate[0].eur) || 50.4877 };
+    }
+  } catch { /* offline / hata — localStorage'a düş */ }
+
+  return loadExchangeRates();
+}
+
+/** Bugünün kuru — daily_rates'te bugün yoksa en son önceki güne (carry-forward) düşer. */
+export async function getTodayRate(): Promise<{ usd: number; eur: number }> {
+  return getRateForDate(getTodayDate());
+}
+
+/**
  * Çapraz satışları kaydeder (KASA BAZLI)
  */
 export function saveCrossSales(crossSales: any[]): void {

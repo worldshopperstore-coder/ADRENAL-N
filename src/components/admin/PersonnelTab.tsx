@@ -306,8 +306,8 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
           gross = Math.round((Date.now() - new Date(att.check_in).getTime()) / 60000);
         } else {
           // Geçmiş gün, çıkış yapılmamış → shift endTime'a kadar say
-          if (endTime) {
-            const [eH, eM] = endTime.split(':').map(Number);
+          if (daySchedule.endTime) {
+            const [eH, eM] = daySchedule.endTime.split(':').map(Number);
             const endDt = new Date(`${dateStr}T00:00:00`);
             endDt.setHours(eH, eM, 0, 0);
             gross = Math.round((endDt.getTime() - new Date(att.check_in).getTime()) / 60000);
@@ -316,7 +316,8 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
             gross = Math.round((new Date(`${dateStr}T23:59:00`).getTime() - new Date(att.check_in).getTime()) / 60000);
           }
         }
-        row.grossWorkedMin = gross; row.breakMin = 0; row.workedMin = gross;
+        const brk = calcBreakMin(gross);
+        row.grossWorkedMin = gross; row.breakMin = brk; row.workedMin = Math.max(0, gross - brk);
         row.suspicious = !isToday; // Geçmiş günde çıkış yoksa her zaman şüpheli işaretle
         row.status = 'normal';
       } else if (scheduledMin > 0 && dateStr <= fmtDate(today)) {
@@ -819,7 +820,7 @@ function PersonnelDetailModal({ person, onClose }: { person: Personnel; onClose:
                             className={`rounded-lg flex flex-col items-center justify-center py-1.5 text-center cursor-default select-none ${cc} ${isToday ? 'ring-2 ring-orange-400' : ''}`}>
                             <span className="text-[11px] font-bold leading-none">{d}</span>
                             {row?.actualStart && <span className="text-[8px] leading-none mt-0.5 opacity-70">{row.actualStart}</span>}
-                            {row?.workedMin > 0 && <span className="text-[8px] leading-none opacity-60">{minutesToHM(row.workedMin)}</span>}
+                            {!!row?.workedMin && row.workedMin > 0 && <span className="text-[8px] leading-none opacity-60">{minutesToHM(row.workedMin)}</span>}
                           </div>
                         );
                       }
