@@ -1533,47 +1533,50 @@ export default function SalesPanel({ usdRate = 30, eurRate = 50.4877, onSalesUpd
         </div>
       </div>
 
-      {/* ── SUMMARY: Toplam öne çıkmış, PAX/Satış yanında, kırılım altta rozet olarak ── */}
+      {/* ── SUMMARY CARDS ── */}
       {sales.length > 0 && (
-        <div className="space-y-2.5">
-          <div className="grid grid-cols-1 sm:grid-cols-[1.6fr_1fr] gap-2.5">
-            <div className="bg-gray-900 border border-gray-800 border-l-[3px] border-l-orange-500 rounded-xl px-5 py-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">Toplam</p>
-              <p className="text-[26px] leading-none font-black text-white">{grandTotal.toFixed(2)} <span className="text-base font-bold text-gray-500">₺</span></p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+          <div className="bg-gradient-to-br from-orange-950/80 to-gray-900 rounded-xl border border-orange-500/30 p-3 shadow-lg shadow-orange-500/10 ring-1 ring-orange-500/10">
+            <div className="flex items-center gap-2 mb-1.5">
+              <CreditCard className="w-4 h-4 text-orange-400" />
+              <span className="text-[10px] text-orange-300/70 font-bold uppercase tracking-widest">Kredi Kartı</span>
             </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="bg-gray-900 border border-gray-800 rounded-xl px-3.5 py-3">
-                <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-gray-500 mb-1"><Users className="w-3 h-3" /> PAX</div>
-                <p className="text-sm font-black text-white">{totalAdultCount + totalChildCount} <span className="text-[10px] font-normal text-gray-500">kişi</span></p>
-              </div>
-              <div className="bg-gray-900 border border-gray-800 rounded-xl px-3.5 py-3">
-                <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-gray-500 mb-1"><ShoppingCart className="w-3 h-3" /> Satış</div>
-                <p className="text-sm font-black text-white">{sales.length} <span className="text-[10px] font-normal text-gray-500">adet</span></p>
-              </div>
-            </div>
+            <p className="text-lg font-black text-orange-400">{totals.kkTl.toFixed(2)} <span className="text-xs font-normal text-orange-500/60">₺</span></p>
           </div>
-
-          <div className="flex flex-wrap gap-2">
-            <div className="flex items-center gap-1.5 bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-xs">
-              <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="font-bold text-white">{totals.kkTl.toFixed(2)}₺</span>
-              <span className="text-gray-500">Kredi Kartı</span>
+          <div className="bg-gradient-to-br from-blue-950/80 to-gray-900 rounded-xl border border-blue-500/30 p-3 shadow-[0_0_20px_rgba(59,130,246,0.15)] ring-1 ring-blue-500/10">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Banknote className="w-4 h-4 text-blue-400" />
+              <span className="text-[10px] text-blue-300/70 font-bold uppercase tracking-widest">Nakit TL</span>
             </div>
-            <div className="flex items-center gap-1.5 bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-xs">
-              <Banknote className="w-3.5 h-3.5 text-blue-400" />
-              <span className="font-bold text-white">{totals.cashTl.toFixed(2)}₺</span>
-              <span className="text-gray-500">Nakit TL</span>
+            <p className="text-lg font-black text-blue-400">{totals.cashTl.toFixed(2)} <span className="text-xs font-normal text-blue-500/60">₺</span></p>
+          </div>
+          <div className="bg-gradient-to-br from-amber-950/80 to-gray-900 rounded-xl border border-amber-500/30 p-3 shadow-vibrant-amber ring-1 ring-amber-500/10">
+            <div className="flex items-center gap-2 mb-1.5">
+              <DollarSign className="w-4 h-4 text-amber-400" />
+              <span className="text-[10px] text-amber-300/70 font-bold uppercase tracking-widest">USD</span>
             </div>
-            <div className="flex items-center gap-1.5 bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-xs">
-              <DollarSign className="w-3.5 h-3.5 text-amber-400" />
-              <span className="font-bold text-white">{totals.cashUsd.toFixed(2)}</span>
-              <span className="text-gray-500">USD</span>
+            <p className="text-lg font-black text-amber-400">{totals.cashUsd.toFixed(2)} <span className="text-xs font-normal text-amber-500/60">$</span></p>
+          </div>
+          <div className="bg-gradient-to-br from-violet-950/80 to-gray-900 rounded-xl border border-violet-500/30 p-3 shadow-vibrant-violet ring-1 ring-violet-500/10">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Euro className="w-4 h-4 text-violet-400" />
+              <span className="text-[10px] text-violet-300/70 font-bold uppercase tracking-widest">EUR</span>
             </div>
-            <div className="flex items-center gap-1.5 bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-xs">
-              <Euro className="w-3.5 h-3.5 text-violet-400" />
-              <span className="font-bold text-white">{totals.cashEur.toFixed(2)}</span>
-              <span className="text-gray-500">EUR</span>
+            <p className="text-lg font-black text-violet-400">{totals.cashEur.toFixed(2)} <span className="text-xs font-normal text-violet-500/60">€</span></p>
+          </div>
+          <div className="bg-gradient-to-br from-sky-950/80 to-gray-900 rounded-xl border border-sky-500/30 p-3 shadow-vibrant-sky ring-1 ring-sky-500/10">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Users className="w-4 h-4 text-sky-400" />
+              <span className="text-[10px] text-sky-300/70 font-bold uppercase tracking-widest">PAX</span>
             </div>
+            <p className="text-lg font-black text-sky-400">{totalAdultCount}<span className="text-xs font-normal text-sky-500/60"> Yetişkin</span> + {totalChildCount}<span className="text-xs font-normal text-sky-500/60"> Çocuk</span></p>
+          </div>
+          <div className="bg-gradient-to-br from-red-950/80 to-gray-900 rounded-xl border border-red-400/40 p-3 shadow-lg shadow-red-500/10 ring-1 ring-red-400/20">
+            <div className="flex items-center gap-2 mb-1.5">
+              <TrendingUp className="w-4 h-4 text-white" />
+              <span className="text-[10px] text-red-300/70 font-bold uppercase tracking-widest">Toplam</span>
+            </div>
+            <p className="text-lg font-black text-white">{grandTotal.toFixed(2)} <span className="text-xs font-normal text-gray-400">₺</span></p>
           </div>
         </div>
       )}
